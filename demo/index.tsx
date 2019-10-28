@@ -5,8 +5,8 @@ import { render } from 'react-dom'
 import MattersEditor from '../src'
 
 const demoMentionUsers = [
-  { id: uuid(), displayName: 'user1', userName: "user1" },
-  { id: uuid(), displayName: 'user2', userName: "user2" }
+  { id: uuid(), displayName: 'user1', userName: 'user1' },
+  { id: uuid(), displayName: 'user2', userName: 'user2' }
 ]
 
 const DemoMentionList = ({ mentionLoading, mentionSelection, mentionUsers }) => {
