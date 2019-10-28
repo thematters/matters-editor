@@ -431,3 +431,12 @@
     transform: rotate(360deg);
   }
 }
+
+.u-area-disable {
+  cursor: not-allowed;
+  opacity: 0.5;
+
+  & > * {
+    pointer-events: none;
+  }
+}

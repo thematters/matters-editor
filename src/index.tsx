@@ -24,6 +24,7 @@ interface Props {
   mentionKeywordChange: (keyword: string) => void
   mentionUsers: any
   mentionListComponent: any
+  readOnly: boolean
   siteDomain: string
   theme: string
   texts?: Texts
@@ -180,6 +181,8 @@ export default class MattersEditor extends React.Component<Props, State> {
   storeMentionInstance = (instance: any) => this.setState({ mentionInstance: instance })
 
   render() {
+    const classes = (this.props.readOnly ? 'u-area-disable' : '')
+
     const modulesConfig = {
       ...MODULE_CONFIG,
       imageDrop: {
@@ -199,14 +202,16 @@ export default class MattersEditor extends React.Component<Props, State> {
       <>
         <MattersEditorTitle
           defaultValue={this.props.titleDefaultValue}
+          readOnly={this.props.readOnly}
           texts={this.texts}
           update={this.props.editorUpdate}
         />
-        <div id="editor-container">
+        <div id="editor-container" className={classes}>
           <ReactQuill
             formats={FORMAT_CONFIG}
             modules={modulesConfig}
             placeholder={this.texts.EDITOR_PLACEHOLDER}
+            readOnly={this.props.readOnly}
             ref={this.editorReference}
             theme={this.props.theme}
             value={this.state.content}

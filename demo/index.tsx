@@ -70,6 +70,7 @@ const App = () => {
       mentionKeywordChange={mentionKeywordChange}
       mentionUsers={demoMentionUsers}
       mentionListComponent={DemoMentionList}
+      readOnly={false}
       siteDomain=""
       theme="bubble"
       titleDefaultValue=""

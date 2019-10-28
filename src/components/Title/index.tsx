@@ -1,3 +1,4 @@
+import classNames from 'classnames'
 import * as React from 'react'
 
 /**
@@ -6,13 +7,15 @@ import * as React from 'react'
  * Usage:
  *   <MattersEditorTitle
  *     devaultValue="Default title"
- *     update={() => func({ title: '' }}}
+ *     readOnly={false}
  *     texts={{}}
+ *     update={() => func({ title: '' }}}
  *   />
  */
 
 interface Props {
   defaultValue?: string
+  readOnly: boolean
   texts: Texts
   update: (params: { title: any }) => void
 }
@@ -21,7 +24,9 @@ const getValidTitleValue = (value: any, fallback: any): string => {
   return value && value !== fallback ? value : ''
 }
 
-export default ({ defaultValue, texts, update }: Props) => {
+export default ({ defaultValue, readOnly, texts, update }: Props) => {
+  const classes = classNames('editor-title', readOnly ? 'u-area-disable' : '')
+
   const [value, setValue] = React.useState<string>(defaultValue)
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => setValue(event.target.value)
@@ -31,7 +36,7 @@ export default ({ defaultValue, texts, update }: Props) => {
   React.useEffect(() => setValue(defaultValue), [defaultValue])
 
   return (
-    <header className="editor-title">
+    <header className={classes}>
       <input
         type="text"
         aria-label={texts.TITLE_PLACEHOLDER}
