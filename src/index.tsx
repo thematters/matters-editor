@@ -181,7 +181,7 @@ export default class MattersEditor extends React.Component<Props, State> {
   storeMentionInstance = (instance: any) => this.setState({ mentionInstance: instance })
 
   render() {
-    const classes = (this.props.readOnly ? 'u-area-disable' : '')
+    const classes = this.props.readOnly ? 'u-area-disable' : ''
 
     const modulesConfig = {
       ...MODULE_CONFIG,
