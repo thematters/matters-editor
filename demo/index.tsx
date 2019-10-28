@@ -4,7 +4,33 @@ import { render } from 'react-dom'
 
 import MattersEditor from '../src'
 
-const MentionList = () => <div />
+const demoMentionUsers = [
+  { id: uuid(), displayName: 'user1', userName: "user1" },
+  { id: uuid(), displayName: 'user2', userName: "user2" }
+]
+
+const DemoMentionList = ({ mentionLoading, mentionSelection, mentionUsers }) => {
+  const style = { width: '100%', padding: '0.8rem 1rem', textAlign: 'left' as const }
+
+  const handleMentionClick = (user: any) => mentionSelection(user)
+
+  return (
+    <>
+      {mentionUsers.map(user => {
+        return (
+          <button
+            key={user.id}
+            type="button"
+            onClick={() => handleMentionClick(user)}
+            style={style}
+          >
+            {user.userName}
+          </button>
+        )
+      })}
+    </>
+  )
+}
 
 const App = () => {
   const dummyRead = ({ file }: Params) => {
@@ -29,6 +55,7 @@ const App = () => {
 
   const mentionKeywordChange = (keyword: string) => {
     // TODO: add search mention user api
+    // here we use defined demoMentionUsers for demo.
   }
 
   return (
@@ -41,8 +68,8 @@ const App = () => {
       language="ZH_HANT"
       mentionLoading={false}
       mentionKeywordChange={mentionKeywordChange}
-      mentionUsers={[]}
-      mentionListComponent={MentionList}
+      mentionUsers={demoMentionUsers}
+      mentionListComponent={DemoMentionList}
       siteDomain=""
       theme="bubble"
       titleDefaultValue=""
