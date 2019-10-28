@@ -300,6 +300,7 @@
 #editor-container .ql-editor {
   & input.embed-clipboard {
     line-height: 1.875;
+    font-size: inherit;
   }
 
   & figure figcaption {
@@ -313,6 +314,10 @@
       overflow: hidden;
     }
   }
+}
+
+#editor-container .spinner {
+  stroke: var(--color-grey-light);
 }
 
 :root {
@@ -389,5 +394,27 @@
     font-size: 0;
     position: absolute;
     left: -99999px;
+  }
+}
+
+.u-motion-icon-hover {
+  @mixin all-transition;
+
+  &:hover,
+  &:focus {
+    transform: scale(0.9);
+  }
+}
+
+.u-motion-spin {
+  animation: spinning 1s infinite linear;
+}
+
+@keyframes spinning {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
