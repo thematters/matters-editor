@@ -2,6 +2,18 @@ import * as React from 'react'
 
 import SVGSpinner from '../../icons/Spinner'
 
+/**
+ * This component is a mention list container which will be visible when typing `@`.
+ *
+ * Usage:
+ *   <MattersEditorMention
+ *     mentionLoading={false}
+ *     mentionListComponent={() => (<div></div>)}
+ *     mentionUsers={[]}
+ *     reference={}
+ *   />
+ */
+
 interface Props {
   mentionLoading: boolean
   mentionListComponent: any

@@ -18,13 +18,6 @@ import SVGToolbarUploadAudio from '../../icons/ToolbarUploadAudio'
  *     upload={() => {}}
  *     uplaodAudioSizeLimit={1024}
  *   />
- *
- * List of CSS classes used in this component:
- *   [
- *     'toolbar-upload-container',
- *     'u-motion-spin',
- *     'u-motion-icon-hover'
- *   ]
  */
 
 const acceptTypes = ACCEPTED_UPLOAD_AUDIO_TYPES.join(',')

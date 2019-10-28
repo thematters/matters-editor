@@ -10,11 +10,6 @@ import SVGToolbarDivider from '../../icons/ToolbarDivider'
  *     callback=({} => {})
  *     texts={{}}
  *   />
- *
- * List of CSS classes used in this component:
- *   [
- *     'u-motion-icon-hover'
- *   ]
  */
 
 interface Props {

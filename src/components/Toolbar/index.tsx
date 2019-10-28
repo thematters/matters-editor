@@ -16,18 +16,30 @@ import ToolbarUploadImageButton from './ToolbarUploadImageButton'
  * This is a custom toolbar floating on the left of the editor. Put any features
  * except formating features in the toolbar.
  *
+ * Usage:
+ *   <MattersEditorToolbar
+ *     eventDispatcher={() => {}}
+ *     eventName="event-name"
+ *     postion={0}
+ *     visible={false}
+ *     texts={{}}
+ *     update={() => {}}
+ *     upload={() => {}}
+ *     uploadAudioSizeLimit={1024}
+ *     uploadImageSizeLimit={1024}
+ *   />
  */
 
 interface Props {
   eventDispatcher: (event: string, data: any) => void
   eventName: string
   instance: Quill | null
-  position: { top: any }
+  position: number
   visible: boolean
   texts: Texts
   update: any
   upload: any
-  uploadAudioSizeLimit: number
+  uploadAudioSizeLimit?: number
   uploadImageSizeLimit?: number
 }
 
@@ -50,6 +62,10 @@ export default ({
     visible ? 'toolbar-visible' : null,
     expanded ? 'toolbar-expanded' : null
   )
+
+  const style = { top: position }
+
+  const ariaLabel = expanded ? texts.TOOLBAR_CLOSE : texts.TOOLBAR_OPEN
 
   const handleToggle = () => setExpanded(!expanded)
 
@@ -97,12 +113,12 @@ export default ({
   }
 
   return (
-    <aside className={containerClasses} style={position}>
+    <aside className={containerClasses} style={style}>
       <button
         className="toolbar-toggle-button"
         type="button"
         onClick={handleToggle}
-        aria-label={expanded ? texts.TOOLBAR_CLOSE : texts.TOOLBAR_OPEN}
+        aria-label={ariaLabel}
       >
         <SVGToolbarAdd className="u-motion-icon-hover" />
       </button>

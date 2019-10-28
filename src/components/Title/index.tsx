@@ -4,16 +4,11 @@ import * as React from 'react'
  * This is an optional component belonged to the edoitor.
  *
  * Usage:
- *   <ReactQuillTitle
+ *   <MattersEditorTitle
  *     devaultValue="Default title"
  *     update={() => func({ title: '' }}}
  *     texts={{}}
  *   />
- *
- * List of CSS classes used in the component:
- *   [
- *      'editor=title'
- *   ]
  */
 
 interface Props {

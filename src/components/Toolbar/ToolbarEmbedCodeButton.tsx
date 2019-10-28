@@ -10,11 +10,6 @@ import SVGToolbarEmbedCode from '../../icons/ToolbarEmbedCode'
  *     callback={() => {}}
  *     texts={{}}
  *   />
- *
- * List of CSS classes used in the component:
- *   [
- *     'u-motionn-icon-hover'
- *   ]
  */
 
 interface Props {

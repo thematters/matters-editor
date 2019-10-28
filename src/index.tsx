@@ -2,9 +2,9 @@ import debounce from 'lodash/debounce'
 import * as React from 'react'
 import ReactQuill, { Quill } from 'react-quill'
 
-import ReactMention from './components/Mention'
-import ReactQuillTitle from './components/Title'
-import ReactToolbar from './components/Toolbar'
+import MattersEditorMention from './components/Mention'
+import MattersEditorTitle from './components/Title'
+import MattersEditorToolbar from './components/Toolbar'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/default'
 import { DEBOUNCE_DELAY, LANGUAGE, SELECTION_TYPES } from './enums/common'
 import { TEXT } from './enums/text'
@@ -197,14 +197,12 @@ export default class MattersEditor extends React.Component<Props, State> {
 
     return (
       <>
-        {/* Title */}
-        <ReactQuillTitle
+        <MattersEditorTitle
           defaultValue={this.props.titleDefaultValue}
           texts={this.texts}
           update={this.props.editorUpdate}
         />
         <div id="editor-container">
-          {/* Editor */}
           <ReactQuill
             formats={FORMAT_CONFIG}
             modules={modulesConfig}
@@ -216,12 +214,11 @@ export default class MattersEditor extends React.Component<Props, State> {
             onChange={this.handleChange}
             onChangeSelection={this.handleChangeSelection}
           />
-          {/* Toolbar */}
-          <ReactToolbar
+          <MattersEditorToolbar
             eventDispatcher={this.eventDispatcher}
             eventName={this.props.eventName}
             instance={this.instance}
-            position={{ top: this.state.toolbarPosition }}
+            position={this.state.toolbarPosition}
             visible={this.state.toolbarVisible}
             texts={this.texts}
             update={this.props.editorUpdate}
@@ -229,13 +226,12 @@ export default class MattersEditor extends React.Component<Props, State> {
             uploadAudioSizeLimit={this.props.uploadAudioSizeLimit}
             uploadImageSizeLimit={this.props.uploadImageSizeLimit}
           />
-          {/* Mention List */}
-          <ReactMention
-            reference={this.mentionReference}
+          <MattersEditorMention
             mentionLoading={this.props.mentionLoading}
             mentionListComponent={this.props.mentionListComponent}
             mentionSelection={this.handleMentionSelection}
             mentionUsers={this.props.mentionUsers}
+            reference={this.mentionReference}
           />
         </div>
       </>

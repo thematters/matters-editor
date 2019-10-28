@@ -17,13 +17,6 @@ import SVGToolbarUploadImage from '../../icons/ToolbarUploadImage'
  *     upload={() => {}}
  *     uploadImageSizeLimit={1024}
  *   />
- *
- * List of CSS classes used in this component:
- *   [
- *     'toolbar-upload-container',
- *     'u-motion-spin',
- *     'u-motion-icon-hove'
- *   ]
  */
 
 const acceptTypes = ACCEPTED_UPLOAD_IMAGE_TYPES.join(',')
