@@ -6,7 +6,7 @@ import gql from 'graphql-tag'
 import { ApolloProvider } from 'react-apollo'
 
 /**
- * Template for ApolloGQL environment.
+ * Boilerplate for ApolloGQL development environment.
  *
  */
 

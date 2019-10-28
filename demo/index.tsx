@@ -65,7 +65,7 @@ const App = () => {
       editorUpdate={editorUpdate}
       editorUpload={editorUpload}
       eventName="event-name"
-      language="ZH_HANT"
+      language="EN"
       mentionLoading={false}
       mentionKeywordChange={mentionKeywordChange}
       mentionUsers={demoMentionUsers}
