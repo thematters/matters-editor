@@ -10,6 +10,7 @@
   "license": "MIT",
   "main": "src/index.ts",
   "scripts": {
+    "build": "parcel build src/index.tsx",
     "demo": "parcel -p 9000 demo/index.html",
     "format": "prettier --write \"{src,demo}/**/*.{ts,tsx,json}\""
   },
