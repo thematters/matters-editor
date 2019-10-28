@@ -3,16 +3,12 @@ import { render } from 'react-dom'
 
 import MattersEditor from '../src'
 
-const MentionList = () => {
-  return <div />
-}
+const MentionList = () => (<div />)
 
-const DemoApp = () => {
+const App = () => {
   const editorUpdate = (params: Params) => {}
 
-  const editorUpload = async (params: Params): Promise<ResultData> => {
-    return {}
-  }
+  const editorUpload = async (params: Params): Promise<ResultData> => ({})
 
   const mentionKeywordChange = (keyword: string) => {}
 
@@ -36,4 +32,4 @@ const DemoApp = () => {
   )
 }
 
-render(<DemoApp />, document.getElementById('demo'))
+render(<App />, document.getElementById('demo'))
