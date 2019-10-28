@@ -4,13 +4,13 @@ import { render } from 'react-dom'
 import MattersEditor from '../src'
 
 const MentionList = () => {
-  return <div/>
+  return <div />
 }
 
 const DemoApp = () => {
   const editorUpdate = (params: Params) => {}
 
-  const editorUpload = async(params: Params): Promise<ResultData> => {
+  const editorUpload = async (params: Params): Promise<ResultData> => {
     return {}
   }
 
