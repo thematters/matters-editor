@@ -36,9 +36,9 @@ export const DemoGQLSearch = gql`
 `
 
 export const DemoSearch = (props: any) => {
-  const [search, searchResult] = useLazyQuery(DemoGQLSearch, { variables: {}})
-  const newProps = {...props, search, searchResult}
-  return (<DemoMutation {...newProps} />)
+  const [search, searchResult] = useLazyQuery(DemoGQLSearch, { variables: {} })
+  const newProps = { ...props, search, searchResult }
+  return <DemoMutation {...newProps} />
 }
 
 export const DemoGQLUpdate = gql`
@@ -57,17 +57,9 @@ export const DemoMutation = (props: any) => {
   const [update] = useMutation(DemoGQLUpdate, { variables: {} })
   const [upload] = useMutation(DemoGQLUpload, { variables: {} })
   const newProps = { ...props, update, upload }
-  return(
-    <>
-      {() => newProps.children(newProps)}
-    </>
-  )
+  return <>{() => newProps.children(newProps)}</>
 }
 
 export const ApolloDemoApp = ({ children }) => {
-  return (
-    <ApolloProvider client={apollo}>
-      {children}
-    </ApolloProvider>
-  )
+  return <ApolloProvider client={apollo}>{children}</ApolloProvider>
 }

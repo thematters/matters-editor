@@ -3,7 +3,7 @@ import { render } from 'react-dom'
 
 import MattersEditor from '../src'
 
-const MentionList = () => (<div />)
+const MentionList = () => <div />
 
 const App = () => {
   const editorUpdate = (params: Params) => {}
