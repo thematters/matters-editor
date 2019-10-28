@@ -42,13 +42,13 @@ export const DemoSearch = (props: any) => {
 }
 
 export const DemoGQLUpdate = gql`
-  query DemoMutation() {
+  mutation DemoMutation() {
 
   }
 `
 
 export const DemoGQLUpload = gql`
-  query DemoUplod() {
+  mutation DemoUplod() {
 
   }
 `
