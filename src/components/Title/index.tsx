@@ -24,7 +24,7 @@ const getValidTitleValue = (value: any, fallback: any): string => {
   return value && value !== fallback ? value : ''
 }
 
-export default ({ defaultValue, readOnly, texts, update }: Props) => {
+const MattersEditorTitle: React.FC<Props> = ({ defaultValue, readOnly, texts, update }) => {
   const classes = classNames('editor-title', readOnly ? 'u-area-disable' : '')
 
   const [value, setValue] = React.useState<string>(defaultValue)
@@ -48,3 +48,5 @@ export default ({ defaultValue, readOnly, texts, update }: Props) => {
     </header>
   )
 }
+
+export default MattersEditorTitle

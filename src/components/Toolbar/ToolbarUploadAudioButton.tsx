@@ -31,14 +31,14 @@ interface Props {
   uploadAudioSizeLimit?: number
 }
 
-export default ({
+const ToolbarUploadAudioButton: React.FC<Props> = ({
   callback,
   eventDispatcher,
   eventName,
   texts,
   upload,
   uploadAudioSizeLimit = UPLOAD_AUDIO_SIZE_LIMIT
-}: Props) => {
+}) => {
   const [uploading, setUploading] = React.useState(false)
 
   const handleChange = async (event: React.FormEvent<HTMLInputElement>) => {
@@ -88,3 +88,5 @@ export default ({
     </Tooltip>
   )
 }
+
+export default ToolbarUploadAudioButton

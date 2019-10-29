@@ -30,14 +30,14 @@ interface Props {
   uploadImageSizeLimit?: number
 }
 
-export default ({
+const ToolbarUploadImageButton: React.FC<Props> = ({
   callback,
   eventDispatcher,
   eventName,
   texts,
   upload,
   uploadImageSizeLimit = UPLOAD_IMAGE_SIZE_LIMIT
-}: Props) => {
+}) => {
   const [uploading, setUploading] = React.useState(false)
 
   const handleChange = async (event: React.FormEvent<HTMLInputElement>) => {
@@ -84,3 +84,5 @@ export default ({
     </label>
   )
 }
+
+export default ToolbarUploadImageButton

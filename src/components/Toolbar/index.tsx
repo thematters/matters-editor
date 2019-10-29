@@ -43,7 +43,7 @@ interface Props {
   uploadImageSizeLimit?: number
 }
 
-export default ({
+const MattersEditorToolbar: React.FC<Props> = ({
   eventDispatcher,
   eventName,
   instance,
@@ -54,7 +54,7 @@ export default ({
   upload,
   uploadAudioSizeLimit,
   uploadImageSizeLimit
-}: Props) => {
+}) => {
   const [expanded, setExpanded] = React.useState<boolean>(false)
 
   const containerClasses = classNames(
@@ -146,3 +146,5 @@ export default ({
     </aside>
   )
 }
+
+export default MattersEditorToolbar
