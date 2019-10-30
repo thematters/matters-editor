@@ -103,3 +103,5 @@ yarn.lock
 sources.list
 *.rdb
 .ebextensions/http-basic-auth.config
+
+src/themes/*.json
