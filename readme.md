@@ -10,7 +10,6 @@ This rich text editor is based on three amazing projects [Quill](https://quilljs
 - Image upload and drag & drop.
 - Embed video from Youtube and Viemo.
 - Embed code snippet from JSFiddle.
-- Embed wedget such as LikeButton.
 
 ## How to run demo up
 Default web server port is `9000`, and you can change it in `package.json`.
@@ -21,7 +20,7 @@ npm run demo
 Then, check it by viewing `http://localhost:9000`.
 
 ## How to build
-Default output destination is folder `dist`.
+Default output destination is folder `build`.
 
 ```
 npm run build
