@@ -366,6 +366,10 @@
     margin-left: var(--spacing-tight);
   }
 
+  & :global(button) {
+    background: transparent;
+  }
+
   & :global(svg) {
     background: var(--color-white);
     border-radius: 50%;
@@ -382,6 +386,7 @@
 
 .toolbar-toggle-button {
   @mixin all-transition;
+  background: transparent;
   stroke: var(--color-black);
 }
 

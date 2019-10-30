@@ -1,9 +1,14 @@
 {
   "compilerOptions": {
-    "jsx": "preserve",
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": "src",
+    "declaration": true,
+    "jsx": "react",
     "lib": ["dom", "es2017"],
     "module": "esnext",
     "moduleResolution": "node",
+    "outDir": "build",
     "target": "esnext"
-  }
+  },
+  "exclude": ["build", "demo", "dist", "node_modules"]
 }
