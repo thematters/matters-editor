@@ -33,7 +33,7 @@ const DemoMentionList = ({ mentionLoading, mentionSelection, mentionUsers }) => 
 }
 
 const App = () => {
-  const dummyRead = ({ file }: Params) => {
+  const dummyRead = ({ file }: any) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result)
@@ -42,11 +42,11 @@ const App = () => {
     })
   }
 
-  const editorUpdate = (params: Params) => {
+  const editorUpdate = (params: any) => {
     // TODO: add update api
   }
 
-  const editorUpload = async (params: Params): Promise<ResultData> => {
+  const editorUpload = async (params: any): Promise<any> => {
     // TODO: add calling upload api and get source path
     // below is just an example.
     const source = await dummyRead(params)

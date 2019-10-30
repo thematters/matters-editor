@@ -5,8 +5,8 @@
     "postcss-modules": {
       "generateScopedName": "[local]"
     },
-    "postcss-nested": {},
     "postcss-mixins": {},
+    "postcss-nested": {},
     "postcss-color-function": {},
     "postcss-custom-media": {},
   }
