@@ -69,8 +69,7 @@
     "uuid": "^3.3.3"
   },
   "files": [
-    "build/**/*",
-    "src/**/*"
+    "build/**/*"
   ],
   "browserslist": [
     "last 3 Chrome version"
