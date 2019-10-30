@@ -14,7 +14,7 @@
     "build": "npm run build:css && npm run build:lib",
     "build:css": "rimraf build/**/*.css && rollup -c rollup.css.config.js",
     "build:lib": "rimraf build/**/*.js && rollup -c rollup.lib.config.js",
-    "demo": "parcel -p 9000 demo/index.html",
+    "demo": "parcel -p 9000 demo/index.html --open",
     "format": "prettier --write \"{src,demo}/**/*.{ts,tsx,json}\"",
     "tslint": "tslint -p ."
   },
