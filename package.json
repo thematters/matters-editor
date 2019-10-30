@@ -2,7 +2,7 @@
   "name": "@matters/matters-editor",
   "version": "0.1.0",
   "description": "The editor component.",
-  "author": "",
+  "author": "Matters Lab",
   "engines": {
     "node": ">=10.15.0",
     "npm": ">=6.5.0"
