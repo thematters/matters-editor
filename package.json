@@ -1,6 +1,6 @@
 {
   "name": "@matters/matters-editor",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The editor component.",
   "author": "Matters Lab",
   "engines": {
