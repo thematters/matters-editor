@@ -41,7 +41,7 @@ interface State {
   toolbarVisible: boolean
 }
 
-export default class MattersEditor extends React.Component<Props, State> {
+export class MattersArticleEditor extends React.Component<Props, State> {
   private instance: Quill | null = null
 
   private editorReference = React.createRef<ReactQuill>()
@@ -206,7 +206,7 @@ export default class MattersEditor extends React.Component<Props, State> {
           texts={this.texts}
           update={this.props.editorUpdate}
         />
-        <div id="editor-container" className={classes}>
+        <div id="editor-article-container" className={classes}>
           <ReactQuill
             formats={FORMAT_CONFIG}
             modules={modulesConfig}

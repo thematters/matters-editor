@@ -2,7 +2,7 @@ import uuid from 'uuid/v4'
 import * as React from 'react'
 import { render } from 'react-dom'
 
-import MattersEditor from '../src'
+import { MattersArticleEditor, MattersCommentEditor } from '../src'
 
 const demoMentionUsers = [
   { id: uuid(), displayName: 'user1', userName: 'user1' },
@@ -59,23 +59,38 @@ const App = () => {
   }
 
   return (
-    <MattersEditor
-      editorContent=""
-      editorContentId=""
-      editorUpdate={editorUpdate}
-      editorUpload={editorUpload}
-      eventName="event-name"
-      language="EN"
-      mentionLoading={false}
-      mentionKeywordChange={mentionKeywordChange}
-      mentionUsers={demoMentionUsers}
-      mentionListComponent={DemoMentionList}
-      readOnly={false}
-      siteDomain=""
-      theme="bubble"
-      titleDefaultValue=""
-      uploadAssetDomain=""
-    />
+    <>
+      <MattersArticleEditor
+        editorContent=""
+        editorContentId=""
+        editorUpdate={editorUpdate}
+        editorUpload={editorUpload}
+        eventName="event-name"
+        language="EN"
+        mentionLoading={false}
+        mentionKeywordChange={mentionKeywordChange}
+        mentionUsers={demoMentionUsers}
+        mentionListComponent={DemoMentionList}
+        readOnly={false}
+        siteDomain=""
+        theme="bubble"
+        titleDefaultValue=""
+        uploadAssetDomain=""
+      />
+      <br />
+      <MattersCommentEditor
+        editorContent=""
+        editorUpdate={editorUpdate}
+        eventName="event-name"
+        language="EN"
+        mentionLoading={false}
+        mentionKeywordChange={mentionKeywordChange}
+        mentionUsers={demoMentionUsers}
+        mentionListComponent={DemoMentionList}
+        readOnly={false}
+        theme="bubble"
+      />
+    </>
   )
 }
 
