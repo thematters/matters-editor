@@ -65,7 +65,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
 
   handleBlur = () => this.setState({ focus: false })
 
-  handleFocus = () => this.setState({ focus : true })
+  handleFocus = () => this.setState({ focus: true })
 
   handleChange = (content: string) => this.update(content)
 
