@@ -10,6 +10,7 @@
   "license": "MIT",
   "main": "build/index.js",
   "module": "build/index.es.js",
+  "types": "build/index.d.ts",
   "scripts": {
     "build": "npm run build:css && npm run build:lib",
     "build:css": "rimraf build/**/*.css && rollup -c rollup.css.config.js",
