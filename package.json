@@ -3,6 +3,11 @@
   "version": "0.1.2",
   "description": "The editor component.",
   "author": "Matters Lab",
+  "homepage": "https://github.com/thematters/matters-editor",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:thematters/matters-editor.git"
+  },
   "engines": {
     "node": ">=10.15.0",
     "npm": ">=6.5.0"
