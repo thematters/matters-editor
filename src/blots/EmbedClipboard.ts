@@ -110,10 +110,10 @@ class EmbedClipboard extends BlockEmbed {
     if (url === URL_LIKE_BUTTON) {
       const util = Parchment.query('util')
       if (util && util.eventDispatcher && util.eventName && util.language) {
-        util.eventDispatcher(
-          util.eventName,
-          { color: COLOR.RED, content: TEXT[util.language].LIKE_BUTTON_FAILED }
-        )
+        util.eventDispatcher(util.eventName, {
+          color: COLOR.RED,
+          content: TEXT[util.language].LIKE_BUTTON_FAILED
+        })
       }
     }
   }

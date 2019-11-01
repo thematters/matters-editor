@@ -6,7 +6,7 @@ export const TEXT = {
     EMBED_CODE_PLACEHOLDER: 'Paste JSFiddle and press enter',
     EMBED_VIDEO_PLACEHOLDER: 'Paste YouTube or Vimeo link, and press enter',
     LINK_PLACEHOLDER: 'Enter link',
-    LIKE_BUTTON_FAILED: 'Like button has been embeded, so you don\'t need to another.',
+    LIKE_BUTTON_FAILED: "Like button has been embeded, so you don't need to another.",
     TITLE_FALLBACK: 'Untitle',
     TITLE_PLACEHOLDER: 'Enter title ...',
     TOOLBAR_ADD_DIVIDER: 'Add divivder',
