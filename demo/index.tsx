@@ -33,6 +33,8 @@ const DemoMentionList = ({ mentionLoading, mentionSelection, mentionUsers }) => 
 }
 
 const App = () => {
+  const eventName = 'demo-event'
+
   const dummyRead = ({ file }: any) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -58,6 +60,12 @@ const App = () => {
     // here we use defined demoMentionUsers for demo.
   }
 
+  React.useEffect(() => {
+    window.addEventListener(eventName, (data: any) => {
+      // TODO: Process data and hook your notifier.
+    })
+  }, [])
+
   return (
     <>
       <MattersArticleEditor
@@ -65,7 +73,7 @@ const App = () => {
         editorContentId=""
         editorUpdate={editorUpdate}
         editorUpload={editorUpload}
-        eventName="event-name"
+        eventName={eventName}
         language="EN"
         mentionLoading={false}
         mentionKeywordChange={mentionKeywordChange}
@@ -81,7 +89,7 @@ const App = () => {
       <MattersCommentEditor
         editorContent=""
         editorUpdate={editorUpdate}
-        eventName="event-name"
+        eventName={eventName}
         language="EN"
         mentionLoading={false}
         mentionKeywordChange={mentionKeywordChange}

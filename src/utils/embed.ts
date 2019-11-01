@@ -1,3 +1,6 @@
+import { URL_LIKE_BUTTON } from '../enums/common'
+
+
 const getPath = (url: string) => new URL(url).pathname.replace(/\//g, '')
 
 export const code = (value: string) => {
@@ -9,7 +12,7 @@ export const code = (value: string) => {
     return `https://jsfiddle.net/${getPath(value)}/embedded/`
   }
   if (value.match(/http(s)?:\/\/(button\.)?like\.co\//)) {
-    return `https://button.like.co/in/embed/${getPath(value)}/button`
+    return URL_LIKE_BUTTON
   }
   return ''
 }

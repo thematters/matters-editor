@@ -13,7 +13,10 @@ export const FORMAT_CONFIG = [
 
   // custom
   'mention',
-  'smartBreak'
+  'smartBreak',
+
+  // hacks
+  'util'
 ]
 
 export const MODULE_CONFIG = {

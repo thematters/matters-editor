@@ -1,8 +1,10 @@
 import { Quill } from 'react-quill'
 
-import { KEYCODES } from '../enums/common'
+import { COLOR, KEYCODES, URL_LIKE_BUTTON } from '../enums/common'
+import { TEXT } from '../enums/text'
 import * as embedUrl from '../utils/embed'
 
+const Parchment = Quill.import('parchment')
 const BlockEmbed = Quill.import('blots/block/embed')
 
 type Purpose = 'video' | 'code'
@@ -99,10 +101,20 @@ class EmbedClipboard extends BlockEmbed {
       url = embedUrl.code(text)
     }
 
-    if (url) {
+    if (url && url != URL_LIKE_BUTTON) {
       this.insertEmbed(url)
     } else {
       this.replaceWithText(text)
+    }
+
+    if (url === URL_LIKE_BUTTON) {
+      const util = Parchment.query('util')
+      if (util && util.eventDispatcher && util.eventName && util.language) {
+        util.eventDispatcher(
+          util.eventName,
+          { color: COLOR.RED, content: TEXT[util.language].LIKE_BUTTON_FAILED }
+        )
+      }
     }
   }
 

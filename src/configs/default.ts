@@ -33,7 +33,10 @@ export const FORMAT_CONFIG = [
   'audioFigure',
   'mention',
   'smartBreak',
-  'source'
+  'source',
+
+  // hacks
+  'util'
 ]
 
 export const MODULE_CONFIG = {

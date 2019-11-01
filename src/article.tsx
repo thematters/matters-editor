@@ -2,6 +2,7 @@ import debounce from 'lodash/debounce'
 import * as React from 'react'
 import ReactQuill, { Quill } from 'react-quill'
 
+import Util from './blots/Util'
 import MattersEditorMention from './components/Mention'
 import MattersEditorTitle from './components/Title'
 import MattersEditorToolbar from './components/Toolbar'
@@ -59,6 +60,12 @@ export class MattersArticleEditor extends React.Component<Props, State> {
       toolbarVisible: false
     }
     this.texts = props.texts || TEXT[props.language] || TEXT[LANGUAGE.ZH_HANT]
+
+    // temporarily hacky solution
+    Util.eventDispatcher = this.eventDispatcher
+    Util.eventName = props.eventName
+    Util.language = props.language || LANGUAGE.ZH_HANT
+    Quill.register('formats/util', Util, true)
   }
 
   componentDidMount() {
