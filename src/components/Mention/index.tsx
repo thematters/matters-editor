@@ -32,8 +32,7 @@ export default ({
   const hidden = mentionUsers.length <= 0 && !mentionLoading
   return (
     <section className="mention-container" ref={reference} hidden={hidden}>
-      {mentionLoading && <SVGSpinner className="sipinner u-motion-spin" />}
-      {!mentionLoading && mentionListComponent({ mentionLoading, mentionSelection, mentionUsers })}
+      {mentionListComponent({ mentionLoading, mentionSelection, mentionUsers })}
     </section>
   )
 }
