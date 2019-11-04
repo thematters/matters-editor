@@ -111,9 +111,11 @@ export class MattersArticleEditor extends React.Component<Props, State> {
 
   handleBlur = () => this.update(this.state.content)
 
-  handleChange = (content: string) => {
+  handleChange = (content: string, delta: any, source: string) => {
     this.setState({ content }, () => {
-      this.update(content)
+      if (source === 'user') {
+        this.update(content)
+      }
     })
   }
 
