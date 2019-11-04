@@ -88,7 +88,7 @@ export const insertImageBlock = (
     instance.insertEmbed(
       range.index,
       'imageFigure',
-      { src: path, assesId: id, captionPlaceholder },
+      { src: path, assetId: id, captionPlaceholder },
       'user'
     )
     instance.setSelection(range.index + 1, 0, 'silent')
