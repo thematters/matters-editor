@@ -23,7 +23,6 @@ interface Props {
 }
 
 interface State {
-  content: string
   focus: boolean
   mentionInstance: any
 }
@@ -40,7 +39,6 @@ export class MattersCommentEditor extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props)
     this.state = {
-      content: this.props.editorContent,
       focus: false,
       mentionInstance: null
     }
@@ -124,7 +122,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
             readOnly={this.props.readOnly}
             ref={this.editorReference}
             theme={this.props.theme}
-            value={this.state.content}
+            value={this.props.editorContent}
             onBlur={this.handleBlur}
             onFocus={this.handleFocus}
             onChange={this.handleChange}

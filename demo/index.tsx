@@ -35,6 +35,8 @@ const DemoMentionList = ({ mentionLoading, mentionSelection, mentionUsers }) => 
 const App = () => {
   const eventName = 'demo-event'
 
+  const [commentContent, setCommentContent] = React.useState('')
+
   const dummyRead = ({ file }: any) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -87,8 +89,8 @@ const App = () => {
       />
       <br />
       <MattersCommentEditor
-        editorContent=""
-        editorUpdate={editorUpdate}
+        editorContent={commentContent}
+        editorUpdate={params => setCommentContent(params.content)}
         eventName={eventName}
         language="EN"
         mentionLoading={false}
