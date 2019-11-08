@@ -93,14 +93,15 @@ const createImageMatcher = (upload: any, assetDomain: string, siteDomain: string
     }
 
     // upload and replace image content
-    upload(input).then(({ path, id }: any) => {
-      const img = document.getElementById(placeholderId)
-      if (img) {
-        img.setAttribute('src', path)
-        img.setAttribute('data-asset-id', id)
-      }
-    })
-    .catch(error => console.error)
+    upload(input)
+      .then(({ path, id }: any) => {
+        const img = document.getElementById(placeholderId)
+        if (img) {
+          img.setAttribute('src', path)
+          img.setAttribute('data-asset-id', id)
+        }
+      })
+      .catch(error => console.error)
   }
 
   return new Delta().insert(
