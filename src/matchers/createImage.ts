@@ -41,6 +41,10 @@ const createImageMatcher = (upload: any, assetDomain: string, siteDomain: string
   node: Element,
   delta: any
 ) => {
+  if (delta.ops.length === 0) {
+    return delta
+  }
+
   // prevent recursion
   if (delta.ops[0].insert.imageFigure) {
     return delta
@@ -96,6 +100,7 @@ const createImageMatcher = (upload: any, assetDomain: string, siteDomain: string
         img.setAttribute('data-asset-id', id)
       }
     })
+    .catch(error => console.error)
   }
 
   return new Delta().insert(
