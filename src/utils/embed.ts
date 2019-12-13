@@ -1,6 +1,15 @@
 import { URL_LIKE_BUTTON } from '../enums/common'
 
-const getPath = (url: string) => new URL(url).pathname.replace(/\//g, '')
+const getPath = (url: string) => {
+  const path = new URL(url).pathname
+  if (path) {
+    return path
+      .split('/')
+      .filter(fragment => fragment)
+      .join('/')
+  }
+  return ''
+}
 
 export const code = (value: string) => {
   if (!value) {
