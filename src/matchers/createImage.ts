@@ -55,11 +55,14 @@ const createImageMatcher = (upload: any, assetDomain: string, siteDomain: string
   const srcOrg = delta.ops[0].insert.image
 
   let imageFigure
-  // don't upload if copying from matters internally
+  // don't upload if copying from your site internally
   // retrieve asset id from url
   const domain = extractDomain(assetDomain || '') || siteDomain
   if (srcOrg.indexOf(domain) !== -1) {
-    const assetId = srcOrg.split('/').slice(-2, -1)[0]
+    const assetId = (srcOrg.split('/').slice(-1)[0] || '').split('.')[0]
+    if (!assetId) {
+      return delta
+    }
 
     imageFigure = {
       src: srcOrg,
