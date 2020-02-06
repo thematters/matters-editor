@@ -102,11 +102,11 @@ class Mention {
      * handle vertical positioning
      */
     topPosition += mentionCharPosition.bottom
-    if (this.isContainerBottomCovered(topPosition, containerPosition)) {
-      let overMentionCharPos = this.offsetTop * -1
-      overMentionCharPos += mentionCharPosition.top
-      topPosition = overMentionCharPos - containerHeight
-    }
+    // if (this.isContainerBottomCovered(topPosition, containerPosition)) {
+    //   let overMentionCharPos = this.offsetTop * -1
+    //   overMentionCharPos += mentionCharPosition.top
+    //   topPosition = overMentionCharPos - containerHeight
+    // }
 
     this.mentionContainer.style.top = `${topPosition}px`
     this.mentionContainer.style.left = `${leftPosition}px`
