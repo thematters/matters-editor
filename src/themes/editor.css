@@ -402,16 +402,18 @@ pre {
   /* Blockquote
    ========================================================================== */
   & :global(blockquote) {
-    width: 100%;
-    padding: 0 var(--spacing-default);
-    margin: var(--spacing-loose) 0;
+    position: relative;
+    padding: 0 var(--spacing-tight);
 
-    color: var(--color-gold);
-    font-size: var(--font-size-md);
-    line-height: 2;
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
 
-    @media (--sm-up) {
-      padding: 0 var(--spacing-x-loose);
+      width: 4px;
+      height: 100%;
+      background: var(--color-gold);
     }
   }
 
