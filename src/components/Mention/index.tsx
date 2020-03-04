@@ -28,10 +28,13 @@ export default ({
   mentionSelection,
   mentionUsers,
   reference
-}) => {
-  const hidden = mentionUsers.length <= 0 && !mentionLoading
+}: Props) => {
+  if (mentionUsers.length <= 0 && !mentionLoading) {
+    return null
+  }
+
   return (
-    <section className="mention-container" ref={reference} hidden={hidden}>
+    <section className="mention-container" ref={reference}>
       {mentionListComponent({ mentionLoading, mentionSelection, mentionUsers })}
     </section>
   )

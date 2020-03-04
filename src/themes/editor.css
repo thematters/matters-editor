@@ -19,26 +19,22 @@
   --color-line-grey: rgba(0, 0, 0, 0.16);
   --color-line-grey-dark: rgba(0, 0, 0, 0.24);
 
-  --font-sans-tc: -apple-system, BlinkMacSystemFont, 'Helvetica Neue',
-    'PingFang TC', 'Microsoft YaHei', 'Source Han Sans TC', 'Noto Sans CJK TC',
-    'WenQuanYi Micro Hei', sans-serif;
-  --font-sans-sc: -apple-system, BlinkMacSystemFont, 'Helvetica Neue',
-    'PingFang SC', 'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC',
-    'WenQuanYi Micro Hei', sans-serif;
-  --font-serif-tc: 'Noto Serif', 'Noto Serif CJK TC', 'Source Han Serif TC',
-    'Songti TC', serif;
-  --font-serif-sc: 'Noto Serif', 'Noto Serif CJK SC', 'Source Han Serif SC',
-    'Songti SC', serif;
+  --font-sans-tc: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang TC',
+    'Microsoft YaHei', 'Source Han Sans TC', 'Noto Sans CJK TC', 'WenQuanYi Micro Hei', sans-serif;
+  --font-sans-sc: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC',
+    'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC', 'WenQuanYi Micro Hei', sans-serif;
+  --font-serif-tc: 'Noto Serif', 'Noto Serif CJK TC', 'Source Han Serif TC', 'Songti TC', serif;
+  --font-serif-sc: 'Noto Serif', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', serif;
   --font-mono: Menlo, 'SFMono-Regular', Consolas, monaco, monospace;
 
   --font-size-xxs: 0.625rem; /* 10px */
-  --font-size-xs: 0.75rem;   /* 12px */
-  --font-size-sm: 0.875rem;  /* 14px */
-  --font-size-md: 1rem;      /* 16px */
-  --font-size-xm: 1.125rem;  /* 18px */
-  --font-size-lg: 1.25rem;   /* 20px */
-  --font-size-xl: 1.5rem;    /* 24px */
-  --font-size-xxl: 2rem;     /* 32px */
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
+  --font-size-md: 1rem; /* 16px */
+  --font-size-xm: 1.125rem; /* 18px */
+  --font-size-lg: 1.25rem; /* 20px */
+  --font-size-xl: 1.5rem; /* 24px */
+  --font-size-xxl: 2rem; /* 32px */
 
   --font-weight-light: 300;
   --font-weight-normal: 400;
@@ -49,10 +45,10 @@
   --font-weight-base: var(--font-weight-normal);
   --line-height-base: 1.5;
 
-  --font-size-article-base: 1rem;    /* 16px; */
+  --font-size-article-base: 1rem; /* 16px; */
   --line-height-article-base: 1.875; /* 30/16 */
 
-  --font-size-article-h1: 1.375;               /* 22px */
+  --font-size-article-h1: 1.375; /* 22px */
   --font-size-article-h2: var(--font-size-lg); /* 20px */
   --font-size-article-h3: var(--font-size-xm); /* 18px */
   --font-size-article-h4: var(--font-size-md); /* 16px */
@@ -69,11 +65,11 @@
   --sizing-menu-sm: 10.5rem;
 
   --spacing-xx-tight: 0.25rem; /* 4px */
-  --spacing-x-tight: 0.5rem;   /* 8px */
-  --spacing-tight: 1rem;       /* 16px */
-  --spacing-default: 1.5rem;   /* 24px */
-  --spacing-loose: 2rem;       /* 32px */
-  --spacing-x-loose: 2.5rem;   /* 40px */
+  --spacing-x-tight: 0.5rem; /* 8px */
+  --spacing-tight: 1rem; /* 16px */
+  --spacing-default: 1.5rem; /* 24px */
+  --spacing-loose: 2rem; /* 32px */
+  --spacing-x-loose: 2.5rem; /* 40px */
 }
 
 html {
@@ -531,7 +527,6 @@ pre {
   stroke: var(--color-grey-light);
 }
 
-
 #editor-comment-container .ql-editor {
   white-space: pre-wrap;
   line-height: 1.6;
@@ -763,7 +758,6 @@ pre {
   position: absolute;
 
   width: var(--sizing-menu-md);
-  visibility: hidden;
 
   color: var(--color-black);
   border-radius: 2px;
