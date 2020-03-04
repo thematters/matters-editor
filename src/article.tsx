@@ -9,10 +9,9 @@ import MattersEditorToolbar from './components/Toolbar'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/default'
 import { DEBOUNCE_DELAY, LANGUAGE, SELECTION_TYPES } from './enums/common'
 import { TEXT } from './enums/text'
-import SVGSpinner from './icons/Spinner'
 import createImageMatcher from './matchers/createImage'
 import { initAudioPlayers } from './utils/audioPlayer'
-import { defineSelection, getQuillInstance, trimLineBreaks } from './utils/editor'
+import { defineSelection, getQuillInstance } from './utils/editor'
 
 interface Props {
   editorContent: string
@@ -106,7 +105,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
   }
 
   update = debounce((content: string) => {
-    this.props.editorUpdate({ content: trimLineBreaks(content) })
+    this.props.editorUpdate({ content })
   }, DEBOUNCE_DELAY)
 
   handleBlur = () => this.update(this.state.content)

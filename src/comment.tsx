@@ -6,7 +6,7 @@ import MattersEditorMention from './components/Mention'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/comment'
 import { DEBOUNCE_DELAY, LANGUAGE } from './enums/common'
 import { TEXT } from './enums/text'
-import { getQuillInstance, trimLineBreaks } from './utils/editor'
+import { getQuillInstance } from './utils/editor'
 
 interface Props {
   editorContent: string
@@ -58,7 +58,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
   initQuillInstance = () => getQuillInstance(this.editorReference)
 
   update = debounce((content: string) => {
-    this.props.editorUpdate({ content: trimLineBreaks(content) })
+    this.props.editorUpdate({ content })
   }, DEBOUNCE_DELAY)
 
   handleBlur = () => this.setState({ focus: false })
