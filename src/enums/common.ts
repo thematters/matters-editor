@@ -14,6 +14,8 @@ export const CUSTOM_BLOT_TYPES: string[] = ['embedClipboard', 'embedCode', 'embe
 
 export const DEBOUNCE_DELAY: number = 300
 
+export const DEBOUNCE_DELAY_MENTION: number = 900
+
 export const LANGUAGE: { [key: string]: string } = {
   EN: 'EN',
   ZH_HANS: 'ZH_HANS',

@@ -7,7 +7,7 @@ import MattersEditorMention from './components/Mention'
 import MattersEditorTitle from './components/Title'
 import MattersEditorToolbar from './components/Toolbar'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/default'
-import { DEBOUNCE_DELAY, LANGUAGE, SELECTION_TYPES } from './enums/common'
+import { DEBOUNCE_DELAY, DEBOUNCE_DELAY_MENTION, LANGUAGE, SELECTION_TYPES } from './enums/common'
 import { TEXT } from './enums/text'
 import createImageMatcher from './matchers/createImage'
 import { initAudioPlayers } from './utils/audioPlayer'
@@ -43,11 +43,8 @@ interface State {
 
 export class MattersArticleEditor extends React.Component<Props, State> {
   private instance: Quill | null = null
-
   private editorReference = React.createRef<ReactQuill>()
-
   private mentionReference = React.createRef<HTMLElement>()
-
   private texts: Texts = null
 
   constructor(props: Props) {
@@ -157,7 +154,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
 
   handleMentionChange = debounce((keyword: string) => {
     this.props.mentionKeywordChange(keyword)
-  }, DEBOUNCE_DELAY)
+  }, DEBOUNCE_DELAY_MENTION)
 
   handleMentionSelection = ({ id, userName, displayName }) => {
     this.state.mentionInstance.insertMention({
