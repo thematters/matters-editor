@@ -47,7 +47,7 @@
     "autoprefixer": "^9.7.0",
     "graphql": "^14.5.8",
     "graphql-tag": "^2.10.1",
-    "husky": "^3.0.9",
+    "husky": "^4.2.3",
     "parcel-bundler": "^1.12.4",
     "parcel-plugin-clean-dist": "0.0.6",
     "postcss-color-function": "^4.1.0",
