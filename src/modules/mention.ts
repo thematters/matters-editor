@@ -23,8 +23,6 @@ class Mention {
   mentionContainer: HTMLElement
   mentionDenotationChars: string[]
   handleMentionChange: (value: string) => void
-  offsetTop: number
-  offsetLeft: number
 
   constructor(quill: Quill, options: ModuleOptions) {
     this.quill = quill
@@ -34,8 +32,6 @@ class Mention {
     this.mentionContainer = options.mentionContainer
     this.mentionDenotationChars = ['@']
     this.handleMentionChange = options.handleMentionChange
-    this.offsetTop = 16
-    this.offsetLeft = 0
     this.isolateCharacter = false
     options.storeMentionInstance(this)
     quill.on('text-change', this.handleTextChange.bind(this))
@@ -44,9 +40,8 @@ class Mention {
 
   show() {
     if (this.mentionContainer) {
-      this.mentionContainer.style.visibility = 'hidden'
       this.mentionContainer.style.display = ''
-      this.setMentionContainerPosition()
+      this.setMentionPosition()
     }
   }
 
@@ -68,49 +63,37 @@ class Mention {
     this.quill.setSelection(tempMentionCharPos + 2, 'user')
   }
 
-  isContainerBottomCovered(topPos: number, containerPos: any) {
-    const elementBottom = topPos + this.mentionContainer.offsetHeight + containerPos.top
-    return elementBottom > window.pageYOffset + window.innerHeight
-  }
-
-  isContainerRightCovered(leftPos: number, containerPos: any) {
-    const rightPos = leftPos + this.mentionContainer.offsetWidth + containerPos.left
-    const browserWidth = window.pageXOffset + document.documentElement.clientWidth
-    return rightPos > browserWidth
-  }
-
-  setMentionContainerPosition() {
-    const containerHeight = this.mentionContainer.offsetHeight
+  setMentionPosition() {
     // @ts-ignore
-    const containerPosition = this.quill.container.getBoundingClientRect()
+    const editorBounds = this.quill.container.getBoundingClientRect() as DOMRect
+    const mentionBounds = this.mentionContainer.getBoundingClientRect() as DOMRect
     const mentionCharPosition = this.quill.getBounds(this.mentionCharPos)
 
-    let topPosition = this.offsetTop
-    let leftPosition = this.offsetLeft
+    // horizontal
+    const offsetLeft = 16
+    const exceptLeft = mentionCharPosition.left + offsetLeft
+    const maxLeft = editorBounds.width - mentionBounds.width - offsetLeft
+    const left = Math.min(exceptLeft, maxLeft)
 
-    /**
-     * handle horizontal positioning
-     */
-    leftPosition += mentionCharPosition.left
-    if (this.isContainerRightCovered(leftPosition, containerPosition)) {
-      const containerWidth = this.mentionContainer.offsetWidth + this.offsetLeft
-      const editorWidth = containerPosition.width
-      leftPosition = editorWidth - containerWidth
+    // vertical
+    const offsetTop = 16
+    const exceptTop = mentionCharPosition.bottom + offsetTop
+    const exceptTopFlip = mentionCharPosition.top - mentionBounds.height
+    const isOverEditorBottom =
+      editorBounds.top + exceptTop + mentionBounds.height > editorBounds.bottom
+    const isFlipOverEditorTop = exceptTopFlip < 0
+
+    let top
+    if (isOverEditorBottom && isFlipOverEditorTop) {
+      top = exceptTop
+    } else if (isOverEditorBottom) {
+      top = exceptTopFlip
+    } else {
+      top = exceptTop
     }
 
-    /**
-     * handle vertical positioning
-     */
-    topPosition += mentionCharPosition.bottom
-    // if (this.isContainerBottomCovered(topPosition, containerPosition)) {
-    //   let overMentionCharPos = this.offsetTop * -1
-    //   overMentionCharPos += mentionCharPosition.top
-    //   topPosition = overMentionCharPos - containerHeight
-    // }
-
-    this.mentionContainer.style.top = `${topPosition}px`
-    this.mentionContainer.style.left = `${leftPosition}px`
-    this.mentionContainer.style.visibility = 'visible'
+    this.mentionContainer.style.top = `${top}px`
+    this.mentionContainer.style.left = `${left}px`
   }
 
   handleChange() {

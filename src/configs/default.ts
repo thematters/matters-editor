@@ -47,7 +47,10 @@ export const MODULE_CONFIG = {
   clipboard: {
     // toggle to add extra line breaks when pasting HTML
     matchVisual: false,
-    matchers: [['BR', lineBreakMatcher], [Node.TEXT_NODE, urlMatcher]]
+    matchers: [
+      ['BR', lineBreakMatcher],
+      [Node.TEXT_NODE, urlMatcher]
+    ]
   },
   keyboard: {
     bindings: {

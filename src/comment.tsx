@@ -4,9 +4,9 @@ import ReactQuill, { Quill } from 'react-quill'
 
 import MattersEditorMention from './components/Mention'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/comment'
-import { DEBOUNCE_DELAY, LANGUAGE } from './enums/common'
+import { DEBOUNCE_DELAY, DEBOUNCE_DELAY_MENTION, LANGUAGE } from './enums/common'
 import { TEXT } from './enums/text'
-import { getQuillInstance, trimLineBreaks } from './utils/editor'
+import { getQuillInstance } from './utils/editor'
 
 interface Props {
   editorContent: string
@@ -23,23 +23,20 @@ interface Props {
 }
 
 interface State {
-  focus: boolean
+  content: string
   mentionInstance: any
 }
 
 export class MattersCommentEditor extends React.Component<Props, State> {
   private instance: Quill | null = null
-
   private editorReference = React.createRef<ReactQuill>()
-
   private mentionReference = React.createRef<HTMLElement>()
-
   private texts: Texts = null
 
   constructor(props: Props) {
     super(props)
     this.state = {
-      focus: false,
+      content: this.props.editorContent,
       mentionInstance: null
     }
     this.texts = props.texts || TEXT[props.language] || TEXT[LANGUAGE.ZH_HANT]
@@ -58,18 +55,20 @@ export class MattersCommentEditor extends React.Component<Props, State> {
   initQuillInstance = () => getQuillInstance(this.editorReference)
 
   update = debounce((content: string) => {
-    this.props.editorUpdate({ content: trimLineBreaks(content) })
+    this.props.editorUpdate({ content })
   }, DEBOUNCE_DELAY)
 
-  handleBlur = () => this.setState({ focus: false })
-
-  handleFocus = () => this.setState({ focus: true })
-
-  handleChange = (content: string) => this.update(content)
+  handleChange = (content: string, delta: any, source: string) => {
+    this.setState({ content }, () => {
+      if (source === 'user') {
+        this.update(content)
+      }
+    })
+  }
 
   handleMentionChange = debounce((keyword: string) => {
     this.props.mentionKeywordChange(keyword)
-  }, DEBOUNCE_DELAY)
+  }, DEBOUNCE_DELAY_MENTION)
 
   handleMentionSelection = ({ id, userName, displayName }) => {
     this.state.mentionInstance.insertMention({
@@ -92,17 +91,16 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     try {
       // @ts-ignore
       const input = this.instance.theme.tooltip.root.querySelector('input[data-link]')
+
       input.dataset.link = this.texts.LINK_PLACEHOLDER
     } catch (error) {
-      // TODO: Add error handler
+      // TODO
     }
   }
 
   storeMentionInstance = (instance: any) => this.setState({ mentionInstance: instance })
 
   render() {
-    const classes = this.state.focus ? 'focus' : ''
-
     const modulesConfig = {
       ...MODULE_CONFIG,
       mention: {
@@ -114,7 +112,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
 
     return (
       <>
-        <div id="editor-comment-container" className={classes}>
+        <div id="editor-comment-container">
           <ReactQuill
             formats={FORMAT_CONFIG}
             modules={modulesConfig}
@@ -122,12 +120,11 @@ export class MattersCommentEditor extends React.Component<Props, State> {
             readOnly={this.props.readOnly}
             ref={this.editorReference}
             theme={this.props.theme}
-            value={this.props.editorContent}
-            onBlur={this.handleBlur}
-            onFocus={this.handleFocus}
+            value={this.state.content}
             onChange={this.handleChange}
             bounds="#editor-comment-container"
           />
+
           <MattersEditorMention
             mentionLoading={this.props.mentionLoading}
             mentionListComponent={this.props.mentionListComponent}
