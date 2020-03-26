@@ -29,13 +29,11 @@ export default ({
   mentionUsers,
   reference
 }: Props) => {
-  if (mentionUsers.length <= 0 && !mentionLoading) {
-    return null
-  }
+  const hasMention = mentionUsers.length <= 0 && !mentionLoading
 
   return (
     <section className="mention-container" ref={reference}>
-      {mentionListComponent({ mentionLoading, mentionSelection, mentionUsers })}
+      {hasMention ? null : mentionListComponent({ mentionLoading, mentionSelection, mentionUsers })}
     </section>
   )
 }

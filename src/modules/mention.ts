@@ -40,14 +40,14 @@ class Mention {
 
   show() {
     if (this.mentionContainer) {
-      this.mentionContainer.style.display = ''
+      this.mentionContainer.style.visibility = 'visible'
       this.setMentionPosition()
     }
   }
 
   hide() {
     if (this.mentionContainer) {
-      this.mentionContainer.style.display = 'none'
+      this.mentionContainer.style.visibility = 'hidden'
     }
   }
 
@@ -92,8 +92,7 @@ class Mention {
       top = exceptTop
     }
 
-    this.mentionContainer.style.top = `${top}px`
-    this.mentionContainer.style.left = `${left}px`
+    this.mentionContainer.style.transform = `translate(${left}px, ${top}px)`
   }
 
   handleChange() {
