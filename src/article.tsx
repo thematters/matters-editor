@@ -32,6 +32,7 @@ interface Props {
   uploadAssetDomain: string
   uploadAudioSizeLimit?: number
   uploadImageSizeLimit?: number
+  scrollingContainer?: string | HTMLElement
 }
 
 interface State {
@@ -223,6 +224,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
             onBlur={this.handleBlur}
             onChange={this.handleChange}
             onChangeSelection={this.handleChangeSelection}
+            scrollingContainer={this.props.scrollingContainer}
           />
           <MattersEditorToolbar
             eventDispatcher={this.eventDispatcher}

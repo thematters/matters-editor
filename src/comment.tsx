@@ -20,6 +20,7 @@ interface Props {
   readOnly: boolean
   theme: string
   texts?: Texts
+  scrollingContainer?: string | HTMLElement
 }
 
 interface State {
@@ -123,6 +124,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
             value={this.state.content}
             onChange={this.handleChange}
             bounds="#editor-comment-container"
+            scrollingContainer={this.props.scrollingContainer}
           />
 
           <MattersEditorMention
