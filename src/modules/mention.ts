@@ -42,14 +42,14 @@ class Mention {
 
   show() {
     if (this.mentionContainer) {
-      this.mentionContainer.style.visibility = 'visible'
+      this.mentionContainer.style.display = ''
       this.setMentionPosition()
     }
   }
 
   hide() {
     if (this.mentionContainer) {
-      this.mentionContainer.style.visibility = 'hidden'
+      this.mentionContainer.style.display = 'none'
     }
   }
 
