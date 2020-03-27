@@ -4,7 +4,7 @@ import ReactQuill, { Quill } from 'react-quill'
 
 import MattersEditorMention from './components/Mention'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/comment'
-import { DEBOUNCE_DELAY, DEBOUNCE_DELAY_MENTION, LANGUAGE } from './enums/common'
+import { DEBOUNCE_DELAY, LANGUAGE } from './enums/common'
 import { TEXT } from './enums/text'
 import { getQuillInstance } from './utils/editor'
 
@@ -20,6 +20,7 @@ interface Props {
   readOnly: boolean
   theme: string
   texts?: Texts
+  scrollingContainer?: string | HTMLElement
 }
 
 interface State {
@@ -66,9 +67,9 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     })
   }
 
-  handleMentionChange = debounce((keyword: string) => {
+  handleMentionChange = (keyword: string) => {
     this.props.mentionKeywordChange(keyword)
-  }, DEBOUNCE_DELAY_MENTION)
+  }
 
   handleMentionSelection = ({ id, userName, displayName }) => {
     this.state.mentionInstance.insertMention({
@@ -123,6 +124,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
             value={this.state.content}
             onChange={this.handleChange}
             bounds="#editor-comment-container"
+            scrollingContainer={this.props.scrollingContainer}
           />
 
           <MattersEditorMention

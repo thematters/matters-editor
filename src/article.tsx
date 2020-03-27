@@ -7,7 +7,7 @@ import MattersEditorMention from './components/Mention'
 import MattersEditorTitle from './components/Title'
 import MattersEditorToolbar from './components/Toolbar'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/default'
-import { DEBOUNCE_DELAY, DEBOUNCE_DELAY_MENTION, LANGUAGE, SELECTION_TYPES } from './enums/common'
+import { DEBOUNCE_DELAY, LANGUAGE, SELECTION_TYPES } from './enums/common'
 import { TEXT } from './enums/text'
 import createImageMatcher from './matchers/createImage'
 import { initAudioPlayers } from './utils/audioPlayer'
@@ -32,6 +32,7 @@ interface Props {
   uploadAssetDomain: string
   uploadAudioSizeLimit?: number
   uploadImageSizeLimit?: number
+  scrollingContainer?: string | HTMLElement
 }
 
 interface State {
@@ -152,9 +153,9 @@ export class MattersArticleEditor extends React.Component<Props, State> {
 
   handleImageDrop = async (file: any): Promise<ResultData> => this.props.editorUpload({ file })
 
-  handleMentionChange = debounce((keyword: string) => {
+  handleMentionChange = (keyword: string) => {
     this.props.mentionKeywordChange(keyword)
-  }, DEBOUNCE_DELAY_MENTION)
+  }
 
   handleMentionSelection = ({ id, userName, displayName }) => {
     this.state.mentionInstance.insertMention({
@@ -223,6 +224,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
             onBlur={this.handleBlur}
             onChange={this.handleChange}
             onChangeSelection={this.handleChangeSelection}
+            scrollingContainer={this.props.scrollingContainer}
           />
           <MattersEditorToolbar
             eventDispatcher={this.eventDispatcher}

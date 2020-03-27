@@ -1,6 +1,8 @@
 import { Quill } from 'react-quill'
 
 import { isValidChars, REGEXP_DISPLAY_NAME } from '../utils/validator'
+import { isSafari } from '../utils/browser'
+import { dom } from '../utils/dom'
 
 /**
  * Mention module.
@@ -40,14 +42,14 @@ class Mention {
 
   show() {
     if (this.mentionContainer) {
-      this.mentionContainer.style.visibility = 'visible'
+      this.mentionContainer.style.display = ''
       this.setMentionPosition()
     }
   }
 
   hide() {
     if (this.mentionContainer) {
-      this.mentionContainer.style.visibility = 'hidden'
+      this.mentionContainer.style.display = 'none'
     }
   }
 
@@ -59,8 +61,12 @@ class Mention {
     const tempMentionCharPos = this.mentionCharPos
     this.quill.deleteText(this.mentionCharPos, this.cursorPos - this.mentionCharPos, 'user')
     this.quill.insertEmbed(tempMentionCharPos, 'mention', data, 'user')
-    this.quill.insertText(tempMentionCharPos + 1, ' ', 'user')
-    this.quill.setSelection(tempMentionCharPos + 2, 'user')
+    this.quill.setSelection(tempMentionCharPos + 1, 'user')
+
+    setTimeout(() => {
+      this.quill.insertText(tempMentionCharPos + 1, ' ', 'user')
+      this.quill.setSelection(tempMentionCharPos + 2, 'user')
+    })
   }
 
   setMentionPosition() {
