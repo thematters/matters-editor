@@ -57,19 +57,15 @@ class Mention {
     if (!data || !this.cursorPos) {
       return
     }
-    // store scroll position
-    const target = isSafari() ? 'body' : 'html'
-    const element = dom.$(target)
-    const scrollTop = element ? element.scrollTop || 0 : 0
 
     const tempMentionCharPos = this.mentionCharPos
-    this.quill.deleteText(this.mentionCharPos, this.cursorPos - this.mentionCharPos, 'user')
-    this.quill.insertEmbed(tempMentionCharPos, 'mention', data, 'user')
-    this.quill.insertText(tempMentionCharPos + 1, ' ', 'user')
-    this.quill.setSelection(tempMentionCharPos + 2, 'user')
-
-    // re-apply stored scroll position
-    element.scrollTop = scrollTop
+    this.quill.deleteText(this.mentionCharPos, this.cursorPos - this.mentionCharPos, 'silent')
+    this.quill.insertEmbed(tempMentionCharPos, 'mention', data, 'silent')
+    this.quill.setSelection(tempMentionCharPos + 1, 'silent')
+    setTimeout(() => {
+      this.quill.insertText(tempMentionCharPos + 1, ' ', 'silent')
+      this.quill.setSelection(tempMentionCharPos + 2, 'silent')
+    })
   }
 
   setMentionPosition() {
