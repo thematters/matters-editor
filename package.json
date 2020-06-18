@@ -20,7 +20,7 @@
     "build": "rimraf build/**/* && rollup -c rollup.config.js",
     "demo": "parcel -p 9000 demo/index.html --open",
     "format": "prettier --write \"{src,demo}/**/*.{ts,tsx,json}\"",
-    "tslint": "tslint -p ."
+    "lint": "tslint -p ."
   },
   "husky": {
     "hooks": {
