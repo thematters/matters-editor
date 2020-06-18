@@ -52,6 +52,7 @@ jobs:
       - name: Slack Notification
         if: always()
         uses: 8398a7/action-slack@v3
+        fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
         with:
           status: ${{ job.status }}
           author_name: matters-editor
