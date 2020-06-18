@@ -34,3 +34,4 @@ jobs:
         with:
           status: ${{ job.status }}
           author_name: matters-email
+          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
