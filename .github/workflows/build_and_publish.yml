@@ -22,9 +22,10 @@ jobs:
         uses: actions/checkout@master
 
       - name: Setup Node.js
-        uses: actions/setup-node@v2-beta
+        uses: actions/setup-node@v1
         with:
           node-version: '12.16'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Cache Dependencies
         id: cache
