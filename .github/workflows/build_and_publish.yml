@@ -47,7 +47,7 @@ jobs:
       # === `master` branch ===
       - name: Publish to NPM
         if: github.ref == 'refs/heads/master'
-        run: npm publish --access public
+        run: npm publish
 
       - name: Slack Notification
         if: always()
