@@ -10,7 +10,6 @@ on:
       - '*'
 
 env:
-  NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
 
@@ -22,10 +21,11 @@ jobs:
         uses: actions/checkout@master
 
       - name: Setup Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2-beta
         with:
           node-version: '12.16'
           registry-url: 'https://registry.npmjs.org'
+          always-auth: true
 
       - name: Cache Dependencies
         id: cache
@@ -49,6 +49,8 @@ jobs:
       - name: Publish to NPM
         if: github.ref == 'refs/heads/master'
         run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 
       - name: Slack Notification
         if: always()
