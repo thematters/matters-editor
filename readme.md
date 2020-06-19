@@ -1,6 +1,6 @@
 # Matters Editor
 
-![](https://github.com/thematters/matters-editor/workflows/Build%20&%20Publish/badge.svg)
+![](https://github.com/thematters/matters-editor/workflows/Build%20&%20Publish/badge.svg) ![](https://github.com/thematters/matters-editor/workflows/Create%20Release/badge.svg)
 
 This rich text editor is based on three amazing projects [Quill](https://quilljs.com/), [react-quill](https://github.com/zenoamaro/react-quill) and [Tippy.js](https://atomiks.github.io/tippyjs/). This editor has been used in a real production called [Matters](http://matters.news), a writing platform built on top of IPFS. Currently, we're pulling it out as a standalone package, so there will be some big changes in the following. 😎
 

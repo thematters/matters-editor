@@ -36,7 +36,7 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Test
         run: npm run lint
