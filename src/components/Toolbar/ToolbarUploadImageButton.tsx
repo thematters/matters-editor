@@ -1,6 +1,10 @@
-import * as React from 'react'
+import React from 'react'
 
-import { ACCEPTED_UPLOAD_IMAGE_TYPES, COLOR, UPLOAD_IMAGE_SIZE_LIMIT } from '../../enums/common'
+import {
+  ACCEPTED_UPLOAD_IMAGE_TYPES,
+  COLOR,
+  UPLOAD_IMAGE_SIZE_LIMIT,
+} from '../../enums/common'
 import SVGSpinner from '../../icons/Spinner'
 import SVGToolbarUploadImage from '../../icons/ToolbarUploadImage'
 
@@ -36,7 +40,7 @@ const ToolbarUploadImageButton: React.FC<Props> = ({
   eventName,
   texts,
   upload,
-  uploadImageSizeLimit = UPLOAD_IMAGE_SIZE_LIMIT
+  uploadImageSizeLimit = UPLOAD_IMAGE_SIZE_LIMIT,
 }) => {
   const [uploading, setUploading] = React.useState(false)
 
@@ -51,7 +55,10 @@ const ToolbarUploadImageButton: React.FC<Props> = ({
     event.currentTarget.value = ''
 
     if (file && file.size > uploadImageSizeLimit) {
-      eventDispatcher(eventName, { color: COLOR.RED, content: texts.UPLOAD_IMAGE_REACH_SIZE_LIMIT })
+      eventDispatcher(eventName, {
+        color: COLOR.RED,
+        content: texts.UPLOAD_IMAGE_REACH_SIZE_LIMIT,
+      })
       return
     }
 
@@ -60,11 +67,17 @@ const ToolbarUploadImageButton: React.FC<Props> = ({
       const result = await upload({ file })
       callback(result)
       setUploading(false)
-      eventDispatcher(eventName, { color: COLOR.GREEN, content: texts.UPLOAD_IMAGE_SUCCESSFUL })
+      eventDispatcher(eventName, {
+        color: COLOR.GREEN,
+        content: texts.UPLOAD_IMAGE_SUCCESSFUL,
+      })
     } catch (error) {
       callback({})
       setUploading(false)
-      eventDispatcher(eventName, { color: COLOR.RED, content: texts.UPLOAD_IMAGE_FAILED })
+      eventDispatcher(eventName, {
+        color: COLOR.RED,
+        content: texts.UPLOAD_IMAGE_FAILED,
+      })
       console.error(error)
     }
   }

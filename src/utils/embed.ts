@@ -5,7 +5,7 @@ const getPath = (url: string) => {
   if (path) {
     return path
       .split('/')
-      .filter(fragment => fragment)
+      .filter((fragment) => fragment)
       .join('/')
   }
   return ''

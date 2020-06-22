@@ -6,7 +6,8 @@ export const TEXT = {
     EMBED_CODE_PLACEHOLDER: 'Paste JSFiddle and press enter',
     EMBED_VIDEO_PLACEHOLDER: 'Paste YouTube or Vimeo link, and press enter',
     LINK_PLACEHOLDER: 'Enter link',
-    LIKE_BUTTON_FAILED: "Like button has been embeded, so you don't need to another.",
+    LIKE_BUTTON_FAILED:
+      "Like button has been embeded, so you don't need to another.",
     TITLE_FALLBACK: 'Untitle',
     TITLE_PLACEHOLDER: 'Enter title ...',
     TOOLBAR_ADD_DIVIDER: 'Add divivder',
@@ -19,11 +20,12 @@ export const TEXT = {
     UPLOAD_AUDIO_FAILED: 'Audio upload failed',
     UPLOAD_AUDIO_REACH_SIZE_LIMIT: 'Image size must be under 100MB',
     UPLOAD_AUDIO_SUCCESSFUL: 'Audio upload successfully',
-    UPLOAD_AUDIO_TOOLTIP: 'Only accept MP3 and AAC, and size must be under 100MB',
+    UPLOAD_AUDIO_TOOLTIP:
+      'Only accept MP3 and AAC, and size must be under 100MB',
     UPLOAD_IMAGE_FAILED: 'Image upload failed',
     UPLOAD_IMAGE_REACH_SIZE_LIMIT: 'Image size must be under 5MB',
     UPLOAD_IMAGE_SINGLE_LIMIT: 'Please upload one image at a time',
-    UPLOAD_IMAGE_SUCCESSFUL: 'Image upload successfully'
+    UPLOAD_IMAGE_SUCCESSFUL: 'Image upload successfully',
   },
   ZH_HANS: {
     CAPTION_PLACEHOLDER: '添加说明文字…',
@@ -49,7 +51,7 @@ export const TEXT = {
     UPLOAD_IMAGE_FAILED: '圖片上傳失敗',
     UPLOAD_IMAGE_REACH_SIZE_LIMIT: '上传文件请勿超过 5 MB',
     UPLOAD_IMAGE_SINGLE_LIMIT: '请一次上传一个文件',
-    UPLOAD_IMAGE_SUCCESSFUL: '圖片上傳成功'
+    UPLOAD_IMAGE_SUCCESSFUL: '圖片上傳成功',
   },
   ZH_HANT: {
     CAPTION_PLACEHOLDER: '添加說明文字…',
@@ -75,6 +77,6 @@ export const TEXT = {
     UPLOAD_IMAGE_FAILED: '圖片上傳失敗',
     UPLOAD_IMAGE_REACH_SIZE_LIMIT: '上傳檔案請勿超過 5 MB',
     UPLOAD_IMAGE_SINGLE_LIMIT: '請一次上傳一個檔案',
-    UPLOAD_IMAGE_SUCCESSFUL: '圖片上傳成功'
-  }
+    UPLOAD_IMAGE_SUCCESSFUL: '圖片上傳成功',
+  },
 }

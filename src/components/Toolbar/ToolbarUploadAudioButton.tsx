@@ -1,7 +1,11 @@
-import * as React from 'react'
+import React from 'react'
 
 import { Tooltip } from '../Tooltip'
-import { ACCEPTED_UPLOAD_AUDIO_TYPES, COLOR, UPLOAD_AUDIO_SIZE_LIMIT } from '../../enums/common'
+import {
+  ACCEPTED_UPLOAD_AUDIO_TYPES,
+  COLOR,
+  UPLOAD_AUDIO_SIZE_LIMIT,
+} from '../../enums/common'
 import SVGSpinner from '../../icons/Spinner'
 import SVGToolbarUploadAudio from '../../icons/ToolbarUploadAudio'
 
@@ -37,7 +41,7 @@ const ToolbarUploadAudioButton: React.FC<Props> = ({
   eventName,
   texts,
   upload,
-  uploadAudioSizeLimit = UPLOAD_AUDIO_SIZE_LIMIT
+  uploadAudioSizeLimit = UPLOAD_AUDIO_SIZE_LIMIT,
 }) => {
   const [uploading, setUploading] = React.useState(false)
 
@@ -53,7 +57,10 @@ const ToolbarUploadAudioButton: React.FC<Props> = ({
     event.currentTarget.value = ''
 
     if (file && file.size > uploadAudioSizeLimit) {
-      eventDispatcher(eventName, { color: COLOR.RED, content: texts.UPLOAD_AUDIO_REACH_SIZE_LIMIT })
+      eventDispatcher(eventName, {
+        color: COLOR.RED,
+        content: texts.UPLOAD_AUDIO_REACH_SIZE_LIMIT,
+      })
       return
     }
 
@@ -62,11 +69,17 @@ const ToolbarUploadAudioButton: React.FC<Props> = ({
       const result = await upload({ file, type: 'embedaudio' })
       callback({ ...result, mimeType, fileName })
       setUploading(false)
-      eventDispatcher(eventName, { color: COLOR.GREEN, content: texts.UPLOAD_AUDIO_SUCCESSFUL })
+      eventDispatcher(eventName, {
+        color: COLOR.GREEN,
+        content: texts.UPLOAD_AUDIO_SUCCESSFUL,
+      })
     } catch (e) {
       callback({})
       setUploading(false)
-      eventDispatcher(eventName, { color: COLOR.RED, content: texts.UPLOAD_AUDIO_FAILED })
+      eventDispatcher(eventName, {
+        color: COLOR.RED,
+        content: texts.UPLOAD_AUDIO_FAILED,
+      })
       console.error(e)
     }
   }
@@ -83,7 +96,9 @@ const ToolbarUploadAudioButton: React.FC<Props> = ({
           onChange={handleChange}
         />
         {uploading && <SVGSpinner className="spinner u-motion-spin" />}
-        {!uploading && <SVGToolbarUploadAudio className="u-motion-icon-hover" />}
+        {!uploading && (
+          <SVGToolbarUploadAudio className="u-motion-icon-hover" />
+        )}
       </label>
     </Tooltip>
   )

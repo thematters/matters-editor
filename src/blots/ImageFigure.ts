@@ -20,7 +20,7 @@ class ImageFigure extends BlockEmbed {
 
     // caption
     const figcaption = Parchment.create('figcaption', {
-      caption: value.caption
+      caption: value.caption,
     }).domNode
 
     // image
@@ -48,7 +48,7 @@ class ImageFigure extends BlockEmbed {
     return {
       assetId: image ? image.dataset.assetId : undefined,
       caption: caption ? caption.innerText : '',
-      src: image ? image.getAttribute('src') : ''
+      src: image ? image.getAttribute('src') : '',
     }
   }
 }

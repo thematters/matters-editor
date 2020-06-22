@@ -16,7 +16,7 @@ class EmbedVideo extends BlockEmbed {
 
     // caption
     const figcaption = Parchment.create('figcaption', {
-      caption: value.caption
+      caption: value.caption,
     }).domNode
 
     // iframe
@@ -42,7 +42,7 @@ class EmbedVideo extends BlockEmbed {
 
     return {
       caption: caption ? caption.innerText : '',
-      url: iframe ? iframe.getAttribute('src') : ''
+      url: iframe ? iframe.getAttribute('src') : '',
     }
   }
 }

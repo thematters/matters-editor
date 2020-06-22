@@ -15,7 +15,7 @@ class AudioFigure extends BlockEmbed {
 
     // caption
     const figcaption = Parchment.create('figcaption', {
-      caption: value.caption || ''
+      caption: value.caption || '',
     }).domNode
 
     // audio
@@ -72,7 +72,7 @@ class AudioFigure extends BlockEmbed {
         sourcesVal.push({
           src: node.getAttribute('src') || '',
           type: node.getAttribute('type') || '',
-          assetId: node.dataset.assetId || ''
+          assetId: node.dataset.assetId || '',
         })
       })
     }
@@ -80,7 +80,7 @@ class AudioFigure extends BlockEmbed {
     return {
       caption: caption ? caption.innerText : '',
       fileName: audio ? audio.dataset.fileName : '',
-      sources: sourcesVal
+      sources: sourcesVal,
     }
   }
 

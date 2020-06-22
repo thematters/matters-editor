@@ -1,5 +1,5 @@
-import debounce from 'lodash/debounce'
-import * as React from 'react'
+import _debounce from 'lodash/debounce'
+import React from 'react'
 import ReactQuill, { Quill } from 'react-quill'
 
 import Util from './blots/Util'
@@ -54,7 +54,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
       content: this.props.editorContent,
       mentionInstance: null,
       toolbarPosition: 0,
-      toolbarVisible: false
+      toolbarVisible: false,
     }
     this.texts = props.texts || TEXT[props.language] || TEXT[LANGUAGE.ZH_HANT]
 
@@ -83,7 +83,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     this.setState({
       content: this.props.editorContent || '',
       toolbarVisible: false,
-      toolbarPosition: 0
+      toolbarPosition: 0,
     })
   }
 
@@ -102,7 +102,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     return instance
   }
 
-  update = debounce((content: string) => {
+  update = _debounce((content: string) => {
     this.props.editorUpdate({ content })
   }, DEBOUNCE_DELAY)
 
@@ -116,7 +116,11 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     })
   }
 
-  handleChangeSelection = (range: SelectionRange, source: string, editor: any) => {
+  handleChangeSelection = (
+    range: SelectionRange,
+    source: string,
+    editor: any
+  ) => {
     if (!range) {
       return
     }
@@ -128,14 +132,14 @@ export class MattersArticleEditor extends React.Component<Props, State> {
       case SELECTION_TYPES.CUSTOM_BLOT: {
         this.setState({
           toolbarVisible: false,
-          toolbarPosition: bounds.top || 0
+          toolbarPosition: bounds.top || 0,
         })
         break
       }
       case SELECTION_TYPES.NEW_LINE: {
         this.setState({
           toolbarVisible: true,
-          toolbarPosition: bounds.top
+          toolbarPosition: bounds.top,
         })
         break
       }
@@ -143,7 +147,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
         if (this.state.toolbarVisible) {
           this.setState({
             toolbarVisible: false,
-            toolbarPosition: bounds.top || 0
+            toolbarPosition: bounds.top || 0,
           })
         }
         break
@@ -151,7 +155,8 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     }
   }
 
-  handleImageDrop = async (file: any): Promise<ResultData> => this.props.editorUpload({ file })
+  handleImageDrop = async (file: any): Promise<ResultData> =>
+    this.props.editorUpload({ file })
 
   handleMentionChange = (keyword: string) => {
     this.props.mentionKeywordChange(keyword)
@@ -161,7 +166,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     this.state.mentionInstance.insertMention({
       id,
       displayName,
-      userName
+      userName,
     })
   }
 
@@ -177,14 +182,17 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     }
     try {
       // @ts-ignore
-      const input = this.instance.theme.tooltip.root.querySelector('input[data-link]')
+      const input = this.instance.theme.tooltip.root.querySelector(
+        'input[data-link]'
+      )
       input.dataset.link = this.texts.LINK_PLACEHOLDER
     } catch (error) {
       // TODO: Add error handler
     }
   }
 
-  storeMentionInstance = (instance: any) => this.setState({ mentionInstance: instance })
+  storeMentionInstance = (instance: any) =>
+    this.setState({ mentionInstance: instance })
 
   render() {
     const classes = this.props.readOnly ? 'u-area-disable' : ''
@@ -195,13 +203,14 @@ export class MattersArticleEditor extends React.Component<Props, State> {
         eventDispatcher: this.eventDispatcher,
         eventName: this.props.eventName,
         handleImageDrop: this.handleImageDrop,
-        texts: this.texts
+        texts: this.texts,
       },
       mention: {
-        mentionContainer: this.mentionReference && this.mentionReference.current,
+        mentionContainer:
+          this.mentionReference && this.mentionReference.current,
         handleMentionChange: this.handleMentionChange,
-        storeMentionInstance: this.storeMentionInstance
-      }
+        storeMentionInstance: this.storeMentionInstance,
+      },
     }
 
     return (

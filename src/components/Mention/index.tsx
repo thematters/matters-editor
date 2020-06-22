@@ -1,4 +1,4 @@
-import * as React from 'react'
+import React from 'react'
 
 import SVGSpinner from '../../icons/Spinner'
 
@@ -27,13 +27,19 @@ export default ({
   mentionListComponent,
   mentionSelection,
   mentionUsers,
-  reference
+  reference,
 }: Props) => {
   const hasMention = mentionUsers.length <= 0 && !mentionLoading
 
   return (
     <section className="mention-container" ref={reference}>
-      {hasMention ? null : mentionListComponent({ mentionLoading, mentionSelection, mentionUsers })}
+      {hasMention
+        ? null
+        : mentionListComponent({
+            mentionLoading,
+            mentionSelection,
+            mentionUsers,
+          })}
     </section>
   )
 }

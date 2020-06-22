@@ -38,7 +38,7 @@ class RemadeClipboard extends Clipboard {
     let delta = new Delta().retain(range.index)
     if (formats[CodeBlock.blotName]) {
       delta.insert(text, {
-        [CodeBlock.blotName]: formats[CodeBlock.blotName]
+        [CodeBlock.blotName]: formats[CodeBlock.blotName],
       })
     } else if (!html) {
       delta.insert(text)

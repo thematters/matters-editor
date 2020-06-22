@@ -13,7 +13,7 @@ class Source extends BlockEmbed {
   static value(domNode: HTMLElement): any {
     return {
       src: domNode.getAttribute('src') || '',
-      type: domNode.getAttribute('type') || ''
+      type: domNode.getAttribute('type') || '',
     }
   }
 }
