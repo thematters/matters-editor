@@ -1,12 +1,12 @@
-import uuid from 'uuid/v4'
+import { v4 } from 'uuid'
 import * as React from 'react'
 import { render } from 'react-dom'
 
 import { MattersArticleEditor, MattersCommentEditor } from '../src'
 
 const demoMentionUsers = [
-  { id: uuid(), displayName: 'user1', userName: 'user1' },
-  { id: uuid(), displayName: 'user2', userName: 'user2' }
+  { id: v4(), displayName: 'user1', userName: 'user1' },
+  { id: v4(), displayName: 'user2', userName: 'user2' },
 ]
 
 const DemoMentionList = ({ mentionLoading, mentionSelection, mentionUsers }) => {
@@ -16,7 +16,7 @@ const DemoMentionList = ({ mentionLoading, mentionSelection, mentionUsers }) => 
 
   return (
     <>
-      {mentionUsers.map(user => {
+      {mentionUsers.map((user) => {
         return (
           <button
             key={user.id}
@@ -54,7 +54,7 @@ const App = () => {
     // TODO: add calling upload api and get source path
     // below is just an example.
     const source = await dummyRead(params)
-    return { id: uuid(), path: source }
+    return { id: v4(), path: source }
   }
 
   const mentionKeywordChange = (keyword: string) => {
@@ -90,7 +90,7 @@ const App = () => {
       <br />
       <MattersCommentEditor
         editorContent={commentContent}
-        editorUpdate={params => setCommentContent(params.content)}
+        editorUpdate={(params) => setCommentContent(params.content)}
         eventName={eventName}
         language="EN"
         mentionLoading={false}
