@@ -1,69 +1,85 @@
-import commonjs from 'rollup-plugin-commonjs'
 import external from 'rollup-plugin-peer-deps-external'
 import postcss from 'rollup-plugin-postcss'
-import resolve from 'rollup-plugin-node-resolve'
 import typescript from 'rollup-plugin-typescript2'
+import resolve from '@rollup/plugin-node-resolve'
+import commonjs from '@rollup/plugin-commonjs'
 
 import pkg from './package.json'
 
-const inputDir = 'src/themes'
+const mainDir = {
+  input: 'src/index.ts',
+}
 
-const outputDir = 'build/themes'
+const themeDir = {
+  input: 'src/themes',
+  output: 'dist/themes',
+}
 
 export default [
   {
-    input: "src/index.ts",
+    input: mainDir.input,
     output: [
       {
         file: pkg.main,
-        format: 'cjs'
+        format: 'umd',
+        name: pkg.name,
       },
       {
         file: pkg.module,
-        format: 'es'
-      }
+        format: 'es',
+      },
     ],
     plugins: [
-      commonjs({ include: 'node_modules/**'}),
+      commonjs({
+        include: 'node_modules/**',
+      }),
       external(),
       resolve(),
-      typescript({ clean: true })
-    ]
+      typescript({
+        clean: true,
+      }),
+    ],
   },
   {
-    input: `${inputDir}/editor.css`,
+    input: `${themeDir.input}/editor.css`,
     output: [
       {
-        file: `${outputDir}/editor.min.css`,
-        format: 'es'
+        file: `${themeDir.output}/editor.min.css`,
+        format: 'es',
       },
     ],
     plugins: [
-      postcss({ extract: true })
-    ]
+      postcss({
+        extract: true,
+      }),
+    ],
   },
   {
-    input: `${inputDir}/quill.bubble.css`,
+    input: `${themeDir.input}/quill.bubble.css`,
     output: [
       {
-        file: `${outputDir}/quill.bubble.min.css`,
-        format: 'es'
+        file: `${themeDir.output}/quill.bubble.min.css`,
+        format: 'es',
       },
     ],
     plugins: [
-      postcss({ extract: true })
-    ]
+      postcss({
+        extract: true,
+      }),
+    ],
   },
   {
-    input: `${inputDir}/tippy.css`,
+    input: `${themeDir.input}/tippy.css`,
     output: [
       {
-        file: `${outputDir}/tippy.min.css`,
-        format: 'es'
+        file: `${themeDir.output}/tippy.min.css`,
+        format: 'es',
       },
     ],
     plugins: [
-      postcss({ extract: true })
-    ]
-  }
+      postcss({
+        extract: true,
+      }),
+    ],
+  },
 ]

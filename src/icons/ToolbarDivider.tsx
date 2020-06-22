@@ -1,4 +1,4 @@
-import * as React from 'react'
+import React from 'react'
 
 export default ({ className }: any) => (
   <svg
@@ -10,7 +10,11 @@ export default ({ className }: any) => (
   >
     <g fill="none" fillRule="evenodd">
       <circle cx="16.5" cy="16.5" r="16" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13 13h7-7zm0 8h7-7zm-5-4h17H8z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13 13h7-7zm0 8h7-7zm-5-4h17H8z"
+      />
     </g>
   </svg>
 )

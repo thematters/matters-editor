@@ -16,7 +16,11 @@ const Delta = Quill.import('delta')
  * @see http://stackoverflow.com/questions/16245767/creating-a-blob-from-a-base64-string-in-javascript
  * @return Blob
  */
-const b64toBlob = (b64Data: string, contentType: string = '', sliceSize: number = 512) => {
+const b64toBlob = (
+  b64Data: string,
+  contentType: string = '',
+  sliceSize: number = 512
+) => {
   const byteCharacters = atob(b64Data)
   const byteArrays = []
 
@@ -37,10 +41,11 @@ const b64toBlob = (b64Data: string, contentType: string = '', sliceSize: number 
   return blob
 }
 
-const createImageMatcher = (upload: any, assetDomain: string, siteDomain: string) => (
-  node: Element,
-  delta: any
-) => {
+const createImageMatcher = (
+  upload: any,
+  assetDomain: string,
+  siteDomain: string
+) => (node: Element, delta: any) => {
   if (delta.ops.length === 0) {
     return delta
   }
@@ -66,7 +71,7 @@ const createImageMatcher = (upload: any, assetDomain: string, siteDomain: string
 
     imageFigure = {
       src: srcOrg,
-      assetId
+      assetId,
     }
   } else {
     // upload if copying from external resource
@@ -74,7 +79,7 @@ const createImageMatcher = (upload: any, assetDomain: string, siteDomain: string
     const placeholderId = (+new Date()).toString(36).slice(-5)
     imageFigure = {
       src: IMAGE_PLACEHOLDER,
-      id: placeholderId
+      id: placeholderId,
     }
 
     let input
@@ -104,12 +109,12 @@ const createImageMatcher = (upload: any, assetDomain: string, siteDomain: string
           img.setAttribute('data-asset-id', id)
         }
       })
-      .catch(error => console.error)
+      .catch((error) => console.error)
   }
 
   return new Delta().insert(
     {
-      imageFigure
+      imageFigure,
     },
     attributes
   )

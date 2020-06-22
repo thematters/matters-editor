@@ -1,5 +1,5 @@
 import classNames from 'classnames'
-import * as React from 'react'
+import React from 'react'
 import { Quill } from 'react-quill'
 
 import SVGToolbarAdd from '../../icons/ToolbarAdd'
@@ -53,7 +53,7 @@ const MattersEditorToolbar: React.FC<Props> = ({
   update,
   upload,
   uploadAudioSizeLimit,
-  uploadImageSizeLimit
+  uploadImageSizeLimit,
 }) => {
   const [expanded, setExpanded] = React.useState<boolean>(false)
 
@@ -75,12 +75,22 @@ const MattersEditorToolbar: React.FC<Props> = ({
   }
 
   const handleEmbedVideoCallback = () => {
-    insertEmbedBlock(instance, 'video', texts.EMBED_VIDEO_PLACEHOLDER, texts.CAPTION_PLACEHOLDER)
+    insertEmbedBlock(
+      instance,
+      'video',
+      texts.EMBED_VIDEO_PLACEHOLDER,
+      texts.CAPTION_PLACEHOLDER
+    )
     setExpanded(false)
   }
 
   const handleEmbedCodeCallback = () => {
-    insertEmbedBlock(instance, 'code', texts.EMBED_CODE_PLACEHOLDER, texts.CAPTION_PLACEHOLDER)
+    insertEmbedBlock(
+      instance,
+      'code',
+      texts.EMBED_CODE_PLACEHOLDER,
+      texts.CAPTION_PLACEHOLDER
+    )
     setExpanded(false)
   }
 
@@ -94,7 +104,14 @@ const MattersEditorToolbar: React.FC<Props> = ({
   }
 
   const handleUploadAudioCallback = (params: Params) => {
-    if (instance && params && params.id && params.path && params.fileName && params.mimeType) {
+    if (
+      instance &&
+      params &&
+      params.id &&
+      params.path &&
+      params.fileName &&
+      params.mimeType
+    ) {
       const { id, path, fileName, mimeType } = params
       const range = instance.getSelection(true)
       instance.insertEmbed(
@@ -103,7 +120,7 @@ const MattersEditorToolbar: React.FC<Props> = ({
         {
           sources: [{ src: path, type: mimeType, assetId: id }],
           fileName,
-          captionPlaceholder: texts.CAPTION_PLACEHOLDER
+          captionPlaceholder: texts.CAPTION_PLACEHOLDER,
         },
         'user'
       )
@@ -131,9 +148,18 @@ const MattersEditorToolbar: React.FC<Props> = ({
           upload={upload}
           uploadImageSizeLimit={uploadImageSizeLimit}
         />
-        <ToolbarEmbedVideoButton callback={handleEmbedVideoCallback} texts={texts} />
-        <ToolbarEmbedCodeButton callback={handleEmbedCodeCallback} texts={texts} />
-        <ToolbarDividerButton callback={handleAddDividerCallback} texts={texts} />
+        <ToolbarEmbedVideoButton
+          callback={handleEmbedVideoCallback}
+          texts={texts}
+        />
+        <ToolbarEmbedCodeButton
+          callback={handleEmbedCodeCallback}
+          texts={texts}
+        />
+        <ToolbarDividerButton
+          callback={handleAddDividerCallback}
+          texts={texts}
+        />
         <ToolbarUploadAudioButton
           callback={handleUploadAudioCallback}
           eventDispatcher={eventDispatcher}

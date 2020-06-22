@@ -1,6 +1,9 @@
 import { Quill } from 'react-quill'
 
-import { SANDBOX_DEFAULT_SETTINGS, SANDBOX_SPECIAL_SETTINGS } from '../enums/common'
+import {
+  SANDBOX_DEFAULT_SETTINGS,
+  SANDBOX_SPECIAL_SETTINGS,
+} from '../enums/common'
 
 const BlockEmbed = Quill.import('blots/block/embed')
 const Parchment = Quill.import('parchment')
@@ -16,7 +19,7 @@ class EmbedCode extends BlockEmbed {
 
     // caption
     const figcaption = Parchment.create('figcaption', {
-      caption: value.caption
+      caption: value.caption,
     }).domNode
 
     // iframe
@@ -52,7 +55,7 @@ class EmbedCode extends BlockEmbed {
 
     return {
       caption: caption ? caption.innerText : '',
-      url: iframe ? iframe.getAttribute('src') : ''
+      url: iframe ? iframe.getAttribute('src') : '',
     }
   }
 

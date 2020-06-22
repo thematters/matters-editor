@@ -1,5 +1,5 @@
 import classNames from 'classnames'
-import * as React from 'react'
+import React from 'react'
 
 /**
  * This is an optional component belonged to the edoitor.
@@ -24,14 +24,21 @@ const getValidTitleValue = (value: any, fallback: any): string => {
   return value && value !== fallback ? value : ''
 }
 
-const MattersEditorTitle: React.FC<Props> = ({ defaultValue, readOnly, texts, update }) => {
+const MattersEditorTitle: React.FC<Props> = ({
+  defaultValue,
+  readOnly,
+  texts,
+  update,
+}) => {
   const classes = classNames('editor-title', readOnly ? 'u-area-disable' : '')
 
   const [value, setValue] = React.useState<string>(defaultValue)
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => setValue(event.target.value)
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) =>
+    setValue(event.target.value)
 
-  const handleBlur = (event: React.FocusEvent<HTMLInputElement>) => update({ title: value })
+  const handleBlur = (event: React.FocusEvent<HTMLInputElement>) =>
+    update({ title: value })
 
   React.useEffect(() => setValue(defaultValue), [defaultValue])
 

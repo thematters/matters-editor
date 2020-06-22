@@ -9,8 +9,16 @@ const demoMentionUsers = [
   { id: v4(), displayName: 'user2', userName: 'user2' },
 ]
 
-const DemoMentionList = ({ mentionLoading, mentionSelection, mentionUsers }) => {
-  const style = { width: '100%', padding: '0.8rem 1rem', textAlign: 'left' as const }
+const DemoMentionList = ({
+  mentionLoading,
+  mentionSelection,
+  mentionUsers,
+}) => {
+  const style = {
+    width: '100%',
+    padding: '0.8rem 1rem',
+    textAlign: 'left' as const,
+  }
 
   const handleMentionClick = (user: any) => mentionSelection(user)
 
