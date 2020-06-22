@@ -59,7 +59,11 @@ class Mention {
     }
 
     const tempMentionCharPos = this.mentionCharPos
-    this.quill.deleteText(this.mentionCharPos, this.cursorPos - this.mentionCharPos, 'user')
+    this.quill.deleteText(
+      this.mentionCharPos,
+      this.cursorPos - this.mentionCharPos,
+      'user'
+    )
     this.quill.insertEmbed(tempMentionCharPos, 'mention', data, 'user')
     this.quill.setSelection(tempMentionCharPos + 1, 'user')
 
@@ -109,7 +113,10 @@ class Mention {
 
     this.cursorPos = range.index
     const startPos = Math.max(0, this.cursorPos - this.maxChars)
-    const beforeCursorPos = this.quill.getText(startPos, this.cursorPos - startPos)
+    const beforeCursorPos = this.quill.getText(
+      startPos,
+      this.cursorPos - startPos
+    )
     const mentionCharIndex = this.mentionDenotationChars.reduce((prev, cur) => {
       const previousIndex = prev
       const mentionIndex = beforeCursorPos.lastIndexOf(cur)
@@ -123,13 +130,17 @@ class Mention {
 
     if (
       this.isolateCharacter &&
-      !(mentionCharIndex === 0 || !!beforeCursorPos[mentionCharIndex - 1].match(/\s/g))
+      !(
+        mentionCharIndex === 0 ||
+        !!beforeCursorPos[mentionCharIndex - 1].match(/\s/g)
+      )
     ) {
       this.hide()
       return
     }
 
-    const mentionCharPos = this.cursorPos - (beforeCursorPos.length - mentionCharIndex)
+    const mentionCharPos =
+      this.cursorPos - (beforeCursorPos.length - mentionCharIndex)
     const textAfter = beforeCursorPos.substring(mentionCharIndex + 1)
     this.mentionCharPos = mentionCharPos
 

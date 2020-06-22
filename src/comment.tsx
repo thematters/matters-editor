@@ -1,5 +1,5 @@
-import debounce from 'lodash/debounce'
-import * as React from 'react'
+import _debounce from 'lodash/debounce'
+import React from 'react'
 import ReactQuill, { Quill } from 'react-quill'
 
 import MattersEditorMention from './components/Mention'
@@ -38,7 +38,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     super(props)
     this.state = {
       content: this.props.editorContent,
-      mentionInstance: null
+      mentionInstance: null,
     }
     this.texts = props.texts || TEXT[props.language] || TEXT[LANGUAGE.ZH_HANT]
   }
@@ -55,7 +55,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
 
   initQuillInstance = () => getQuillInstance(this.editorReference)
 
-  update = debounce((content: string) => {
+  update = _debounce((content: string) => {
     this.props.editorUpdate({ content })
   }, DEBOUNCE_DELAY)
 
@@ -75,7 +75,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     this.state.mentionInstance.insertMention({
       id,
       displayName,
-      userName
+      userName,
     })
   }
 
@@ -91,7 +91,9 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     }
     try {
       // @ts-ignore
-      const input = this.instance.theme.tooltip.root.querySelector('input[data-link]')
+      const input = this.instance.theme.tooltip.root.querySelector(
+        'input[data-link]'
+      )
 
       input.dataset.link = this.texts.LINK_PLACEHOLDER
     } catch (error) {
@@ -99,16 +101,18 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     }
   }
 
-  storeMentionInstance = (instance: any) => this.setState({ mentionInstance: instance })
+  storeMentionInstance = (instance: any) =>
+    this.setState({ mentionInstance: instance })
 
   render() {
     const modulesConfig = {
       ...MODULE_CONFIG,
       mention: {
-        mentionContainer: this.mentionReference && this.mentionReference.current,
+        mentionContainer:
+          this.mentionReference && this.mentionReference.current,
         handleMentionChange: this.handleMentionChange,
-        storeMentionInstance: this.storeMentionInstance
-      }
+        storeMentionInstance: this.storeMentionInstance,
+      },
     }
 
     return (

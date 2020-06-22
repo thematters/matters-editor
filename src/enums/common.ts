@@ -5,12 +5,16 @@ export const ACCEPTED_UPLOAD_IMAGE_TYPES: string[] = [
   'image/png',
   'image/jpeg',
   'image/svg+xml',
-  'image/webp'
+  'image/webp',
 ]
 
 export const COLOR: { [key: string]: string } = { GREEN: 'green', RED: 'red' }
 
-export const CUSTOM_BLOT_TYPES: string[] = ['embedClipboard', 'embedCode', 'embedVideo']
+export const CUSTOM_BLOT_TYPES: string[] = [
+  'embedClipboard',
+  'embedCode',
+  'embedVideo',
+]
 
 export const DEBOUNCE_DELAY: number = 300
 
@@ -19,7 +23,7 @@ export const DEBOUNCE_DELAY_MENTION: number = 900
 export const LANGUAGE: { [key: string]: string } = {
   EN: 'EN',
   ZH_HANS: 'ZH_HANS',
-  ZH_HANT: 'ZH_HANT'
+  ZH_HANT: 'ZH_HANT',
 }
 
 export const KEYCODES: { [key: string]: number } = {
@@ -28,25 +32,25 @@ export const KEYCODES: { [key: string]: number } = {
   ESCAPE: 27,
   TAB: 9,
   UP: 38,
-  V: 86
+  V: 86,
 }
 
 export const SANDBOX_DEFAULT_SETTINGS: string[] = [
   'allow-scripts',
   'allow-same-origin',
-  'allow-popups'
+  'allow-popups',
 ]
 
 export const SANDBOX_SPECIAL_SETTINGS: string[] = [
   ...SANDBOX_DEFAULT_SETTINGS,
   'allow-popups-to-escape-sandbox',
   'allow-storage-access-by-user-activation',
-  'allow-top-navigation-by-user-activation'
+  'allow-top-navigation-by-user-activation',
 ]
 
 export const SELECTION_TYPES: { [key: string]: string } = {
   CUSTOM_BLOT: 'customBlot',
-  NEW_LINE: 'newLine'
+  NEW_LINE: 'newLine',
 }
 
 export const UPLOAD_IMAGE_SIZE_LIMIT: number = 5 * 1024 * 1024

@@ -16,13 +16,13 @@ export const FORMAT_CONFIG = [
   'smartBreak',
 
   // hacks
-  'util'
+  'util',
 ]
 
 export const MODULE_CONFIG = {
   ...config.MODULE_CONFIG,
   toolbar: [
     ['bold', 'italic', 'underline'],
-    ['blockquote', { list: 'ordered' }, { list: 'bullet' }, 'link']
-  ]
+    ['blockquote', { list: 'ordered' }, { list: 'bullet' }, 'link'],
+  ],
 }

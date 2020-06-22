@@ -1,4 +1,4 @@
-import * as React from 'react'
+import React from 'react'
 
 import SVGToolbarDivider from '../../icons/ToolbarDivider'
 
@@ -18,7 +18,11 @@ interface Props {
 }
 
 export default ({ callback, texts }: Props) => (
-  <button aria-label={texts.TOOLBAR_ADD_DIVIDER} type="button" onClick={callback}>
+  <button
+    aria-label={texts.TOOLBAR_ADD_DIVIDER}
+    type="button"
+    onClick={callback}
+  >
     <SVGToolbarDivider className="u-motion-icon-hover" />
   </button>
 )

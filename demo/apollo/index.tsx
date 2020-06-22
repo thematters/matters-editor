@@ -59,8 +59,8 @@ export const apollo = new ApolloClient({
   cache: new InMemoryCache(),
   link: createUploadLink({
     uri: 'http://localhost:4000/graphql',
-    headers: {}
-  })
+    headers: {},
+  }),
 })
 
 export const ApolloDemoApp = ({ children }) => {

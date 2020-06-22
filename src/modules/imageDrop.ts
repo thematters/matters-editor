@@ -1,6 +1,10 @@
 import { Quill } from 'react-quill'
 
-import { ACCEPTED_UPLOAD_IMAGE_TYPES, COLOR, UPLOAD_IMAGE_SIZE_LIMIT } from '../enums/common'
+import {
+  ACCEPTED_UPLOAD_IMAGE_TYPES,
+  COLOR,
+  UPLOAD_IMAGE_SIZE_LIMIT,
+} from '../enums/common'
 import { insertImageBlock } from '../utils/editor'
 
 /**
@@ -38,11 +42,15 @@ class ImageDrop {
     event.preventDefault()
     event.stopPropagation()
 
-    if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+    if (
+      event.dataTransfer &&
+      event.dataTransfer.files &&
+      event.dataTransfer.files.length > 0
+    ) {
       if (event.dataTransfer.files.length > 1) {
         this.eventDispatcher(this.eventName, {
           color: COLOR.RED,
-          content: this.texts.UPLOAD_IMAGE_SINGLE_LIMIT
+          content: this.texts.UPLOAD_IMAGE_SINGLE_LIMIT,
         })
         return
       }
@@ -50,7 +58,7 @@ class ImageDrop {
       if (file && file.size > UPLOAD_IMAGE_SIZE_LIMIT) {
         this.eventDispatcher(this.eventName, {
           color: COLOR.GREEN,
-          content: this.texts.UPLOAD_IMAGE_REACH_SIZE_LIMIT
+          content: this.texts.UPLOAD_IMAGE_REACH_SIZE_LIMIT,
         })
         return
       }
@@ -67,13 +75,13 @@ class ImageDrop {
         const asset = await this.handleImageDrop(file)
         this.eventDispatcher(this.eventName, {
           color: COLOR.GREEN,
-          content: this.texts.UPLOAD_IMAGE_SUCCESSFUL
+          content: this.texts.UPLOAD_IMAGE_SUCCESSFUL,
         })
         return [asset]
       } catch (error) {
         this.eventDispatcher(this.eventName, {
           color: COLOR.RED,
-          content: this.texts.UPLOAD_IMAGE_FAILED
+          content: this.texts.UPLOAD_IMAGE_FAILED,
         })
         console.log(error)
       }

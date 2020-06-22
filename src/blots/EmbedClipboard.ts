@@ -34,7 +34,7 @@ class EmbedClipboard extends BlockEmbed {
   static value(domNode: HTMLElement) {
     return {
       placeholder: domNode.getAttribute('placeholder') || '',
-      purpose: domNode.getAttribute('data-purpose') || null
+      purpose: domNode.getAttribute('data-purpose') || null,
     }
   }
 
@@ -112,7 +112,7 @@ class EmbedClipboard extends BlockEmbed {
       if (util && util.eventDispatcher && util.eventName && util.language) {
         util.eventDispatcher(util.eventName, {
           color: COLOR.RED,
-          content: TEXT[util.language].LIKE_BUTTON_FAILED
+          content: TEXT[util.language].LIKE_BUTTON_FAILED,
         })
       }
     }
@@ -121,7 +121,9 @@ class EmbedClipboard extends BlockEmbed {
   insertEmbed = (url: string) => {
     const { embedClipboard } = this.value()
     const range = this.quill.getSelection(true)
-    const blotName = { video: 'embedVideo', code: 'embedCode' }[embedClipboard.purpose as Purpose]
+    const blotName = { video: 'embedVideo', code: 'embedCode' }[
+      embedClipboard.purpose as Purpose
+    ]
     this.removeBlot()
     this.quill.insertEmbed(range.index, blotName, { url }, 'user')
     this.quill.setSelection(range.index + 1, 0, 'silent')

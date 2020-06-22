@@ -1,4 +1,4 @@
-import * as React from 'react'
+import React from 'react'
 
 import SVGToolbarEmbedCode from '../../icons/ToolbarEmbedCode'
 
@@ -18,7 +18,11 @@ interface Props {
 }
 
 export default ({ callback, texts }: Props) => (
-  <button aria-label={texts.TOOLBAR_EMBED_CODE} type="button" onClick={callback}>
+  <button
+    aria-label={texts.TOOLBAR_EMBED_CODE}
+    type="button"
+    onClick={callback}
+  >
     <SVGToolbarEmbedCode className="u-motion-icon-hover" />
   </button>
 )

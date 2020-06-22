@@ -8,7 +8,7 @@ const urlMatcher = (node: Node & { data: any }, delta: any) => {
   if (matches && matches.length > 0) {
     const ops: any[] = []
     let str = node.data
-    matches.forEach(match => {
+    matches.forEach((match) => {
       const split = str.split(match)
 
       // get and push prefix

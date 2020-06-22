@@ -40,9 +40,15 @@ export const initAudioPlayers = () => {
     // const $player = $audioFigure.querySelector('.player') as HTMLElement
     const $play = $audioFigure.querySelector('.play') as HTMLElement
     const $current = $audioFigure.querySelector('.time .current') as HTMLElement
-    const $duration = $audioFigure.querySelector('.time .duration') as HTMLElement
-    const $progressBar = $audioFigure.querySelector('.progress-bar') as HTMLElement
-    const $progressBarValue = $audioFigure.querySelector('.progress-bar span') as HTMLElement
+    const $duration = $audioFigure.querySelector(
+      '.time .duration'
+    ) as HTMLElement
+    const $progressBar = $audioFigure.querySelector(
+      '.progress-bar'
+    ) as HTMLElement
+    const $progressBarValue = $audioFigure.querySelector(
+      '.progress-bar span'
+    ) as HTMLElement
 
     if (!$audio || !$play || !$duration || !$current) {
       return
@@ -79,7 +85,7 @@ export const initAudioPlayers = () => {
       loading()
     })
 
-    $progressBar.addEventListener('click', e => {
+    $progressBar.addEventListener('click', (e) => {
       const position = e.pageX - $progressBar.getBoundingClientRect().left
       const percent = position / $progressBar.offsetWidth
       $audio.currentTime = $audio.duration * percent

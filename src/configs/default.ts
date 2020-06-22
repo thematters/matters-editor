@@ -36,21 +36,21 @@ export const FORMAT_CONFIG = [
   'source',
 
   // hacks
-  'util'
+  'util',
 ]
 
 export const MODULE_CONFIG = {
   toolbar: [
     [{ header: '2' }, 'bold', 'italic', 'strike', 'underline', 'code-block'],
-    ['blockquote', { list: 'ordered' }, { list: 'bullet' }, 'link']
+    ['blockquote', { list: 'ordered' }, { list: 'bullet' }, 'link'],
   ],
   clipboard: {
     // toggle to add extra line breaks when pasting HTML
     matchVisual: false,
     matchers: [
       ['BR', lineBreakMatcher],
-      [Node.TEXT_NODE, urlMatcher]
-    ]
+      [Node.TEXT_NODE, urlMatcher],
+    ],
   },
   keyboard: {
     bindings: {
@@ -58,7 +58,7 @@ export const MODULE_CONFIG = {
         key: KEYCODES.TAB,
         handler() {
           return false
-        }
+        },
       },
       linebreak: {
         key: KEYCODES.ENTER,
@@ -78,8 +78,8 @@ export const MODULE_CONFIG = {
           }
           // move the cursor after insert a line break
           quill.setSelection(range.index + 1, 'silent')
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 }

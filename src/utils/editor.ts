@@ -25,7 +25,8 @@ export const defineSelection = (
     return SELECTION_TYPES.CUSTOM_BLOT
   }
 
-  const isNewLine = bounds.left === 0 && !editor.getText(range.index, 1).replace(/\s/, '')
+  const isNewLine =
+    bounds.left === 0 && !editor.getText(range.index, 1).replace(/\s/, '')
   if (isNewLine) {
     return SELECTION_TYPES.NEW_LINE
   }
@@ -36,7 +37,11 @@ export const defineSelection = (
  *
  */
 export const getQuillInstance = (reference: any): Quill | null => {
-  if (!reference || !reference.current || typeof reference.current.getEditor !== 'function') {
+  if (
+    !reference ||
+    !reference.current ||
+    typeof reference.current.getEditor !== 'function'
+  ) {
     return null
   }
   return reference.current.getEditor()
