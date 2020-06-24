@@ -25,7 +25,8 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "npm run tslint && npm run format"
+      "pre-commit": "npm run lint && npm run format",
+      "prepare-commit-msg": "exec < /dev/tty && git cz --hook || true"
     }
   },
   "peerDependencies": {
@@ -51,6 +52,7 @@
     "apollo-client": "^2.6.4",
     "apollo-upload-client": "^13.0.0",
     "autoprefixer": "^9.7.0",
+    "cz-conventional-changelog": "^3.2.0",
     "graphql": "^14.5.8",
     "graphql-tag": "^2.10.1",
     "husky": "^4.2.3",
@@ -86,5 +88,10 @@
   "prettier": {
     "singleQuote": true,
     "semi": false
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
   }
 }
