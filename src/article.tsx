@@ -3,7 +3,6 @@ import React from 'react'
 import ReactQuill, { Quill } from 'react-quill'
 
 import Util from './blots/Util'
-import MattersEditorMention from './components/Mention'
 import MattersEditorTitle from './components/Title'
 import MattersEditorToolbar from './components/Toolbar'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/default'
@@ -20,10 +19,6 @@ interface Props {
   editorUpload: (params: Params) => Promise<ResultData>
   eventName: string
   language: string
-  mentionLoading: boolean
-  mentionKeywordChange: (keyword: string) => void
-  mentionUsers: any
-  mentionListComponent: any
   readOnly: boolean
   siteDomain: string
   theme: string
@@ -37,7 +32,6 @@ interface Props {
 
 interface State {
   content: string
-  mentionInstance: any
   toolbarPosition: number
   toolbarVisible: boolean
 }
@@ -45,14 +39,12 @@ interface State {
 export class MattersArticleEditor extends React.Component<Props, State> {
   private instance: Quill | null = null
   private editorReference = React.createRef<ReactQuill>()
-  private mentionReference = React.createRef<HTMLElement>()
   private texts: Texts = null
 
   constructor(props: Props) {
     super(props)
     this.state = {
       content: this.props.editorContent,
-      mentionInstance: null,
       toolbarPosition: 0,
       toolbarVisible: false,
     }
@@ -158,10 +150,6 @@ export class MattersArticleEditor extends React.Component<Props, State> {
   handleImageDrop = async (file: any): Promise<ResultData> =>
     this.props.editorUpload({ file })
 
-  handleMentionChange = (keyword: string) => {
-    this.props.mentionKeywordChange(keyword)
-  }
-
   handleMentionSelection = ({ id, userName, displayName }) => {
     this.state.mentionInstance.insertMention({
       id,
@@ -191,9 +179,6 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     }
   }
 
-  storeMentionInstance = (instance: any) =>
-    this.setState({ mentionInstance: instance })
-
   render() {
     const classes = this.props.readOnly ? 'u-area-disable' : ''
 
@@ -204,12 +189,6 @@ export class MattersArticleEditor extends React.Component<Props, State> {
         eventName: this.props.eventName,
         handleImageDrop: this.handleImageDrop,
         texts: this.texts,
-      },
-      mention: {
-        mentionContainer:
-          this.mentionReference && this.mentionReference.current,
-        handleMentionChange: this.handleMentionChange,
-        storeMentionInstance: this.storeMentionInstance,
       },
     }
 
@@ -246,13 +225,6 @@ export class MattersArticleEditor extends React.Component<Props, State> {
             upload={this.props.editorUpload}
             uploadAudioSizeLimit={this.props.uploadAudioSizeLimit}
             uploadImageSizeLimit={this.props.uploadImageSizeLimit}
-          />
-          <MattersEditorMention
-            mentionLoading={this.props.mentionLoading}
-            mentionListComponent={this.props.mentionListComponent}
-            mentionSelection={this.handleMentionSelection}
-            mentionUsers={this.props.mentionUsers}
-            reference={this.mentionReference}
           />
         </div>
       </>
