@@ -1,6 +1,5 @@
 import { Quill } from 'react-quill'
 
-import { extractDomain } from '../utils/url'
 //import IMAGE_PLACEHOLDER from '~/static/images/image-placeholder.svg'
 
 const IMAGE_PLACEHOLDER = ''
@@ -41,11 +40,7 @@ const b64toBlob = (
   return blob
 }
 
-const createImageMatcher = (
-  upload: any,
-  assetDomain: string,
-  siteDomain: string
-) => (node: Element, delta: any) => {
+const createImageMatcher = (upload: any) => (node: Element, delta: any) => {
   if (delta.ops.length === 0) {
     return delta
   }
@@ -60,57 +55,42 @@ const createImageMatcher = (
   const srcOrg = delta.ops[0].insert.image
 
   let imageFigure
-  // don't upload if copying from your site internally
-  // retrieve asset id from url
-  const domain = extractDomain(assetDomain || '') || siteDomain
-  if (srcOrg.indexOf(domain) !== -1) {
-    const assetId = (srcOrg.split('/').slice(-1)[0] || '').split('.')[0]
-    if (!assetId) {
-      return delta
-    }
 
-    imageFigure = {
-      src: srcOrg,
-      assetId,
-    }
-  } else {
-    // upload if copying from external resource
-    // make placeholder first
-    const placeholderId = (+new Date()).toString(36).slice(-5)
-    imageFigure = {
-      src: IMAGE_PLACEHOLDER,
-      id: placeholderId,
-    }
-
-    let input
-    // handle data url
-    if (srcOrg.startsWith('data:')) {
-      // Split the base64 string in data and contentType
-      const block = srcOrg.split(';')
-      // Get the content type of the image
-      const contentType = block[0].split(':')[1]
-      // get the real base64 content of the file
-      const realData = block[1].split(',')[1]
-
-      // Convert it to a blob to upload
-      const blob = b64toBlob(realData, contentType)
-      input = { file: blob }
-    } else {
-      // handle http url
-      input = { url: srcOrg }
-    }
-
-    // upload and replace image content
-    upload(input)
-      .then(({ path, id }: any) => {
-        const img = document.getElementById(placeholderId)
-        if (img) {
-          img.setAttribute('src', path)
-          img.setAttribute('data-asset-id', id)
-        }
-      })
-      .catch((error) => console.error)
+  // make placeholder first
+  const placeholderId = (+new Date()).toString(36).slice(-5)
+  imageFigure = {
+    src: IMAGE_PLACEHOLDER,
+    id: placeholderId,
   }
+
+  let input
+  // handle data url
+  if (srcOrg.startsWith('data:')) {
+    // Split the base64 string in data and contentType
+    const block = srcOrg.split(';')
+    // Get the content type of the image
+    const contentType = block[0].split(':')[1]
+    // get the real base64 content of the file
+    const realData = block[1].split(',')[1]
+
+    // Convert it to a blob to upload
+    const blob = b64toBlob(realData, contentType)
+    input = { file: blob }
+  } else {
+    // handle http url
+    input = { url: srcOrg }
+  }
+
+  // upload and replace image content
+  upload(input)
+    .then(({ path, id }: any) => {
+      const img = document.getElementById(placeholderId)
+      if (img) {
+        img.setAttribute('src', path)
+        img.setAttribute('data-asset-id', id)
+      }
+    })
+    .catch((error) => console.error)
 
   return new Delta().insert(
     {
