@@ -90,10 +90,8 @@ const App = () => {
         mentionUsers={demoMentionUsers}
         mentionListComponent={DemoMentionList}
         readOnly={false}
-        siteDomain=""
         theme="bubble"
         titleDefaultValue=""
-        uploadAssetDomain=""
       />
       <br />
       <MattersCommentEditor

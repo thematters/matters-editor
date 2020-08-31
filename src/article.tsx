@@ -25,11 +25,9 @@ interface Props {
   mentionUsers: any
   mentionListComponent: any
   readOnly: boolean
-  siteDomain: string
   theme: string
   texts?: Texts
   titleDefaultValue?: string
-  uploadAssetDomain: string
   uploadAudioSizeLimit?: number
   uploadImageSizeLimit?: number
   scrollingContainer?: string | HTMLElement
@@ -92,11 +90,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     if (instance) {
       instance.clipboard.addMatcher(
         'IMG',
-        createImageMatcher(
-          this.props.editorUpload,
-          this.props.uploadAssetDomain,
-          this.props.siteDomain
-        )
+        createImageMatcher(this.props.editorUpload)
       )
     }
     return instance
