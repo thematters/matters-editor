@@ -11,7 +11,7 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+  SLACK_WEBHOOK_URL: ${{ secrets.WRONG_SLACK_WEBHOOK }}
 
 jobs:
   build_and_publish:
