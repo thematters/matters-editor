@@ -1,6 +1,6 @@
 # Matters Editor
 
-![Deploy Status](https://github.com/thematters/matters-editor/workflows/Build%20&%20Publish/badge.svg) ![Release Status](https://github.com/thematters/matters-editor/workflows/Create%20Release/badge.svg) [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
+![Publish Status](https://github.com/thematters/matters-editor/workflows/Publish/badge.svg) ![Test Status](https://github.com/thematters/matters-editor/workflows/Test/badge.svg) [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
 
 This rich text editor is based on three amazing projects [Quill](https://quilljs.com/), [react-quill](https://github.com/zenoamaro/react-quill) and [Tippy.js](https://atomiks.github.io/tippyjs/). This editor has been used in a real production called [Matters](http://matters.news), a writing platform built on top of IPFS. Currently, we're pulling it out as a standalone package, so there will be some big changes in the following. 😎
 
