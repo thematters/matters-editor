@@ -1,13 +1,10 @@
-name: Build & Publish
+name: Publish
 
 on:
   push:
     branches:
       - master
       - develop
-  pull_request_target:
-    branches:
-      - '*'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
