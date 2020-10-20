@@ -1,8 +1,9 @@
 import { Quill } from 'react-quill'
 
+import BaseBlockEmbed from './BaseBlockEmbed'
+
 import { SANDBOX_DEFAULT_SETTINGS } from '../enums/common'
 
-const BlockEmbed = Quill.import('blots/block/embed')
 const Parchment = Quill.import('parchment')
 
 interface EmbedVideoParams {
@@ -10,7 +11,11 @@ interface EmbedVideoParams {
   url: string
 }
 
-class EmbedVideo extends BlockEmbed {
+class EmbedVideo extends BaseBlockEmbed {
+  static blotName = 'embedVideo'
+  static className = 'embed-video'
+  static tagName = 'figure'
+
   static create(value: EmbedVideoParams) {
     const node = super.create()
 
@@ -30,6 +35,12 @@ class EmbedVideo extends BlockEmbed {
     iframeContainer.setAttribute('class', 'iframe-container')
     iframeContainer.appendChild(iframe)
 
+    const util = Parchment.query('util')
+    if (util && util.reviseMode === true) {
+      node.setAttribute('contenteditable', false)
+      node.classList.add('u-area-disable')
+    }
+
     node.appendChild(iframeContainer)
     node.appendChild(figcaption)
 
@@ -46,10 +57,6 @@ class EmbedVideo extends BlockEmbed {
     }
   }
 }
-
-EmbedVideo.blotName = 'embedVideo'
-EmbedVideo.className = 'embed-video'
-EmbedVideo.tagName = 'figure'
 
 Quill.register('formats/embedVideo', EmbedVideo)
 
