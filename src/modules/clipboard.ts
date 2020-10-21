@@ -51,8 +51,14 @@ class RemadeClipboard extends Clipboard {
       let pasteDelta = this.convert(html)
 
       if (reviseMode) {
-        const excludedFormats = ['audioFigure', 'divider', 'embedCode', 'embedVideo', 'imageFigure']
-        pasteDelta.ops = pasteDelta.ops.filter(ops => {
+        const excludedFormats = [
+          'audioFigure',
+          'divider',
+          'embedCode',
+          'embedVideo',
+          'imageFigure',
+        ]
+        pasteDelta.ops = pasteDelta.ops.filter((ops) => {
           const name = Object.keys(ops.insert || {})[0]
           if (excludedFormats.includes(name)) {
             return false
