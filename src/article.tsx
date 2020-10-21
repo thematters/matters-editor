@@ -34,7 +34,6 @@ interface Props {
   uploadAudioSizeLimit?: number
   uploadImageSizeLimit?: number
   scrollingContainer?: string | HTMLElement
-  disableToolbar?: boolean
 }
 
 interface State {
