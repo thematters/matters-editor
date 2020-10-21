@@ -154,8 +154,12 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     }
   }
 
-  handleImageDrop = async (file: any): Promise<ResultData> =>
-    this.props.editorUpload({ file })
+  handleImageDrop = async (file: any): Promise<ResultData> => {
+    if (this.props.enableReviseMode) {
+      return
+    }
+    return this.props.editorUpload({ file })
+  }
 
   handleMentionChange = (keyword: string) => {
     this.props.mentionKeywordChange(keyword)
@@ -196,7 +200,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
   render() {
     const classes = this.props.readOnly ? 'u-area-disable' : ''
 
-    const modulesConfig = {
+    let modulesConfig = {
       ...MODULE_CONFIG,
       imageDrop: {
         eventDispatcher: this.eventDispatcher,
@@ -210,6 +214,10 @@ export class MattersArticleEditor extends React.Component<Props, State> {
         handleMentionChange: this.handleMentionChange,
         storeMentionInstance: this.storeMentionInstance,
       },
+    }
+
+    if (this.props.enableReviseMode) {
+      modulesConfig.toolbar = null
     }
 
     return (

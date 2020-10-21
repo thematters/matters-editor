@@ -9,6 +9,8 @@ const CodeBlock = Quill.import('formats/code')
 
 const Clipboard = Quill.import('modules/clipboard')
 
+const Parchment = Quill.import('parchment')
+
 /**
  * Override Clipboard because pasting will cause browser scroll to top. And
  * it seems no solution for this bug at this moment.
@@ -21,6 +23,9 @@ class RemadeClipboard extends Clipboard {
     if (event.defaultPrevented || !this.quill.isEnabled()) {
       return
     }
+    const util = Parchment.query('util')
+    const reviseMode = util && util.reviseMode === true
+
     // store scroll position
     const target = isSafari() ? 'body' : 'html'
     const element = dom.$(target)
@@ -43,7 +48,19 @@ class RemadeClipboard extends Clipboard {
     } else if (!html) {
       delta.insert(text)
     } else {
-      const pasteDelta = this.convert(html)
+      let pasteDelta = this.convert(html)
+
+      if (reviseMode) {
+        const excludedFormats = ['audioFigure', 'divider', 'embedCode', 'embedVideo', 'imageFigure']
+        pasteDelta.ops = pasteDelta.ops.filter(ops => {
+          const name = Object.keys(ops.insert || {})[0]
+          if (excludedFormats.includes(name)) {
+            return false
+          }
+          return true
+        })
+      }
+
       delta = delta.concat(pasteDelta)
     }
     delta.delete(range.length)
