@@ -153,12 +153,8 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     }
   }
 
-  handleImageDrop = async (file: any): Promise<ResultData> => {
-    if (this.props.enableReviseMode) {
-      return
-    }
-    return this.props.editorUpload({ file })
-  }
+  handleImageDrop = async (file: any): Promise<ResultData> =>
+    this.props.editorUpload({ file })
 
   handleMentionChange = (keyword: string) => {
     this.props.mentionKeywordChange(keyword)
@@ -217,6 +213,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
 
     if (this.props.enableReviseMode) {
       modulesConfig.toolbar = null
+      modulesConfig.imageDrop = null
     }
 
     return (
