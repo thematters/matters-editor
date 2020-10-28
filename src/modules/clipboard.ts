@@ -51,6 +51,7 @@ class RemadeClipboard extends Clipboard {
       let pasteDelta = this.convert(html)
 
       if (reviseMode) {
+        // if revise-mode is enabled, then skip figure blocks when pasting
         const excludedFormats = [
           'audioFigure',
           'divider',
