@@ -83,6 +83,8 @@ const App = () => {
         editorContentId=""
         editorUpdate={editorUpdate}
         editorUpload={editorUpload}
+        enableReviseMode={false}
+        enableToolbar={true}
         eventName={eventName}
         language="EN"
         mentionLoading={false}
@@ -92,6 +94,7 @@ const App = () => {
         readOnly={false}
         theme="bubble"
         titleDefaultValue=""
+        titleReadOnly={false}
       />
       <br />
       <MattersCommentEditor

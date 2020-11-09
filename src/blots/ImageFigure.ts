@@ -1,7 +1,8 @@
 import { Quill } from 'react-quill'
 
+import BaseBlockEmbed from './BaseBlockEmbed'
+
 const Parchment = Quill.import('parchment')
-const BlockEmbed = Quill.import('blots/block/embed')
 
 /**
  * @see ref: https://github.com/quilljs/quill/blob/develop/formats/image.js
@@ -14,7 +15,11 @@ interface ImageFigureParams {
   src?: string
 }
 
-class ImageFigure extends BlockEmbed {
+class ImageFigure extends BaseBlockEmbed {
+  static blotName = 'imageFigure'
+  static className = 'image'
+  static tagName = 'figure'
+
   public static create(value: ImageFigureParams) {
     const node = super.create(value)
 
@@ -35,6 +40,12 @@ class ImageFigure extends BlockEmbed {
       image.dataset.assetId = value.assetId
     }
 
+    const util = Parchment.query('util')
+    if (util && util.reviseMode === true) {
+      node.setAttribute('contenteditable', false)
+      node.classList.add('u-area-disable')
+    }
+
     node.appendChild(image)
     node.appendChild(figcaption)
 
@@ -52,10 +63,6 @@ class ImageFigure extends BlockEmbed {
     }
   }
 }
-
-ImageFigure.blotName = 'imageFigure'
-ImageFigure.className = 'image'
-ImageFigure.tagName = 'figure'
 
 Quill.register('formats/imageFigure', ImageFigure)
 

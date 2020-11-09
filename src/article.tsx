@@ -18,6 +18,8 @@ interface Props {
   editorContentId: string
   editorUpdate: (params: Params) => void
   editorUpload: (params: Params) => Promise<ResultData>
+  enableReviseMode?: boolean
+  enableToolbar?: boolean
   eventName: string
   language: string
   mentionLoading: boolean
@@ -28,6 +30,7 @@ interface Props {
   theme: string
   texts?: Texts
   titleDefaultValue?: string
+  titleReadOnly?: boolean
   uploadAudioSizeLimit?: number
   uploadImageSizeLimit?: number
   scrollingContainer?: string | HTMLElement
@@ -60,6 +63,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     Util.eventDispatcher = this.eventDispatcher
     Util.eventName = props.eventName
     Util.language = props.language || LANGUAGE.ZH_HANT
+    Util.reviseMode = props.enableReviseMode
     Quill.register('formats/util', Util, true)
   }
 
@@ -191,7 +195,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
   render() {
     const classes = this.props.readOnly ? 'u-area-disable' : ''
 
-    const modulesConfig = {
+    let modulesConfig = {
       ...MODULE_CONFIG,
       imageDrop: {
         eventDispatcher: this.eventDispatcher,
@@ -207,11 +211,16 @@ export class MattersArticleEditor extends React.Component<Props, State> {
       },
     }
 
+    if (this.props.enableReviseMode) {
+      modulesConfig.toolbar = null
+      modulesConfig.imageDrop = null
+    }
+
     return (
       <>
         <MattersEditorTitle
           defaultValue={this.props.titleDefaultValue}
-          readOnly={this.props.readOnly}
+          readOnly={this.props.titleReadOnly}
           texts={this.texts}
           update={this.props.editorUpdate}
         />
@@ -230,6 +239,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
             scrollingContainer={this.props.scrollingContainer}
           />
           <MattersEditorToolbar
+            enable={this.props.enableToolbar}
             eventDispatcher={this.eventDispatcher}
             eventName={this.props.eventName}
             instance={this.instance}

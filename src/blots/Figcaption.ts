@@ -1,16 +1,19 @@
 import { Quill } from 'react-quill'
 
+import BaseBlockEmbed from './BaseBlockEmbed'
+
 import { TEXT } from '../enums/text'
 import { getLangFromRoot } from '../utils/dom'
 import { langConvert } from '../utils/language'
-
-const BlockEmbed = Quill.import('blots/block/embed')
 
 interface FigcaptionParams {
   caption: string
 }
 
-class Figcaption extends BlockEmbed {
+class Figcaption extends BaseBlockEmbed {
+  static blotName = 'figcaption'
+  static tagName = 'figcaption'
+
   static create(value: FigcaptionParams) {
     const node = super.create(value)
 
@@ -61,9 +64,6 @@ class Figcaption extends BlockEmbed {
     textarea.style.height = `${textarea.scrollHeight}px`
   }
 }
-
-Figcaption.blotName = 'figcaption'
-Figcaption.tagName = 'figcaption'
 
 Quill.register('formats/figcaption', Figcaption)
 
