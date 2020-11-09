@@ -1,11 +1,12 @@
 import { Quill } from 'react-quill'
 
+import BaseBlockEmbed from './BaseBlockEmbed'
+
 import {
   SANDBOX_DEFAULT_SETTINGS,
   SANDBOX_SPECIAL_SETTINGS,
 } from '../enums/common'
 
-const BlockEmbed = Quill.import('blots/block/embed')
 const Parchment = Quill.import('parchment')
 
 interface EmbedCodeParams {
@@ -13,9 +14,13 @@ interface EmbedCodeParams {
   url: string
 }
 
-class EmbedCode extends BlockEmbed {
+class EmbedCode extends BaseBlockEmbed {
+  static blotName = 'embedCode'
+  static className = 'embed-code'
+  static tagName = 'figure'
+
   static create(value: EmbedCodeParams) {
-    const node = super.create() as HTMLElement
+    const node = super.create()
 
     // caption
     const figcaption = Parchment.create('figcaption', {
@@ -38,6 +43,12 @@ class EmbedCode extends BlockEmbed {
     const iframeContainer = document.createElement('div')
     iframeContainer.setAttribute('class', 'iframe-container')
     iframeContainer.appendChild(iframe)
+
+    const util = Parchment.query('util')
+    if (util && util.reviseMode === true) {
+      node.setAttribute('contenteditable', false)
+      node.classList.add('u-area-disable')
+    }
 
     node.appendChild(iframeContainer)
     node.appendChild(figcaption)
@@ -67,10 +78,6 @@ class EmbedCode extends BlockEmbed {
     }
   }
 }
-
-EmbedCode.blotName = 'embedCode'
-EmbedCode.className = 'embed-code'
-EmbedCode.tagName = 'figure'
 
 Quill.register('formats/embedCode', EmbedCode)
 

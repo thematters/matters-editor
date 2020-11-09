@@ -1,7 +1,8 @@
 import { Quill } from 'react-quill'
 
+import BaseBlockEmbed from './BaseBlockEmbed'
+
 const Parchment = Quill.import('parchment')
-const BlockEmbed = Quill.import('blots/block/embed')
 
 interface AudioFigureParams {
   caption?: string
@@ -9,7 +10,11 @@ interface AudioFigureParams {
   sources: Array<{ src: string; type: string; assetId: string }>
 }
 
-class AudioFigure extends BlockEmbed {
+class AudioFigure extends BaseBlockEmbed {
+  static blotName = 'audioFigure'
+  static className = 'audio'
+  static tagName = 'figure'
+
   public static create(value: AudioFigureParams) {
     const node = super.create(value)
 
@@ -53,6 +58,12 @@ class AudioFigure extends BlockEmbed {
         </div>
       </footer>
     `
+
+    const util = Parchment.query('util')
+    if (util && util.reviseMode === true) {
+      node.setAttribute('contenteditable', false)
+      node.classList.add('u-area-disable')
+    }
 
     node.appendChild(audio)
     node.appendChild(player)
@@ -115,10 +126,6 @@ class AudioFigure extends BlockEmbed {
     this.$audio.dataset.fileName = this.$title.innerText
   }
 }
-
-AudioFigure.blotName = 'audioFigure'
-AudioFigure.className = 'audio'
-AudioFigure.tagName = 'figure'
 
 Quill.register('formats/audioFigure', AudioFigure)
 

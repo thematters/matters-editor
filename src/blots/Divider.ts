@@ -1,11 +1,11 @@
 import { Quill } from 'react-quill'
 
-const BlockEmbed = Quill.import('blots/block/embed')
+import BaseBlockEmbed from './BaseBlockEmbed'
 
-class DividerBlot extends BlockEmbed {}
-
-DividerBlot.blotName = 'divider'
-DividerBlot.tagName = 'HR'
+class DividerBlot extends BaseBlockEmbed {
+  static blotName = 'divider'
+  static tagName = 'HR'
+}
 
 Quill.register('formats/divider', DividerBlot)
 

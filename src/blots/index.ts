@@ -1,4 +1,5 @@
 import './AudioFigure'
+import './BaseBlockEmbed'
 import './Divider'
 import './EmbedClipboard'
 import './EmbedCode'

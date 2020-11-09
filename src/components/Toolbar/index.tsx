@@ -18,6 +18,7 @@ import ToolbarUploadImageButton from './ToolbarUploadImageButton'
  *
  * Usage:
  *   <MattersEditorToolbar
+ *     enable={true}
  *     eventDispatcher={() => {}}
  *     eventName="event-name"
  *     postion={0}
@@ -31,6 +32,7 @@ import ToolbarUploadImageButton from './ToolbarUploadImageButton'
  */
 
 interface Props {
+  enable?: boolean
   eventDispatcher: (event: string, data: any) => void
   eventName: string
   instance: Quill | null
@@ -44,6 +46,7 @@ interface Props {
 }
 
 const MattersEditorToolbar: React.FC<Props> = ({
+  enable = true,
   eventDispatcher,
   eventName,
   instance,
@@ -127,6 +130,10 @@ const MattersEditorToolbar: React.FC<Props> = ({
       instance.setSelection(range.index + 1, 0, 'silent')
     }
     setExpanded(false)
+  }
+
+  if (enable === false) {
+    return null
   }
 
   return (
