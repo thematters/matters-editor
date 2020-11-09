@@ -4,42 +4,6 @@ import { render } from 'react-dom'
 
 import { MattersArticleEditor, MattersCommentEditor } from '../src'
 
-const demoMentionUsers = [
-  { id: v4(), displayName: 'user1', userName: 'user1' },
-  { id: v4(), displayName: 'user2', userName: 'user2' },
-]
-
-const DemoMentionList = ({
-  mentionLoading,
-  mentionSelection,
-  mentionUsers,
-}) => {
-  const style = {
-    width: '100%',
-    padding: '0.8rem 1rem',
-    textAlign: 'left' as const,
-  }
-
-  const handleMentionClick = (user: any) => mentionSelection(user)
-
-  return (
-    <>
-      {mentionUsers.map((user) => {
-        return (
-          <button
-            key={user.id}
-            type="button"
-            onClick={() => handleMentionClick(user)}
-            style={style}
-          >
-            {user.userName}
-          </button>
-        )
-      })}
-    </>
-  )
-}
-
 const App = () => {
   const eventName = 'demo-event'
 
@@ -65,11 +29,6 @@ const App = () => {
     return { id: v4(), path: source }
   }
 
-  const mentionKeywordChange = (keyword: string) => {
-    // TODO: add search mention user api
-    // here we use defined demoMentionUsers for demo.
-  }
-
   React.useEffect(() => {
     window.addEventListener(eventName, (data: any) => {
       // TODO: Process data and hook your notifier.
@@ -87,10 +46,6 @@ const App = () => {
         enableToolbar={true}
         eventName={eventName}
         language="EN"
-        mentionLoading={false}
-        mentionKeywordChange={mentionKeywordChange}
-        mentionUsers={demoMentionUsers}
-        mentionListComponent={DemoMentionList}
         readOnly={false}
         theme="bubble"
         titleDefaultValue=""
@@ -102,10 +57,6 @@ const App = () => {
         editorUpdate={(params) => setCommentContent(params.content)}
         eventName={eventName}
         language="EN"
-        mentionLoading={false}
-        mentionKeywordChange={mentionKeywordChange}
-        mentionUsers={demoMentionUsers}
-        mentionListComponent={DemoMentionList}
         readOnly={false}
         theme="bubble"
       />
