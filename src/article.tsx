@@ -45,9 +45,11 @@ interface State {
 
 export class MattersArticleEditor extends React.Component<Props, State> {
   private instance: Quill | null = null
+  private initText: string = ''
+  private texts: Texts = null
+
   private editorReference = React.createRef<ReactQuill>()
   private mentionReference = React.createRef<HTMLElement>()
-  private texts: Texts = null
 
   constructor(props: Props) {
     super(props)
@@ -71,6 +73,9 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     this.instance = this.initQuillInstance()
     this.resetLinkInputPlaceholder()
     initAudioPlayers()
+
+    // set init text
+    this.initText = this.instance.getText() || ''
   }
 
   componentDidUpdate(prevProps: Props, prevState: State) {
@@ -100,16 +105,24 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     return instance
   }
 
-  update = _debounce((content: string) => {
-    this.props.editorUpdate({ content })
-  }, DEBOUNCE_DELAY)
+  update = _debounce(
+    (updateData: { content: string; currText: string; initText: string }) => {
+      this.props.editorUpdate(updateData)
+    },
+    DEBOUNCE_DELAY
+  )
 
   handleBlur = () => this.update(this.state.content)
 
   handleChange = (content: string, delta: any, source: string) => {
     this.setState({ content }, () => {
       if (source === 'user') {
-        this.update(content)
+        // expose content, current text and initial text to parent
+        this.update({
+          content,
+          currText: this.instance.getText() || '',
+          initText: this.initText,
+        })
       }
     })
   }
