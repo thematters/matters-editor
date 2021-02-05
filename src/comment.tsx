@@ -5,14 +5,14 @@ import ReactQuill, { Quill } from 'react-quill'
 import MattersEditorMention from './components/Mention'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/comment'
 import { DEBOUNCE_DELAY, LANGUAGE } from './enums/common'
-import { TEXT } from './enums/text'
+import { TEXT, Texts } from './enums/text'
 import { getQuillInstance } from './utils/editor'
 
 interface Props {
   editorContent: string
   editorUpdate: (params: Params) => void
   eventName: string
-  language: string
+  language: Language
   mentionLoading: boolean
   mentionKeywordChange: (keyword: string) => void
   mentionUsers: any
@@ -40,7 +40,11 @@ export class MattersCommentEditor extends React.Component<Props, State> {
       content: this.props.editorContent,
       mentionInstance: null,
     }
-    this.texts = props.texts || TEXT[props.language] || TEXT[LANGUAGE.ZH_HANT]
+
+    this.texts = {
+      ...TEXT[props.language || LANGUAGE.zh_hant],
+      ...props.texts,
+    }
   }
 
   componentDidMount() {

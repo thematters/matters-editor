@@ -1,5 +1,5 @@
 export const TEXT = {
-  EN: {
+  en: {
     CAPTION_PLACEHOLDER: 'Add your description',
     COMMENT_PLACEHOLDER: 'Enter comment ...',
     EDITOR_PLACEHOLDER: 'Enter content ...',
@@ -27,7 +27,7 @@ export const TEXT = {
     UPLOAD_IMAGE_SINGLE_LIMIT: 'Please upload one image at a time',
     UPLOAD_IMAGE_SUCCESSFUL: 'Image upload successfully',
   },
-  ZH_HANS: {
+  zh_hans: {
     CAPTION_PLACEHOLDER: '添加说明文字…',
     COMMENT_PLACEHOLDER: '发表你的评论…',
     EDITOR_PLACEHOLDER: '请输入正文…',
@@ -53,7 +53,7 @@ export const TEXT = {
     UPLOAD_IMAGE_SINGLE_LIMIT: '请一次上传一个文件',
     UPLOAD_IMAGE_SUCCESSFUL: '圖片上傳成功',
   },
-  ZH_HANT: {
+  zh_hant: {
     CAPTION_PLACEHOLDER: '添加說明文字…',
     COMMENT_PLACEHOLDER: '發表你的評論…',
     EDITOR_PLACEHOLDER: '請輸入正文…',
@@ -80,3 +80,7 @@ export const TEXT = {
     UPLOAD_IMAGE_SUCCESSFUL: '圖片上傳成功',
   },
 }
+
+export type TextKeys = keyof typeof TEXT.en
+
+export type Texts = { [key in TextKeys]?: string }
