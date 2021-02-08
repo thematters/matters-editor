@@ -86,7 +86,7 @@ const App = () => {
         enableReviseMode={false}
         enableToolbar={true}
         eventName={eventName}
-        language="EN"
+        language="zh_hant"
         mentionLoading={false}
         mentionKeywordChange={mentionKeywordChange}
         mentionUsers={demoMentionUsers}
@@ -101,13 +101,16 @@ const App = () => {
         editorContent={commentContent}
         editorUpdate={(params) => setCommentContent(params.content)}
         eventName={eventName}
-        language="EN"
+        language="en"
         mentionLoading={false}
         mentionKeywordChange={mentionKeywordChange}
         mentionUsers={demoMentionUsers}
         mentionListComponent={DemoMentionList}
         readOnly={false}
         theme="bubble"
+        texts={{
+          COMMENT_PLACEHOLDER: 'custom placeholder\nand line break',
+        }}
       />
     </>
   )

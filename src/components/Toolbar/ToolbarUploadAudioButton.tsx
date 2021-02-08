@@ -8,6 +8,7 @@ import {
 } from '../../enums/common'
 import SVGSpinner from '../../icons/Spinner'
 import SVGToolbarUploadAudio from '../../icons/ToolbarUploadAudio'
+import { Texts } from '../../enums/text'
 
 /**
  * This component is an audio upload button which shoule only resides in toolbar. Now, it supports

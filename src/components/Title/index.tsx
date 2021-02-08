@@ -1,5 +1,6 @@
 import classNames from 'classnames'
 import React from 'react'
+import { Texts } from '../../enums/text'
 
 /**
  * This is an optional component belonged to the edoitor.

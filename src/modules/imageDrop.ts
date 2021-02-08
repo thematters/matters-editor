@@ -5,6 +5,7 @@ import {
   COLOR,
   UPLOAD_IMAGE_SIZE_LIMIT,
 } from '../enums/common'
+import { Texts } from '../enums/text'
 import { insertImageBlock } from '../utils/editor'
 
 /**
