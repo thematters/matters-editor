@@ -1,5 +1,6 @@
 import React from 'react'
 
+import { Texts } from '../../enums/text'
 import SVGToolbarDivider from '../../icons/ToolbarDivider'
 
 /**

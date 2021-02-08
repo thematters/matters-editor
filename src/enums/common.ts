@@ -20,10 +20,10 @@ export const DEBOUNCE_DELAY: number = 300
 
 export const DEBOUNCE_DELAY_MENTION: number = 900
 
-export const LANGUAGE: { [key: string]: string } = {
-  EN: 'EN',
-  ZH_HANS: 'ZH_HANS',
-  ZH_HANT: 'ZH_HANT',
+export const LANGUAGE = {
+  en: 'en',
+  zh_hans: 'zh_hans',
+  zh_hant: 'zh_hant',
 }
 
 export const KEYCODES: { [key: string]: number } = {

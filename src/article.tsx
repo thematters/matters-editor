@@ -8,7 +8,7 @@ import MattersEditorTitle from './components/Title'
 import MattersEditorToolbar from './components/Toolbar'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/default'
 import { DEBOUNCE_DELAY, LANGUAGE, SELECTION_TYPES } from './enums/common'
-import { TEXT } from './enums/text'
+import { TEXT, Texts } from './enums/text'
 import createImageMatcher from './matchers/createImage'
 import { initAudioPlayers } from './utils/audioPlayer'
 import { defineSelection, getQuillInstance } from './utils/editor'
@@ -21,7 +21,7 @@ interface Props {
   enableReviseMode?: boolean
   enableToolbar?: boolean
   eventName: string
-  language: string
+  language: Language
   mentionLoading: boolean
   mentionKeywordChange: (keyword: string) => void
   mentionUsers: any
@@ -59,12 +59,16 @@ export class MattersArticleEditor extends React.Component<Props, State> {
       toolbarPosition: 0,
       toolbarVisible: false,
     }
-    this.texts = props.texts || TEXT[props.language] || TEXT[LANGUAGE.ZH_HANT]
+
+    this.texts = {
+      ...TEXT[props.language || LANGUAGE.zh_hant],
+      ...props.texts,
+    }
 
     // temporarily hacky solution
     Util.eventDispatcher = this.eventDispatcher
     Util.eventName = props.eventName
-    Util.language = props.language || LANGUAGE.ZH_HANT
+    Util.language = props.language || LANGUAGE.zh_hant
     Util.reviseMode = props.enableReviseMode
     Quill.register('formats/util', Util, true)
   }

@@ -5,6 +5,7 @@ import BaseBlockEmbed from './BaseBlockEmbed'
 import { TEXT } from '../enums/text'
 import { getLangFromRoot } from '../utils/dom'
 import { langConvert } from '../utils/language'
+import { LANGUAGE } from '../enums/common'
 
 interface FigcaptionParams {
   caption: string
@@ -17,8 +18,8 @@ class Figcaption extends BaseBlockEmbed {
   static create(value: FigcaptionParams) {
     const node = super.create(value)
 
-    const lang = (langConvert.html2sys(getLangFromRoot()) || '').toUpperCase()
-    const placeholder = (TEXT[lang] || TEXT['ZH_HANT']).CAPTION_PLACEHOLDER
+    const lang = langConvert.html2sys(getLangFromRoot()) || ''
+    const placeholder = TEXT[lang || LANGUAGE.zh_hant].CAPTION_PLACEHOLDER
 
     const textarea = document.createElement('textarea')
     textarea.value = value.caption || ''

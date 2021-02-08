@@ -2,8 +2,8 @@ import classNames from 'classnames'
 import React from 'react'
 import { Quill } from 'react-quill'
 
+import { Texts } from '../../enums/text'
 import SVGToolbarAdd from '../../icons/ToolbarAdd'
-
 import { insertImageBlock, insertEmbedBlock } from '../../utils/editor'
 
 import ToolbarDividerButton from './ToolbarDividerButton'
