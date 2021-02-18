@@ -9,6 +9,7 @@ import { Texts } from '../../enums/text'
  * Usage:
  *   <MattersEditorSummary
  *      devalutValue="Default summary"
+ *      enable={true}
  *      readOnly={false}
  *      texts={{}}
  *      update={() => func({ summary: '' })}
@@ -17,6 +18,7 @@ import { Texts } from '../../enums/text'
 
 interface Props {
   defaultValue?: string
+  enable?: boolean
   readOnly: boolean
   texts: Texts
   update: (params: { summary: any }) => void
@@ -28,6 +30,7 @@ const getValidValue = (value: any, fallback: string): string => {
 
 const MattersEditorSummary: React.FC<Props> = ({
   defaultValue,
+  enable,
   readOnly,
   texts,
   update,
@@ -56,9 +59,15 @@ const MattersEditorSummary: React.FC<Props> = ({
   }
 
   React.useEffect(() => {
-    setHeight(`${instance.current.scrollHeight}px`)
-    setParentHeight(`${instance.current.scrollHeight}px`)
+    if (enable && instance) {
+      setHeight(`${instance.current.scrollHeight}px`)
+      setParentHeight(`${instance.current.scrollHeight}px`)
+    }
   }, [value])
+
+  if (!enable) {
+    return null
+  }
 
   const classes = classNames({
     'editor-summary': true,

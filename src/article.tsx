@@ -20,6 +20,7 @@ interface Props {
   editorUpdate: (params: Params) => void
   editorUpload: (params: Params) => Promise<ResultData>
   enableReviseMode?: boolean
+  enableSummary?: boolean
   enableToolbar?: boolean
   eventName: string
   language: Language
@@ -246,6 +247,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
         />
         <MattersEditorSummary
           defaultValue={this.props.summaryDefaultValue}
+          enable={this.props.enableSummary}
           readOnly={this.props.summaryReadOnly}
           texts={this.texts}
           update={this.props.editorUpdate}
