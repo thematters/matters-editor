@@ -4,6 +4,7 @@ import ReactQuill, { Quill } from 'react-quill'
 
 import Util from './blots/Util'
 import MattersEditorMention from './components/Mention'
+import MattersEditorSummary from './components/Summary'
 import MattersEditorTitle from './components/Title'
 import MattersEditorToolbar from './components/Toolbar'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/default'
@@ -27,6 +28,8 @@ interface Props {
   mentionUsers: any
   mentionListComponent: any
   readOnly: boolean
+  summaryDefaultValue?: string
+  summaryReadOnly?: boolean
   theme: string
   texts?: Texts
   titleDefaultValue?: string
@@ -238,6 +241,12 @@ export class MattersArticleEditor extends React.Component<Props, State> {
         <MattersEditorTitle
           defaultValue={this.props.titleDefaultValue}
           readOnly={this.props.titleReadOnly}
+          texts={this.texts}
+          update={this.props.editorUpdate}
+        />
+        <MattersEditorSummary
+          defaultValue={this.props.summaryDefaultValue}
+          readOnly={this.props.summaryReadOnly}
           texts={this.texts}
           update={this.props.editorUpdate}
         />

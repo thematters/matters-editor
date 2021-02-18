@@ -10,7 +10,7 @@ import { Texts } from '../../enums/text'
  *     devaultValue="Default title"
  *     readOnly={false}
  *     texts={{}}
- *     update={() => func({ title: '' }}}
+ *     update={() => func({ title: '' })}
  *   />
  */
 
