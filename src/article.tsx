@@ -120,7 +120,11 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     DEBOUNCE_DELAY
   )
 
-  handleBlur = () => this.update(this.state.content)
+  handleBlur = () => this.update({
+    content: this.state.content,
+    currText: this.instance.getText() || '',
+    initText: this.initText,
+  })
 
   handleChange = (content: string, delta: any, source: string) => {
     this.setState({ content }, () => {
