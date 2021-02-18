@@ -1,5 +1,7 @@
+import autosize from 'autosize'
 import classNames from 'classnames'
 import React from 'react'
+
 import { KEYCODES } from '../../enums/common'
 import { Texts } from '../../enums/text'
 
@@ -37,15 +39,11 @@ const MattersEditorSummary: React.FC<Props> = ({
 }) => {
   const instance = React.useRef(null)
   const [value, setValue] = React.useState<string>(defaultValue)
-  const [height, setHeight] = React.useState('auto')
-  const [parentHeight, setParentHeight] = React.useState('auto')
 
   const length = (value && value.length) || 0
 
   const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = (event.target.value || '').replace(/\r\n|\r|\n/g, '')
-    setHeight('auto')
-    setParentHeight(`${instance.current.scrollHeight}px`)
     setValue(text)
   }
 
@@ -60,10 +58,9 @@ const MattersEditorSummary: React.FC<Props> = ({
 
   React.useEffect(() => {
     if (enable && instance) {
-      setHeight(`${instance.current.scrollHeight}px`)
-      setParentHeight(`${instance.current.scrollHeight}px`)
+      autosize(instance.current)
     }
-  }, [value])
+  }, [])
 
   if (!enable) {
     return null
@@ -79,7 +76,7 @@ const MattersEditorSummary: React.FC<Props> = ({
   })
 
   return (
-    <section className={classes} style={{ minHeight: parentHeight }}>
+    <section className={classes}>
       <textarea
         ref={instance}
         rows={1}
@@ -89,7 +86,6 @@ const MattersEditorSummary: React.FC<Props> = ({
         onBlur={handleBlur}
         onChange={handleChange}
         onKeyPress={handleKeyPress}
-        style={{ height }}
       />
       {!readOnly && (
         <section className={counterClasses}>({length}/200)</section>
