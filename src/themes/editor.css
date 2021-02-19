@@ -1,6 +1,7 @@
 :root {
   --color-gold: #c0a46b;
   --color-green: #0d6763;
+  --color-red: #c85c41;
 
   --color-bg-green: #f2faf7;
 
@@ -211,6 +212,32 @@ pre {
       color: var(--color-grey);
       opacity: 1; /* Firefox */
     }
+  }
+}
+
+.editor-summary {
+  margin-bottom: var(--spacing-x-tight);
+
+  & :global(textarea) {
+    padding: var(--spacing-x-tight) 0 0;
+    font-size: var(--font-size-xm);
+    line-height: var(--line-height-article-base);
+    resize: none;
+
+    &::placeholder {
+      color: var(--color-grey);
+      opacity: 1; /* Firefox */
+    }
+  }
+
+  & .counter {
+    color: var(--color-grey-light);
+    font-size: var(--font-size-xs);
+    text-align: right;
+  }
+
+  & .error {
+    color: var(--color-red);
   }
 }
 

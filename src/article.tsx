@@ -4,6 +4,7 @@ import ReactQuill, { Quill } from 'react-quill'
 
 import Util from './blots/Util'
 import MattersEditorMention from './components/Mention'
+import MattersEditorSummary from './components/Summary'
 import MattersEditorTitle from './components/Title'
 import MattersEditorToolbar from './components/Toolbar'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/default'
@@ -19,6 +20,7 @@ interface Props {
   editorUpdate: (params: Params) => void
   editorUpload: (params: Params) => Promise<ResultData>
   enableReviseMode?: boolean
+  enableSummary?: boolean
   enableToolbar?: boolean
   eventName: string
   language: Language
@@ -27,6 +29,8 @@ interface Props {
   mentionUsers: any
   mentionListComponent: any
   readOnly: boolean
+  summaryDefaultValue?: string
+  summaryReadOnly?: boolean
   theme: string
   texts?: Texts
   titleDefaultValue?: string
@@ -116,7 +120,11 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     DEBOUNCE_DELAY
   )
 
-  handleBlur = () => this.update(this.state.content)
+  handleBlur = () => this.update({
+    content: this.state.content,
+    currText: this.instance.getText() || '',
+    initText: this.initText,
+  })
 
   handleChange = (content: string, delta: any, source: string) => {
     this.setState({ content }, () => {
@@ -238,6 +246,13 @@ export class MattersArticleEditor extends React.Component<Props, State> {
         <MattersEditorTitle
           defaultValue={this.props.titleDefaultValue}
           readOnly={this.props.titleReadOnly}
+          texts={this.texts}
+          update={this.props.editorUpdate}
+        />
+        <MattersEditorSummary
+          defaultValue={this.props.summaryDefaultValue}
+          enable={this.props.enableSummary}
+          readOnly={this.props.summaryReadOnly}
           texts={this.texts}
           update={this.props.editorUpdate}
         />

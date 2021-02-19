@@ -8,6 +8,7 @@ export const TEXT = {
     LINK_PLACEHOLDER: 'Enter link',
     LIKE_BUTTON_FAILED:
       "Like button has been embeded, so you don't need to another.",
+    SUMMARY_PLACEHOLDER: 'Enter summary ...',
     TITLE_FALLBACK: 'Untitle',
     TITLE_PLACEHOLDER: 'Enter title ...',
     TOOLBAR_ADD_DIVIDER: 'Add divivder',
@@ -35,6 +36,7 @@ export const TEXT = {
     EMBED_VIDEO_PLACEHOLDER: '贴上 YouTube、Vimeo 链接後，Enter 进行新增',
     LINK_PLACEHOLDER: '输入链接地址',
     LIKE_BUTTON_FAILED: '作品页面中的赞赏按钮已嵌入 LikeButton，你无需手动添加',
+    SUMMARY_PLACEHOLDER: '自订义摘要…',
     TITLE_FALLBACK: '未命名',
     TITLE_PLACEHOLDER: '请输入标题…',
     TOOLBAR_ADD_DIVIDER: '新增分割线',
@@ -61,6 +63,7 @@ export const TEXT = {
     EMBED_VIDEO_PLACEHOLDER: '貼上 YouTube、Vimeo 連結後，Enter 進行新增',
     LINK_PLACEHOLDER: '輸入連結地址',
     LIKE_BUTTON_FAILED: '作品頁面中的讚賞按鈕已嵌入 LikeButton，你無需手動添加',
+    SUMMARY_PLACEHOLDER: '自訂義摘要…',
     TITLE_FALLBACK: '未命名',
     TITLE_PLACEHOLDER: '請輸入標題…',
     TOOLBAR_ADD_DIVIDER: '新增分割線',
