@@ -84,6 +84,7 @@ const App = () => {
         editorUpdate={editorUpdate}
         editorUpload={editorUpload}
         enableReviseMode={false}
+        enableSummary={true}
         enableToolbar={true}
         eventName={eventName}
         language="zh_hant"
