@@ -1,5 +1,6 @@
 import { Quill } from 'react-quill'
 
+import createImageMatcher from '../matchers/createImage'
 import { isSafari } from '../utils/browser'
 import { dom } from '../utils/dom'
 
@@ -19,10 +20,18 @@ const Parchment = Quill.import('parchment')
  */
 
 class RemadeClipboard extends Clipboard {
+  upload: Promise<ResultData>
+
+  constructor(quill, options) {
+    super(quill, options)
+    this.upload = options.upload
+  }
+
   onPaste(event: any) {
     if (event.defaultPrevented || !this.quill.isEnabled()) {
       return
     }
+
     const util = Parchment.query('util')
     const reviseMode = util && util.reviseMode === true
 
@@ -48,7 +57,14 @@ class RemadeClipboard extends Clipboard {
     } else if (!html) {
       delta.insert(text)
     } else {
+      // add image matcher only pasting html
+      this.addMatcher('IMG', createImageMatcher(this.upload))
       let pasteDelta = this.convert(html)
+
+      // remove image matcher in case of re-upload by calling this.convert directly
+      this.matchers = (this.matchers || []).filter(
+        (matcher) => Array.isArray(matcher) && matcher[0] !== 'IMG'
+      )
 
       if (reviseMode) {
         // if revise-mode is enabled, then skip figure blocks when pasting
