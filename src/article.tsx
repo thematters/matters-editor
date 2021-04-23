@@ -10,7 +10,6 @@ import MattersEditorToolbar from './components/Toolbar'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/default'
 import { DEBOUNCE_DELAY, LANGUAGE, SELECTION_TYPES } from './enums/common'
 import { TEXT, Texts } from './enums/text'
-import createImageMatcher from './matchers/createImage'
 import { initAudioPlayers } from './utils/audioPlayer'
 import { defineSelection, getQuillInstance } from './utils/editor'
 
@@ -51,6 +50,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
   private instance: Quill | null = null
   private initText: string = ''
   private texts: Texts = null
+  private baseConfig: Record<string, any> = {}
 
   private editorReference = React.createRef<ReactQuill>()
   private mentionReference = React.createRef<HTMLElement>()
@@ -68,6 +68,9 @@ export class MattersArticleEditor extends React.Component<Props, State> {
       ...TEXT[props.language || LANGUAGE.zh_hant],
       ...props.texts,
     }
+
+    this.baseConfig = { ...MODULE_CONFIG }
+    this.baseConfig.clipboard.upload = props.editorUpload
 
     // temporarily hacky solution
     Util.eventDispatcher = this.eventDispatcher
@@ -104,12 +107,6 @@ export class MattersArticleEditor extends React.Component<Props, State> {
 
   initQuillInstance = () => {
     const instance = getQuillInstance(this.editorReference)
-    if (instance) {
-      instance.clipboard.addMatcher(
-        'IMG',
-        createImageMatcher(this.props.editorUpload)
-      )
-    }
     return instance
   }
 
@@ -120,11 +117,12 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     DEBOUNCE_DELAY
   )
 
-  handleBlur = () => this.update({
-    content: this.state.content,
-    currText: this.instance.getText() || '',
-    initText: this.initText,
-  })
+  handleBlur = () =>
+    this.update({
+      content: this.state.content,
+      currText: this.instance.getText() || '',
+      initText: this.initText,
+    })
 
   handleChange = (content: string, delta: any, source: string) => {
     this.setState({ content }, () => {
@@ -220,8 +218,8 @@ export class MattersArticleEditor extends React.Component<Props, State> {
   render() {
     const classes = this.props.readOnly ? 'u-area-disable' : ''
 
-    let modulesConfig = {
-      ...MODULE_CONFIG,
+    let modulesConfig: Record<string, any> = {
+      ...this.baseConfig,
       imageDrop: {
         eventDispatcher: this.eventDispatcher,
         eventName: this.props.eventName,
