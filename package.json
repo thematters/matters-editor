@@ -58,8 +58,6 @@
     "graphql-tag": "^2.10.1",
     "husky": "^4.2.3",
     "lodash": "^4.17.15",
-    "parcel-bundler": "^1.12.4",
-    "parcel-plugin-clean-dist": "0.0.6",
     "postcss-color-function": "^4.1.0",
     "postcss-custom-media": "^7.0.8",
     "postcss-mixins": "^6.2.2",
