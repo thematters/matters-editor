@@ -1,5 +1,7 @@
 import { Quill } from 'react-quill'
 
+import { docsSoap } from 'docs-soap'
+
 import createImageMatcher from '../matchers/createImage'
 import { isSafari } from '../utils/browser'
 import { dom } from '../utils/dom'
@@ -46,7 +48,8 @@ class RemadeClipboard extends Clipboard {
     event.stopPropagation()
 
     const formats = this.quill.getFormat(this.quill.selection.savedRange.index)
-    const html = event.clipboardData.getData('text/html')
+    const htmlRaw = event.clipboardData.getData('text/html')
+    const html = docsSoap(htmlRaw) // Needed for Google docs
     const text = event.clipboardData.getData('text/plain')
 
     let delta = new Delta().retain(range.index)
