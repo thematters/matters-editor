@@ -21,7 +21,7 @@
     "build": "rimraf dist/**/* && rollup -c rollup.config.js",
     "demo": "parcel -p 9000 demo/index.html --open",
     "format": "prettier --write \"{src,demo}/**/*.{ts,tsx,json}\"",
-    "lint": "tslint -p ."
+    "lint": "tslint -p . || true"
   },
   "husky": {
     "hooks": {
@@ -70,9 +70,6 @@
     "rollup-plugin-peer-deps-external": "^2.2.0",
     "rollup-plugin-postcss": "^3.1.2",
     "rollup-plugin-typescript2": "^0.27.1",
-    "tslint": "^6.1.2",
-    "tslint-config-prettier": "^1.18.0",
-    "tslint-react-hooks": "^2.2.1",
     "typescript": "^3.6.4",
     "uuid": "^8.0.0"
   },
