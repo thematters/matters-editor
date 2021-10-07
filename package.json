@@ -54,7 +54,7 @@
     "autoprefixer": "^9.7.0",
     "graphql": "^14.5.8",
     "graphql-tag": "^2.10.1",
-    "husky": "^4.2.3",
+    "husky": "^7.0.2",
     "lodash": "^4.17.15",
     "postcss-color-function": "^4.1.0",
     "postcss-custom-media": "^7.0.8",
