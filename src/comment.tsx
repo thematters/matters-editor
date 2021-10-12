@@ -2,7 +2,6 @@ import _debounce from 'lodash/debounce'
 import React from 'react'
 import ReactQuill, { Quill } from 'react-quill'
 
-import MattersEditorMention from './components/Mention'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/comment'
 import { DEBOUNCE_DELAY, LANGUAGE } from './enums/common'
 import { TEXT, Texts } from './enums/text'
@@ -13,10 +12,6 @@ interface Props {
   editorUpdate: (params: Params) => void
   eventName: string
   language: Language
-  mentionLoading: boolean
-  mentionKeywordChange: (keyword: string) => void
-  mentionUsers: any
-  mentionListComponent: any
   readOnly: boolean
   theme: string
   texts?: Texts
@@ -25,20 +20,17 @@ interface Props {
 
 interface State {
   content: string
-  mentionInstance: any
 }
 
 export class MattersCommentEditor extends React.Component<Props, State> {
   private instance: Quill | null = null
   private editorReference = React.createRef<ReactQuill>()
-  private mentionReference = React.createRef<HTMLElement>()
   private texts: Texts = null
 
   constructor(props: Props) {
     super(props)
     this.state = {
       content: this.props.editorContent,
-      mentionInstance: null,
     }
 
     this.texts = {
@@ -71,18 +63,6 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     })
   }
 
-  handleMentionChange = (keyword: string) => {
-    this.props.mentionKeywordChange(keyword)
-  }
-
-  handleMentionSelection = ({ id, userName, displayName }) => {
-    this.state.mentionInstance.insertMention({
-      id,
-      displayName,
-      userName,
-    })
-  }
-
   eventDispatcher = (event: string, data: any) => {
     if (this.props.eventName && window) {
       window.dispatchEvent(new CustomEvent(event, { detail: { ...data } }))
@@ -105,18 +85,9 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     }
   }
 
-  storeMentionInstance = (instance: any) =>
-    this.setState({ mentionInstance: instance })
-
   render() {
     const modulesConfig = {
       ...MODULE_CONFIG,
-      mention: {
-        mentionContainer:
-          this.mentionReference && this.mentionReference.current,
-        handleMentionChange: this.handleMentionChange,
-        storeMentionInstance: this.storeMentionInstance,
-      },
     }
 
     return (
@@ -133,14 +104,6 @@ export class MattersCommentEditor extends React.Component<Props, State> {
             onChange={this.handleChange}
             bounds="#editor-comment-container"
             scrollingContainer={this.props.scrollingContainer}
-          />
-
-          <MattersEditorMention
-            mentionLoading={this.props.mentionLoading}
-            mentionListComponent={this.props.mentionListComponent}
-            mentionSelection={this.handleMentionSelection}
-            mentionUsers={this.props.mentionUsers}
-            reference={this.mentionReference}
           />
         </div>
       </>
