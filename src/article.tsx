@@ -57,8 +57,13 @@ export class MattersArticleEditor extends React.Component<Props, State> {
 
   constructor(props: Props) {
     super(props)
+
+    let content = this.props.editorContent
+    if (content.match(/^\s*<pre +/)) {
+      content = '<p><br></p>' + content.trimLeft()
+    }
     this.state = {
-      content: this.props.editorContent,
+      content,
       mentionInstance: null,
       toolbarPosition: 0,
       toolbarVisible: false,
