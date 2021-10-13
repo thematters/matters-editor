@@ -31,6 +31,25 @@ export const video = (value: string) => {
   }
 
   let id: string | null
+  const inputUrl = new URL(value)
+  switch (inputUrl.hostname) {
+    case 'youtu.be':
+      /* URL {
+           href: 'https://youtu.be/shoVsQhou-8?t=17643',
+           origin: 'https://youtu.be',
+           hostname: 'youtu.be',
+           pathname: '/shoVsQhou-8',
+           search: '?t=17643',
+           searchParams: URLSearchParams { 't' => '17643' },
+           ...
+      */
+      id = inputUrl.pathname.substring(1) // remove '/'
+      const outputUrl = new URL(`https://www.youtube.com/embed/${id}?rel=0`)
+      if (inputUrl.searchParams.has('t'))
+        outputUrl.searchParams.set('start', inputUrl.searchParams.get('t'))
+      return outputUrl.toString()
+  }
+
   if (value.match('/(http(s)?://)?(www.)?youtube|youtu.be/')) {
     id = value.match('embed')
       ? value.split(/embed\//)[1].split('"')[0]
