@@ -49,7 +49,6 @@ class RemadeClipboard extends Clipboard {
 
     const formats = this.quill.getFormat(this.quill.selection.savedRange.index)
     const htmlRaw = event.clipboardData.getData('text/html')
-    const html = docsSoap(htmlRaw) // Needed for Google docs
     const text = event.clipboardData.getData('text/plain')
 
     let delta = new Delta().retain(range.index)
@@ -57,11 +56,13 @@ class RemadeClipboard extends Clipboard {
       delta.insert(text, {
         [CodeBlock.blotName]: formats[CodeBlock.blotName],
       })
-    } else if (!html) {
+    } else if (!htmlRaw) {
       delta.insert(text)
     } else {
       // add image matcher only pasting html
       this.addMatcher('IMG', createImageMatcher(this.upload))
+
+      const html = docsSoap(htmlRaw) // Needed for Google docs, run only when clipboard is HTML
       let pasteDelta = this.convert(html)
 
       // remove image matcher in case of re-upload by calling this.convert directly
