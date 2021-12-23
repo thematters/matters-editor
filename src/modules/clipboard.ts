@@ -1,6 +1,7 @@
 import { Quill } from 'react-quill'
 
-import { docsSoap } from 'docs-soap'
+// import { docsSoap } from 'docs-soap'
+import { soap } from '../utils/soap'
 
 import createImageMatcher from '../matchers/createImage'
 import { isSafari } from '../utils/browser'
@@ -48,21 +49,28 @@ class RemadeClipboard extends Clipboard {
     event.stopPropagation()
 
     const formats = this.quill.getFormat(this.quill.selection.savedRange.index)
-    const htmlRaw = event.clipboardData.getData('text/html')
-    const text = event.clipboardData.getData('text/plain')
+    const clipboardData = event.clipboardData // || window.clipboardData
+    // const types = clipboardData.types
+    const text = clipboardData.getData('text/plain') // text/plain always exists
+    const htmlRaw = clipboardData.getData('text/html')
+
+    // console.log("onPaste:", { types, text, htmlRaw, })
 
     let delta = new Delta().retain(range.index)
     if (formats[CodeBlock.blotName]) {
       delta.insert(text, {
         [CodeBlock.blotName]: formats[CodeBlock.blotName],
       })
-    } else if (!htmlRaw) {
+    } else if (!clipboardData.types.includes("text/html") || !htmlRaw) {
       delta.insert(text)
-    } else {
-      // add image matcher only pasting html
+    } else { // text/html
+      // add image matcher only when pasting html
       this.addMatcher('IMG', createImageMatcher(this.upload))
 
-      const html = docsSoap(htmlRaw) // Needed for Google docs, run only when clipboard is HTML
+      // Needed for Google docs, run only when clipboard is HTML
+      const html = soap(htmlRaw) // docsSoap(htmlRaw)
+      // console.log("onPaste:", { text, htmlRaw, html })
+
       let pasteDelta = this.convert(html)
 
       // remove image matcher in case of re-upload by calling this.convert directly
