@@ -3,7 +3,11 @@
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "jsx": "react",
-    "lib": ["dom", "es2017"],
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2017",
+    ],
     "module": "esnext",
     "moduleResolution": "node",
     "outDir": "build",
