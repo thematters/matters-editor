@@ -1,6 +1,8 @@
 import React from 'react';
 import { render } from 'react-dom';
 
+import { useHelpers } from '@remirror/react';
+
 import { MarkdownEditor } from '../src';
 
 const basicContent = `
@@ -43,12 +45,26 @@ playtime is just beginning
 3. List
 `;
 
+function MarkdownPreview() {
+  const { getMarkdown } = useHelpers(true);
+
+  return (
+    <pre>
+      <code>{getMarkdown()}</code>
+    </pre>
+  );
+}
+
 const App = () => {
-  return <MarkdownEditor
-    placeholder="Start typing..."
-    initialContent={basicContent}
-    editorUpdate={(params: Params) => console.log('editorUpdate:', params)}
-  />;
+  return (
+    <MarkdownEditor
+      placeholder="Start typing..."
+      initialContent={basicContent}
+      editorUpdate={(params: Params) => console.log('editorUpdate:', params)}
+    >
+      <MarkdownPreview />
+    </MarkdownEditor>
+  );
 };
 
 render(<App />, document.getElementById('demo'));

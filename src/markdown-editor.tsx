@@ -16,6 +16,7 @@ import {
   BulletListExtension,
   CodeBlockExtension,
   CodeExtension,
+  EmojiExtension,
   HardBreakExtension,
   HeadingExtension,
   ItalicExtension,
@@ -31,6 +32,7 @@ import {
 import {
   ComponentItem,
   EditorComponent,
+  EmojiPopupComponent,
   Remirror,
   ThemeProvider,
   Toolbar,
@@ -39,7 +41,9 @@ import {
 } from '@remirror/react';
 import { AllStyledComponent } from '@remirror/styles/emotion';
 
-import { FloatingLinkToolbar } from './link-toolbar'
+import data from 'svgmoji/emoji.json';
+
+import { FloatingLinkToolbar } from './link-toolbar';
 
 export default { title: 'Editors / Markdown' };
 
@@ -93,6 +97,11 @@ export const MarkdownEditor: FC<MarkdownEditorProps> = ({
   const extensions = useCallback(
     () => [
       new PlaceholderExtension({ placeholder }),
+      new EmojiExtension({
+        data,
+        plainText: true,
+        // moji: 'noto'
+      }),
       // new LinkExtension({ autoLink: true }),
       new BoldExtension(),
       new StrikeExtension(),
@@ -128,7 +137,7 @@ export const MarkdownEditor: FC<MarkdownEditorProps> = ({
     // Update the state to the latest value.
     if (parameter.tr?.docChanged) {
       console.log('before onChange:', parameter);
-      editorUpdate?.(parameter)
+      editorUpdate?.(parameter);
     }
     setState(parameter.state);
   };
@@ -140,6 +149,7 @@ export const MarkdownEditor: FC<MarkdownEditorProps> = ({
           <Toolbar items={toolbarItems} refocusEditor label="Top Toolbar" />
           <EditorComponent />
           <FloatingLinkToolbar />
+          <EmojiPopupComponent />
           {children}
         </Remirror>
       </ThemeProvider>

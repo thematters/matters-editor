@@ -31,7 +31,7 @@ function useLinkShortcut() {
 
         return setLinkShortcut(props);
       }),
-    [isEditing],
+    [isEditing]
   );
 
   return { linkShortcut, isEditing, setIsEditing };
@@ -105,7 +105,7 @@ function useFloatingLinkState() {
       submitHref,
       cancelHref,
     }),
-    [href, linkShortcut, linkPositioner, isEditing, clickEdit, onRemove, submitHref, cancelHref],
+    [href, linkShortcut, linkPositioner, isEditing, clickEdit, onRemove, submitHref, cancelHref]
   );
 }
 
@@ -128,31 +128,31 @@ export const FloatingLinkToolbar = () => {
           : [{ type: ComponentItem.ToolbarButton, onClick: () => clickEdit(), icon: 'link' }],
       },
     ],
-    [clickEdit, onRemove, activeLink],
+    [clickEdit, onRemove, activeLink]
   );
 
   const items: ToolbarItemUnion[] = useMemo(() => linkEditItems, [linkEditItems]);
 
   return (
     <>
-      <FloatingToolbar items={items} positioner='selection' placement='top' enabled={!isEditing} />
+      <FloatingToolbar items={items} positioner="selection" placement="top" enabled={!isEditing} />
       <FloatingToolbar
         items={linkEditItems}
         positioner={linkPositioner}
-        placement='bottom'
+        placement="bottom"
         enabled={!isEditing && empty}
       />
 
       <FloatingWrapper
-        positioner='always'
-        placement='bottom'
+        positioner="always"
+        placement="bottom"
         enabled={isEditing}
         renderOutsideEditor
       >
         <input
           style={{ zIndex: 20 }}
           autoFocus
-          placeholder='Enter link...'
+          placeholder="Enter link..."
           onChange={(event) => setHref(event.target.value)}
           value={href}
           onKeyPress={(event) => {
