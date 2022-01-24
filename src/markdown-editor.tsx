@@ -39,6 +39,8 @@ import {
 } from '@remirror/react';
 import { AllStyledComponent } from '@remirror/styles/emotion';
 
+import { FloatingLinkToolbar } from './link-toolbar'
+
 export default { title: 'Editors / Markdown' };
 
 export interface MarkdownEditorProps {
@@ -137,6 +139,7 @@ export const MarkdownEditor: FC<MarkdownEditorProps> = ({
         <Remirror manager={manager} autoFocus state={state} onChange={changeHandler}>
           <Toolbar items={toolbarItems} refocusEditor label="Top Toolbar" />
           <EditorComponent />
+          <FloatingLinkToolbar />
           {children}
         </Remirror>
       </ThemeProvider>
