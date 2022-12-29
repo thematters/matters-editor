@@ -1,6 +1,7 @@
 import _debounce from 'lodash/debounce'
+import Quill from 'quill'
 import React from 'react'
-import ReactQuill, { Quill } from 'react-quill'
+import ReactQuill from 'react-quill'
 
 import MattersEditorMention from './components/Mention'
 import { FORMAT_CONFIG, MODULE_CONFIG } from './configs/comment'

@@ -1,4 +1,4 @@
-import { Quill } from 'react-quill'
+import Quill from 'quill'
 
 import {
   ACCEPTED_UPLOAD_IMAGE_TYPES,

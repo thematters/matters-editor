@@ -1,13 +1,11 @@
 {
-  "modules": true,
   "plugins": {
-    "autoprefixer": {},
-    "postcss-modules": {
-      "generateScopedName": "[local]"
-    },
     "postcss-mixins": {},
-    "postcss-nested": {},
-    "postcss-color-function": {},
-    "postcss-custom-media": {},
+    "postcss-preset-env": {
+      "stage": 0,
+      "preserve": false
+    },
+    "postcss-calc": {},
+    "postcss-color-function": {}
   }
 }
