@@ -105,3 +105,5 @@ sources.list
 .ebextensions/http-basic-auth.config
 
 src/themes/*.json
+
+.parcel-cache
