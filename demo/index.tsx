@@ -97,7 +97,9 @@ const App = () => {
         titleDefaultValue=""
         titleReadOnly={false}
       />
+
       <br />
+
       <MattersCommentEditor
         editorContent={commentContent}
         editorUpdate={(params) => setCommentContent(params.content)}

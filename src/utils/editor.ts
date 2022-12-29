@@ -1,5 +1,5 @@
 import _includes from 'lodash/includes'
-import { Quill } from 'react-quill'
+import Quill from 'quill'
 
 import { CUSTOM_BLOT_TYPES, SELECTION_TYPES } from '../enums/common'
 

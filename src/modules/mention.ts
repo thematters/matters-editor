@@ -1,8 +1,6 @@
-import { Quill } from 'react-quill'
+import Quill from 'quill'
 
 import { isValidChars, REGEXP_DISPLAY_NAME } from '../utils/validator'
-import { isSafari } from '../utils/browser'
-import { dom } from '../utils/dom'
 
 /**
  * Mention module.
