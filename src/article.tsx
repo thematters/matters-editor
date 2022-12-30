@@ -97,6 +97,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
 
   componentDidUpdate(prevProps: Props, prevState: State) {
     this.instance = this.initQuillInstance()
+
     this.resetLinkInputPlaceholder()
     initAudioPlayers()
 
@@ -260,19 +261,21 @@ export class MattersArticleEditor extends React.Component<Props, State> {
           update={this.props.editorUpdate}
         />
         <div id="editor-article-container" className={classes}>
-          <ReactQuill
-            formats={FORMAT_CONFIG}
-            modules={modulesConfig}
-            placeholder={this.texts.EDITOR_PLACEHOLDER}
-            readOnly={this.props.readOnly}
-            ref={this.editorReference}
-            theme={this.props.theme}
-            value={this.state.content}
-            onBlur={this.handleBlur}
-            onChange={this.handleChange}
-            onChangeSelection={this.handleChangeSelection}
-            scrollingContainer={this.props.scrollingContainer}
-          />
+          {this.mentionReference.current && (
+            <ReactQuill
+              formats={FORMAT_CONFIG}
+              modules={modulesConfig}
+              placeholder={this.texts.EDITOR_PLACEHOLDER}
+              readOnly={this.props.readOnly}
+              ref={this.editorReference}
+              theme={this.props.theme}
+              value={this.state.content}
+              onBlur={this.handleBlur}
+              onChange={this.handleChange}
+              onChangeSelection={this.handleChangeSelection}
+              scrollingContainer={this.props.scrollingContainer}
+            />
+          )}
           <MattersEditorToolbar
             enable={this.props.enableToolbar}
             eventDispatcher={this.eventDispatcher}
@@ -292,6 +295,8 @@ export class MattersArticleEditor extends React.Component<Props, State> {
             mentionSelection={this.handleMentionSelection}
             mentionUsers={this.props.mentionUsers}
             reference={this.mentionReference}
+            // FIXME: force update state to re-render <ReactQuill>
+            onMount={() => this.setState({ content: this.state.content })}
           />
         </div>
       </>
