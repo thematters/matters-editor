@@ -97,7 +97,7 @@ const App = () => {
         titleDefaultValue=""
         titleReadOnly={false}
       />
-
+      {/*
       <br />
 
       <MattersCommentEditor
@@ -114,7 +114,7 @@ const App = () => {
         texts={{
           COMMENT_PLACEHOLDER: 'custom placeholder\nand line break',
         }}
-      />
+      /> */}
     </>
   )
 }

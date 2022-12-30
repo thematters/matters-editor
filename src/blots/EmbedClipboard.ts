@@ -1,4 +1,4 @@
-import { Quill } from 'react-quill'
+import Quill from 'quill'
 
 import { COLOR, KEYCODES, URL_LIKE_BUTTON } from '../enums/common'
 import { TEXT } from '../enums/text'

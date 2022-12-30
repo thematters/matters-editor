@@ -1,7 +1,7 @@
 import _debounce from 'lodash/debounce'
-import Quill from 'quill'
 import React from 'react'
 import ReactQuill from 'react-quill'
+import Quill from 'quill'
 
 import Util from './blots/Util'
 import MattersEditorMention from './components/Mention'
@@ -92,7 +92,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     initAudioPlayers()
 
     // set init text
-    this.initText = this.instance.getText() || ''
+    this.initText = this.instance?.getText() || ''
   }
 
   componentDidUpdate(prevProps: Props, prevState: State) {
@@ -233,8 +233,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
         texts: this.texts,
       },
       mention: {
-        mentionContainer:
-          this.mentionReference && this.mentionReference.current,
+        mentionContainer: this.mentionReference.current,
         handleMentionChange: this.handleMentionChange,
         storeMentionInstance: this.storeMentionInstance,
       },
