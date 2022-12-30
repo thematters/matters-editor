@@ -1,6 +1,4 @@
-import React from 'react'
-
-import SVGSpinner from '../../icons/Spinner'
+import React, { useEffect } from 'react'
 
 /**
  * This component is a mention list container which will be visible when typing `@`.
@@ -20,6 +18,7 @@ interface Props {
   mentionSelection: any
   mentionUsers: any[]
   reference: React.RefObject<HTMLElement>
+  onMount: () => any
 }
 
 export default ({
@@ -28,8 +27,13 @@ export default ({
   mentionSelection,
   mentionUsers,
   reference,
+  onMount,
 }: Props) => {
   const hasMention = mentionUsers.length <= 0 && !mentionLoading
+
+  useEffect(() => {
+    onMount()
+  }, [])
 
   return (
     <section className="mention-container" ref={reference}>

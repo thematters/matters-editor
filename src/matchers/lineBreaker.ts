@@ -1,4 +1,4 @@
-import { Quill } from 'react-quill'
+import Quill from 'quill'
 
 const Delta = Quill.import('delta')
 

@@ -1,4 +1,4 @@
-import { Quill } from 'react-quill'
+import Quill from 'quill'
 
 // import { docsSoap } from 'docs-soap'
 import { soap } from '../utils/soap'
@@ -61,9 +61,10 @@ class RemadeClipboard extends Clipboard {
       delta.insert(text, {
         [CodeBlock.blotName]: formats[CodeBlock.blotName],
       })
-    } else if (!clipboardData.types.includes("text/html") || !htmlRaw) {
+    } else if (!clipboardData.types.includes('text/html') || !htmlRaw) {
       delta.insert(text)
-    } else { // text/html
+    } else {
+      // text/html
       // add image matcher only when pasting html
       this.addMatcher('IMG', createImageMatcher(this.upload))
 
