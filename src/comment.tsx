@@ -1,6 +1,6 @@
 import _debounce from 'lodash/debounce'
-import Quill from 'quill'
 import React from 'react'
+import Quill from 'quill'
 import ReactQuill from 'react-quill'
 
 import MattersEditorMention from './components/Mention'
@@ -113,8 +113,7 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     const modulesConfig = {
       ...MODULE_CONFIG,
       mention: {
-        mentionContainer:
-          this.mentionReference && this.mentionReference.current,
+        mentionContainer: this.mentionReference?.current,
         handleMentionChange: this.handleMentionChange,
         storeMentionInstance: this.storeMentionInstance,
       },
@@ -123,18 +122,20 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     return (
       <>
         <div id="editor-comment-container">
-          <ReactQuill
-            formats={FORMAT_CONFIG}
-            modules={modulesConfig}
-            placeholder={this.texts.COMMENT_PLACEHOLDER}
-            readOnly={this.props.readOnly}
-            ref={this.editorReference}
-            theme={this.props.theme}
-            value={this.state.content}
-            onChange={this.handleChange}
-            bounds="#editor-comment-container"
-            scrollingContainer={this.props.scrollingContainer}
-          />
+          {this.mentionReference?.current && (
+            <ReactQuill
+              formats={FORMAT_CONFIG}
+              modules={modulesConfig}
+              placeholder={this.texts.COMMENT_PLACEHOLDER}
+              readOnly={this.props.readOnly}
+              ref={this.editorReference}
+              theme={this.props.theme}
+              value={this.state.content}
+              onChange={this.handleChange}
+              bounds="#editor-comment-container"
+              scrollingContainer={this.props.scrollingContainer}
+            />
+          )}
 
           <MattersEditorMention
             mentionLoading={this.props.mentionLoading}
@@ -142,6 +143,8 @@ export class MattersCommentEditor extends React.Component<Props, State> {
             mentionSelection={this.handleMentionSelection}
             mentionUsers={this.props.mentionUsers}
             reference={this.mentionReference}
+            // FIXME: force update state to re-render <ReactQuill>
+            onMount={() => this.setState({ content: this.state.content })}
           />
         </div>
       </>

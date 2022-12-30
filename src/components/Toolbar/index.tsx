@@ -1,6 +1,6 @@
 import classNames from 'classnames'
-import Quill from 'quill'
 import React from 'react'
+import Quill from 'quill'
 
 import { Texts } from '../../enums/text'
 import SVGToolbarAdd from '../../icons/ToolbarAdd'

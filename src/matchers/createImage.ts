@@ -1,4 +1,4 @@
-import { Quill } from 'react-quill'
+import Quill from 'quill'
 
 //import IMAGE_PLACEHOLDER from '~/static/images/image-placeholder.svg'
 
