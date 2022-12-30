@@ -234,7 +234,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
         texts: this.texts,
       },
       mention: {
-        mentionContainer: this.mentionReference.current,
+        mentionContainer: this.mentionReference?.current,
         handleMentionChange: this.handleMentionChange,
         storeMentionInstance: this.storeMentionInstance,
       },
@@ -261,7 +261,7 @@ export class MattersArticleEditor extends React.Component<Props, State> {
           update={this.props.editorUpdate}
         />
         <div id="editor-article-container" className={classes}>
-          {this.mentionReference.current && (
+          {this.mentionReference?.current && (
             <ReactQuill
               formats={FORMAT_CONFIG}
               modules={modulesConfig}
