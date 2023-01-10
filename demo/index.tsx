@@ -56,6 +56,7 @@ const App = () => {
 
   const editorUpdate = (params: any) => {
     // TODO: add update api
+    console.log('editorUpdate', params)
   }
 
   const editorUpload = async (params: any): Promise<any> => {
@@ -79,7 +80,7 @@ const App = () => {
   return (
     <>
       <MattersArticleEditor
-        editorContent=""
+        editorContent="init content...."
         editorContentId=""
         editorUpdate={editorUpdate}
         editorUpload={editorUpload}
