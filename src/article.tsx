@@ -296,7 +296,12 @@ export class MattersArticleEditor extends React.Component<Props, State> {
             mentionUsers={this.props.mentionUsers}
             reference={this.mentionReference}
             // FIXME: force update state to re-render <ReactQuill>
-            onMount={() => this.setState({ content: this.state.content })}
+            onMount={() => {
+              this.initText = this.state.content
+              this.setState({
+                content: this.state.content,
+              })
+            }}
           />
         </div>
       </>
