@@ -1,5 +1,5 @@
 import _debounce from 'lodash/debounce'
-import React from 'react'
+import React, { useEffect } from 'react'
 import ReactQuill from 'react-quill'
 import Quill from 'quill'
 
@@ -47,6 +47,20 @@ interface State {
   toolbarVisible: boolean
 }
 
+const Wrapper: React.FC<
+  React.PropsWithChildren & { className: string; onMount: () => any }
+> = ({ onMount, className, children }) => {
+  useEffect(() => {
+    onMount()
+  }, [])
+
+  return (
+    <div id="editor-article-container" className={className}>
+      {children}
+    </div>
+  )
+}
+
 export class MattersArticleEditor extends React.Component<Props, State> {
   private instance: Quill | null = null
   private initText: string = ''
@@ -59,12 +73,8 @@ export class MattersArticleEditor extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props)
 
-    let content = this.props.editorContent
-    if (content.match(/^\s*<pre +/)) {
-      content = '<p><br></p>' + content.trimLeft()
-    }
     this.state = {
-      content,
+      content: this.getInitContent(),
       mentionInstance: null,
       toolbarPosition: 0,
       toolbarVisible: false,
@@ -101,6 +111,11 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     this.resetLinkInputPlaceholder()
     initAudioPlayers()
 
+    // FIXME: set init text, expected to set on mount
+    if (this.state.content === this.getInitContent()) {
+      this.initText = this.instance?.getText() || ''
+    }
+
     if (prevProps.editorContentId === this.props.editorContentId) {
       return
     }
@@ -123,6 +138,14 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     },
     DEBOUNCE_DELAY
   )
+
+  getInitContent = () => {
+    let content = this.props.editorContent
+    if (content.match(/^\s*<pre +/)) {
+      content = '<p><br></p>' + content.trimLeft()
+    }
+    return content
+  }
 
   handleBlur = () =>
     this.update({
@@ -223,8 +246,6 @@ export class MattersArticleEditor extends React.Component<Props, State> {
     this.setState({ mentionInstance: instance })
 
   render() {
-    const classes = this.props.readOnly ? 'u-area-disable' : ''
-
     let modulesConfig: Record<string, any> = {
       ...this.baseConfig,
       imageDrop: {
@@ -260,7 +281,15 @@ export class MattersArticleEditor extends React.Component<Props, State> {
           texts={this.texts}
           update={this.props.editorUpdate}
         />
-        <div id="editor-article-container" className={classes}>
+        <Wrapper
+          className={this.props.readOnly ? 'u-area-disable' : ''}
+          onMount={() => {
+            // FIXME: force update state to re-render <ReactQuill>
+            this.setState({
+              content: this.state.content,
+            })
+          }}
+        >
           {this.mentionReference?.current && (
             <ReactQuill
               formats={FORMAT_CONFIG}
@@ -295,15 +324,8 @@ export class MattersArticleEditor extends React.Component<Props, State> {
             mentionSelection={this.handleMentionSelection}
             mentionUsers={this.props.mentionUsers}
             reference={this.mentionReference}
-            // FIXME: force update state to re-render <ReactQuill>
-            onMount={() => {
-              this.initText = this.state.content
-              this.setState({
-                content: this.state.content,
-              })
-            }}
           />
-        </div>
+        </Wrapper>
       </>
     )
   }
