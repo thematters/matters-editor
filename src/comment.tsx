@@ -1,5 +1,5 @@
 import _debounce from 'lodash/debounce'
-import React from 'react'
+import React, { useEffect } from 'react'
 import Quill from 'quill'
 import ReactQuill from 'react-quill'
 
@@ -27,6 +27,17 @@ interface Props {
 interface State {
   content: string
   mentionInstance: any
+}
+
+const Wrapper: React.FC<React.PropsWithChildren & { onMount: () => any }> = ({
+  onMount,
+  children,
+}) => {
+  useEffect(() => {
+    onMount()
+  }, [])
+
+  return <div id="editor-comment-container">{children}</div>
 }
 
 export class MattersCommentEditor extends React.Component<Props, State> {
@@ -120,34 +131,35 @@ export class MattersCommentEditor extends React.Component<Props, State> {
     }
 
     return (
-      <>
-        <div id="editor-comment-container">
-          {this.mentionReference?.current && (
-            <ReactQuill
-              formats={FORMAT_CONFIG}
-              modules={modulesConfig}
-              placeholder={this.texts.COMMENT_PLACEHOLDER}
-              readOnly={this.props.readOnly}
-              ref={this.editorReference}
-              theme={this.props.theme}
-              value={this.state.content}
-              onChange={this.handleChange}
-              bounds="#editor-comment-container"
-              scrollingContainer={this.props.scrollingContainer}
-            />
-          )}
-
-          <MattersEditorMention
-            mentionLoading={this.props.mentionLoading}
-            mentionListComponent={this.props.mentionListComponent}
-            mentionSelection={this.handleMentionSelection}
-            mentionUsers={this.props.mentionUsers}
-            reference={this.mentionReference}
-            // FIXME: force update state to re-render <ReactQuill>
-            onMount={() => this.setState({ content: this.state.content })}
+      <Wrapper
+        onMount={() => {
+          // FIXME: force update state to re-render <ReactQuill>
+          this.setState({ content: this.state.content })
+        }}
+      >
+        {this.mentionReference?.current && (
+          <ReactQuill
+            formats={FORMAT_CONFIG}
+            modules={modulesConfig}
+            placeholder={this.texts.COMMENT_PLACEHOLDER}
+            readOnly={this.props.readOnly}
+            ref={this.editorReference}
+            theme={this.props.theme}
+            value={this.state.content}
+            onChange={this.handleChange}
+            bounds="#editor-comment-container"
+            scrollingContainer={this.props.scrollingContainer}
           />
-        </div>
-      </>
+        )}
+
+        <MattersEditorMention
+          mentionLoading={this.props.mentionLoading}
+          mentionListComponent={this.props.mentionListComponent}
+          mentionSelection={this.handleMentionSelection}
+          mentionUsers={this.props.mentionUsers}
+          reference={this.mentionReference}
+        />
+      </Wrapper>
     )
   }
 }
