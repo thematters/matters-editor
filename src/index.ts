@@ -1,2 +1,2 @@
 export * from './editors'
-export * from './format-converters'
+export * from './converters'
