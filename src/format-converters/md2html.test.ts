@@ -1,6 +1,9 @@
-import { test, expect } from 'vitest'
+import { test, expect, describe } from 'vitest'
 import { md2html } from './md2html'
 
-test('md2html', () => {
-  expect(md2html('abc')).toBe('abc')
+describe('Markdown to HTML', async () => {
+  test('emphasis', async () => {
+    const html = (await md2html('*emphasis*')).trim()
+    expect(html).toBe('<p><em>emphasis</em></p>')
+  })
 })

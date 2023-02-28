@@ -1,6 +1,9 @@
-import { test, expect } from 'vitest'
+import { test, expect, describe } from 'vitest'
 import { html2md } from './html2md'
 
-test('html2md', () => {
-  expect(html2md('abc')).toBe('abc')
+describe('HTML to Markdown', async () => {
+  test('emphasis', async () => {
+    const md = (await html2md('<p><em>emphasis</em></p>')).trim()
+    expect(md).toBe('*emphasis*')
+  })
 })
