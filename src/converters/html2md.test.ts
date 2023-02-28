@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest'
 import { html2md } from './html2md'
 
-describe('HTML to Markdown', async () => {
+describe('HTML to Markdown: Basic Formats', async () => {
   test('heading #1', async () => {
     const md = (await html2md('<h1>Heading level 1</h1>')).trim()
     expect(md).toBe('# Heading level 1')
@@ -207,7 +207,7 @@ describe('HTML to Markdown', async () => {
 *   Fourth item`)
   })
 
-  test('links', async () => {
+  test('link', async () => {
     const md = (
       await html2md(`
       <p>My favorite search engine is <a href="https://duckduckgo.com" target="_blank" rel="noopener noreferrer nofollow">Duck Duck Go</a>.</p>
@@ -215,6 +215,133 @@ describe('HTML to Markdown', async () => {
     ).trim()
     expect(md).toBe(
       'My favorite search engine is [Duck Duck Go](https://duckduckgo.com).'
+    )
+  })
+
+  test('image', async () => {
+    const md1 = (
+      await html2md(`
+      <p>
+        <img
+          srcset="https://mdg.imgix.net/assets/images/san-juan-mountains.jpg?auto=format&amp;fit=clip&amp;w=480 480w, https://mdg.imgix.net/assets/images/san-juan-mountains.jpg?auto=format&amp;fit=clip&amp;q=40&amp;w=1080 1080w"
+          src="https://mdg.imgix.net/assets/images/san-juan-mountains.jpg"
+          class="img-fluid"
+          title="San Juan Mountains"
+          alt="The San Juan Mountains are beautiful!"
+          loading="lazy"
+          sizes="100vw"
+        >
+      </p>
+      `)
+    ).trim()
+    expect(md1).toBe(
+      '![The San Juan Mountains are beautiful!](https://mdg.imgix.net/assets/images/san-juan-mountains.jpg "San Juan Mountains")'
+    )
+
+    // linking image
+    const md2 = (
+      await html2md(`
+      <p>
+        <a
+          href="https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png"
+          class="no-underline">
+          <img
+            srcset="https://mdg.imgix.net/assets/images/shiprock.jpg?auto=format&amp;fit=clip&amp;w=480 480w, https://mdg.imgix.net/assets/images/shiprock.jpg?auto=format&amp;fit=clip&amp;q=40&amp;w=1080 1080w"
+            src="https://mdg.imgix.net/assets/images/shiprock.jpg"
+            class="img-fluid"
+            title="Shiprock, New Mexico by Beau Rogers"
+            alt="An old rock in the desert"
+            loading="lazy"
+            sizes="100vw">
+        </a>
+      </p>
+      `)
+    ).trim()
+    expect(md2).toBe(
+      '[![An old rock in the desert](https://mdg.imgix.net/assets/images/shiprock.jpg "Shiprock, New Mexico by Beau Rogers")](https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png)'
+    )
+  })
+})
+
+describe('HTML to Markdown: Figures', async () => {
+  test('image figure', async () => {
+    const md = (
+      await html2md(`
+    <p>
+      <figure class="image">
+        <img
+          src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"
+          srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"
+        />
+        <figcaption>
+          <span>caption</span>
+        </figcaption>
+      </figure>
+    </p>
+  `)
+    ).trim()
+
+    expect(md).toBe(
+      '<figure class="image"><img src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"><figcaption><span>caption</span></figcaption></figure>'
+    )
+  })
+
+  test('audio figure', async () => {
+    const md = (
+      await html2md(`
+    <p>
+      <figure class="audio">
+        <audio controls data-file-name="點數經濟：讓過路客成為回頭客">
+          <source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82">
+        </audio>
+        <div class="player">
+          <header>
+            <div class="meta">
+              <h4 class="title">點數經濟：讓過路客成為回頭客</h4>
+              <div class="time">
+                <span class="current" data-time="00:00"></span>
+                <span class="duration" data-time="39:05"></span>
+              </div>
+            </div>
+            <span class="play"></span>
+          </header>
+          <footer>
+            <div class="progress-bar">
+              <span></span>
+            </div>
+          </footer>
+        </div>
+        <figcaption>
+          <span>區塊勢 Podcast</span>
+        </figcaption>
+      </figure>
+    </p>
+  `)
+    ).trim()
+
+    expect(md).toBe(
+      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="39:05"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>區塊勢 Podcast</span></figcaption></figure>'
+    )
+  })
+
+  test('iframe figure', async () => {
+    const md = (
+      await html2md(`
+    <p>
+      <figure class="embed-code">
+        <div class="iframe-container">
+            <iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" allowfullscreen="false" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+        </div>
+        <figcaption>
+            <span>完整的JSFiddle代碼</span>
+        </figcaption>
+      </figure>
+    </p>
+  `)
+    ).trim()
+
+    expect(md).toBe(
+      '<figure class="embed-code"><div class="iframe-container"><iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>完整的JSFiddle代碼</span></figcaption></figure>'
     )
   })
 })
