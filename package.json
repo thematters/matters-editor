@@ -71,9 +71,12 @@
   },
   "dependencies": {
     "hast-util-to-html": "^8.0.4",
+    "rehype-format": "^4.0.1",
     "rehype-parse": "^8.0.4",
     "rehype-raw": "^6.1.1",
     "rehype-remark": "^9.1.2",
+    "rehype-rewrite": "^3.0.6",
+    "rehype-sanitize": "^5.0.1",
     "rehype-stringify": "^9.0.3",
     "remark-gfm": "^3.0.1",
     "remark-parse": "^10.0.1",

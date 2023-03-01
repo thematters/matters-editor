@@ -1,39 +1,38 @@
 # Matters Editor
 
-![Publish Status](https://github.com/thematters/matters-editor/workflows/Publish/badge.svg) ![Test Status](https://github.com/thematters/matters-editor/workflows/Test/badge.svg) [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
+## Usage
 
-This rich text editor is based on three amazing projects [Quill](https://quilljs.com/), [react-quill](https://github.com/zenoamaro/react-quill) and [Tippy.js](https://atomiks.github.io/tippyjs/). This editor has been used in a real production called [Matters](http://matters.news), a writing platform built on top of IPFS. Currently, we're pulling it out as a standalone package, so there will be some big changes in the following. 😎
+Install
 
-## Features
-
-- This package includes two types of editor: article and comment.
-- There languages support by default. (English, 正體中文, 简体中文)
-- Inline formats such as Bold, Italic, Strike, Underline, Blockquote, List and Link.
-- MP3 and AAC file upload.
-- Image upload and drag & drop.
-- Embed video from Youtube and Viemo.
-- Embed code snippet from JSFiddle.
-
-## How to install
-
-```
+```bash
 npm i @matters/matters-editor
 ```
 
-## How to run demo up
+### Converters
 
-Default web server port is `9000`, and you can change it in `package.json`.
+```ts
+import { md2html, html2md } from '@matters/matters-editor'
 
+const html = md2html('**hello, world**')
+const markdown = html2md(html)
 ```
-npm run demo
-```
 
-Then, check it by viewing `http://localhost:9000`.
+## Development
 
-## How to build
+```bash
+# dev
+npm run dev
 
-Default output destination is folder `build`.
-
-```
+# build
 npm run build
+
+# test
+npm run test
 ```
+
+## TODO
+
+### Converters
+
+- [ ] strikethrough `<s>`
+- [ ] underline `<u>`

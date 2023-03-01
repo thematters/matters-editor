@@ -14,11 +14,11 @@ const formatter = unified()
       },
     },
   })
-  .use(remarkGfm, {})
   .use(remarkStringify, {
     bullet: '*',
     listItemIndent: 'one',
     rule: '-',
+    emphasis: '_',
   })
 
 export const html2md = async (html: string): Promise<string> => {

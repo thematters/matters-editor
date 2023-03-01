@@ -24,7 +24,7 @@ describe('HTML to Markdown: Basic Formats', async () => {
 
   test('italic', async () => {
     const md = (await html2md('<em>italic</em>')).trim()
-    expect(md).toBe('*italic*')
+    expect(md).toBe('_italic_')
   })
 
   test('bold', async () => {
@@ -37,13 +37,13 @@ describe('HTML to Markdown: Basic Formats', async () => {
     const md1 = (
       await html2md('This text is <em><strong>really important</strong></em>.')
     ).trim()
-    expect(md1).toBe('This text is ***really important***.')
+    expect(md1).toBe('This text is _**really important**_.')
 
     // <strong><em>
     const md2 = (
       await html2md('This text is <strong><em>really important</em></strong>.')
     ).trim()
-    expect(md2).toBe('This text is ***really important***.')
+    expect(md2).toBe('This text is **_really important_**.')
   })
 
   test('code', async () => {
@@ -257,7 +257,6 @@ describe('HTML to Markdown: Figures', async () => {
   test('image figure', async () => {
     const md = (
       await html2md(`
-    <p>
       <figure class="image">
         <img
           src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"
@@ -267,7 +266,6 @@ describe('HTML to Markdown: Figures', async () => {
           <span>caption</span>
         </figcaption>
       </figure>
-    </p>
   `)
     ).trim()
 
@@ -279,7 +277,6 @@ describe('HTML to Markdown: Figures', async () => {
   test('audio figure', async () => {
     const md = (
       await html2md(`
-    <p>
       <figure class="audio">
         <audio controls data-file-name="點數經濟：讓過路客成為回頭客">
           <source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82">
@@ -305,7 +302,6 @@ describe('HTML to Markdown: Figures', async () => {
           <span>區塊勢 Podcast</span>
         </figcaption>
       </figure>
-    </p>
   `)
     ).trim()
 
@@ -317,21 +313,19 @@ describe('HTML to Markdown: Figures', async () => {
   test('iframe figure', async () => {
     const md = (
       await html2md(`
-    <p>
       <figure class="embed-code">
         <div class="iframe-container">
-            <iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" allowfullscreen="false" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+            <iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
         </div>
         <figcaption>
             <span>完整的JSFiddle代碼</span>
         </figcaption>
       </figure>
-    </p>
   `)
     ).trim()
 
     expect(md).toBe(
-      '<figure class="embed-code"><div class="iframe-container"><iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>完整的JSFiddle代碼</span></figcaption></figure>'
+      '<figure class="embed-code"><div class="iframe-container"><iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>完整的JSFiddle代碼</span></figcaption></figure>'
     )
   })
 })
@@ -354,25 +348,19 @@ describe('HTML to Markdown: Full Content', async () => {
     <h2>Basic Formats</h2>
     <p>Do ea esse amet <strong>excepteur</strong> <strong>esse</strong> incididunt irure.</p>
     <p>Voluptate <em>aute magna</em> sint dolore sunt id tempor.</p>
-    <p>Quis non commodo ex id in <s>non id cillum duis</s> voluptate pariatur elit.</p>
+    <p>Quis non commodo ex id in non id cillum duis voluptate pariatur elit.</p>
     <p>Excepteur nostrud<u> reprehenderit amet</u> adipisicing enim cillum.</p>
     <p>
       Nostrud consequat <strong><em>mollit irure esse</em></strong> laborum amet cupidatat irure ipsum.
     </p>
     <p>
-      Dolore labore laboris <strong><s>consequat nostrud</s></strong> Lorem irure excepteur incididunt adipisicing id.
+      Dolore labore laboris consequat nostrud Lorem irure excepteur incididunt adipisicing id.
     </p>
     <p>
       Ullamco cillum <strong><u>esse anim dolore</u></strong> duis adipisicing.
     </p>
     <p>
-      Cillum incididunt
-      <strong>
-        <em>
-          <s><u>nostrud sunt occaecat</u></s>
-        </em>
-      </strong>
-      fugiat commodo quis in pariatur exercitation.
+      Cillum incididunt <strong><em>nostrud sunt occaecat</em></strong> fugiat commodo quis in pariatur exercitation.
     </p>
     <p>Veniam pariatur labore <a href="https://google.com" rel="noopener noreferrer" target="_blank">consectetur</a> laborum.</p>
     <blockquote>
@@ -429,7 +417,7 @@ describe('HTML to Markdown: Full Content', async () => {
       <figcaption><span>Sit cillum minim minim excepteur nostrud Lorem aliquip sint elit reprehenderit aute ipsum minim.</span></figcaption>
     </figure>
     <figure class="embed-code">
-      <div class="iframe-container"><iframe src="https://jsfiddle.net/scarabresearch/2bzfrg59/embedded/" frameborder="0" allowfullscreen="false" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div>
+      <div class="iframe-container"><iframe src="https://jsfiddle.net/scarabresearch/2bzfrg59/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div>
       <figcaption><span></span></figcaption>
     </figure>
     <p><br /></p>
@@ -448,19 +436,19 @@ enim.
 
 Do ea esse amet **excepteur** **esse** incididunt irure.
 
-Voluptate *aute magna* sint dolore sunt id tempor.
+Voluptate _aute magna_ sint dolore sunt id tempor.
 
-Quis non commodo ex id in ~~non id cillum duis~~ voluptate pariatur elit.
+Quis non commodo ex id in non id cillum duis voluptate pariatur elit.
 
-Excepteur nostrud* reprehenderit amet* adipisicing enim cillum.
+Excepteur nostrud_ reprehenderit amet_ adipisicing enim cillum.
 
-Nostrud consequat ***mollit irure esse*** laborum amet cupidatat irure ipsum.
+Nostrud consequat **_mollit irure esse_** laborum amet cupidatat irure ipsum.
 
-Dolore labore laboris **~~consequat nostrud~~** Lorem irure excepteur incididunt adipisicing id.
+Dolore labore laboris consequat nostrud Lorem irure excepteur incididunt adipisicing id.
 
-Ullamco cillum ***esse anim dolore*** duis adipisicing.
+Ullamco cillum **_esse anim dolore_** duis adipisicing.
 
-Cillum incididunt ***~~*nostrud sunt occaecat*~~ ***fugiat commodo quis in pariatur exercitation.
+Cillum incididunt **_nostrud sunt occaecat_** fugiat commodo quis in pariatur exercitation.
 
 Veniam pariatur labore [consectetur](https://google.com) laborum.
 
@@ -492,6 +480,6 @@ Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum mini
 
 <figure class="embed-video"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/VQKMoT-6XSg?rel=0" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>Sit cillum minim minim excepteur nostrud Lorem aliquip sint elit reprehenderit aute ipsum minim.</span></figcaption></figure>
 
-<figure class="embed-code"><div class="iframe-container"><iframe src="https://jsfiddle.net/scarabresearch/2bzfrg59/embedded/" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span></span></figcaption></figure>`)
+<figure class="embed-code"><div class="iframe-container"><iframe src="https://jsfiddle.net/scarabresearch/2bzfrg59/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span></span></figcaption></figure>`)
   })
 })
