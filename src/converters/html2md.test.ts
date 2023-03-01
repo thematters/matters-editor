@@ -2,34 +2,24 @@ import { test, expect, describe } from 'vitest'
 import { html2md } from './html2md'
 
 describe('HTML to Markdown: Basic Formats', async () => {
-  test('heading #1', async () => {
-    const md = (await html2md('<h1>Heading level 1</h1>')).trim()
-    expect(md).toBe('# Heading level 1')
-  })
+  test('headings', async () => {
+    const md1 = (await html2md('<h1>Heading level 1</h1>')).trim()
+    expect(md1).toBe('# Heading level 1')
 
-  test('heading #2', async () => {
-    const md = (await html2md('<h2>Heading level 2</h2>')).trim()
-    expect(md).toBe('## Heading level 2')
-  })
+    const md2 = (await html2md('<h2>Heading level 2</h2>')).trim()
+    expect(md2).toBe('## Heading level 2')
 
-  test('heading #3', async () => {
-    const md = (await html2md('<h3>Heading level 3</h3>')).trim()
-    expect(md).toBe('### Heading level 3')
-  })
+    const md3 = (await html2md('<h3>Heading level 3</h3>')).trim()
+    expect(md3).toBe('### Heading level 3')
 
-  test('heading #4', async () => {
-    const md = (await html2md('<h4>Heading level 4</h4>')).trim()
-    expect(md).toBe('#### Heading level 4')
-  })
+    const md4 = (await html2md('<h4>Heading level 4</h4>')).trim()
+    expect(md4).toBe('#### Heading level 4')
 
-  test('heading #5', async () => {
-    const md = (await html2md('<h5>Heading level 5</h5>')).trim()
-    expect(md).toBe('##### Heading level 5')
-  })
+    const md5 = (await html2md('<h5>Heading level 5</h5>')).trim()
+    expect(md5).toBe('##### Heading level 5')
 
-  test('heading #6', async () => {
-    const md = (await html2md('<h6>Heading level 6</h6>')).trim()
-    expect(md).toBe('###### Heading level 6')
+    const md6 = (await html2md('<h6>Heading level 6</h6>')).trim()
+    expect(md6).toBe('###### Heading level 6')
   })
 
   test('italic', async () => {
@@ -103,7 +93,7 @@ describe('HTML to Markdown: Basic Formats', async () => {
 
   test('horizontal rules', async () => {
     const md = (await html2md('<hr/>')).trim()
-    expect(md).toBe('***')
+    expect(md).toBe('---')
   })
 
   test('blockquote', async () => {
@@ -129,10 +119,10 @@ describe('HTML to Markdown: Basic Formats', async () => {
         <li>Fourth item</li>
       </ol>`)
     ).trim()
-    expect(md).toBe(`1.  First item
-2.  Second item
-3.  Third item
-4.  Fourth item`)
+    expect(md).toBe(`1. First item
+2. Second item
+3. Third item
+4. Fourth item`)
   })
 
   test('neseted ordered list', async () => {
@@ -151,16 +141,16 @@ describe('HTML to Markdown: Basic Formats', async () => {
       </ol>
       `)
     ).trim()
-    expect(md).toBe(`1.  First item
+    expect(md).toBe(`1. First item
 
-2.  Second item
+2. Second item
 
-3.  Third item
+3. Third item
 
-    1.  Indented item
-    2.  Indented item
+   1. Indented item
+   2. Indented item
 
-4.  Fourth item`)
+4. Fourth item`)
   })
 
   test('unordered list', async () => {
@@ -173,10 +163,10 @@ describe('HTML to Markdown: Basic Formats', async () => {
         <li>Fourth item</li>
       </ul>`)
     ).trim()
-    expect(md).toBe(`*   First item
-*   Second item
-*   Third item
-*   Fourth item`)
+    expect(md).toBe(`* First item
+* Second item
+* Third item
+* Fourth item`)
   })
 
   test('nested unordered list', async () => {
@@ -195,16 +185,16 @@ describe('HTML to Markdown: Basic Formats', async () => {
       </ul>
       `)
     ).trim()
-    expect(md).toBe(`*   First item
+    expect(md).toBe(`* First item
 
-*   Second item
+* Second item
 
-*   Third item
+* Third item
 
-    *   Indented item
-    *   Indented item
+  * Indented item
+  * Indented item
 
-*   Fourth item`)
+* Fourth item`)
   })
 
   test('link', async () => {
@@ -343,5 +333,165 @@ describe('HTML to Markdown: Figures', async () => {
     expect(md).toBe(
       '<figure class="embed-code"><div class="iframe-container"><iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>完整的JSFiddle代碼</span></figcaption></figure>'
     )
+  })
+})
+
+describe('HTML to Markdown: Full Content', async () => {
+  // https://web-develop.matters.news/@btl1/10020-laborum-incididunt
+  test('all formats', async () => {
+    const md = (
+      await html2md(`
+    <p>
+      Cupidatat officia aute adipisicing ut aute reprehenderit ea duis. Commodo elit dolore deserunt occaecat esse ut sint ad eu non. Exercitation dolor in aliquip pariatur non exercitation officia reprehenderit laborum ea duis. Magna tempor eu
+      est.
+    </p>
+    <p>
+      Irure aliqua labore nisi proident<br class="smart" />
+      aliqua ullamco<br class="smart" />
+      id magna<br class="smart" />
+      enim.
+    </p>
+    <h2>Basic Formats</h2>
+    <p>Do ea esse amet <strong>excepteur</strong> <strong>esse</strong> incididunt irure.</p>
+    <p>Voluptate <em>aute magna</em> sint dolore sunt id tempor.</p>
+    <p>Quis non commodo ex id in <s>non id cillum duis</s> voluptate pariatur elit.</p>
+    <p>Excepteur nostrud<u> reprehenderit amet</u> adipisicing enim cillum.</p>
+    <p>
+      Nostrud consequat <strong><em>mollit irure esse</em></strong> laborum amet cupidatat irure ipsum.
+    </p>
+    <p>
+      Dolore labore laboris <strong><s>consequat nostrud</s></strong> Lorem irure excepteur incididunt adipisicing id.
+    </p>
+    <p>
+      Ullamco cillum <strong><u>esse anim dolore</u></strong> duis adipisicing.
+    </p>
+    <p>
+      Cillum incididunt
+      <strong>
+        <em>
+          <s><u>nostrud sunt occaecat</u></s>
+        </em>
+      </strong>
+      fugiat commodo quis in pariatur exercitation.
+    </p>
+    <p>Veniam pariatur labore <a href="https://google.com" rel="noopener noreferrer" target="_blank">consectetur</a> laborum.</p>
+    <blockquote>
+      Fugiat consectetur culpa anim enim sit nisi culpa consequat Lorem ipsum.<br class="smart" />
+      <br class="smart" />
+      Qui proident non pariatur veniam est irure.<br class="smart" />
+    </blockquote>
+    <hr />
+    <h2>Lists</h2>
+    <ol>
+      <li>Consectetur consequat exercitation aute ullamco mollit cillum sunt.</li>
+      <li>Adipisicing enim laboris dolore mollit.</li>
+    </ol>
+    <p>Qui velit id cupidatat reprehenderit velit sit.</p>
+    <ul>
+      <li>Eiusmod sunt in ipsum cupidatat sint.</li>
+      <li>Consectetur voluptate ipsum est.</li>
+    </ul>
+    <p>Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum minim velit nisi.</p>
+    <h2>Image &amp; Audio</h2>
+    <figure class="image">
+      <img src="https://assets-develop.matters.news/embed/c746aa26-794f-4a26-9dd9-c2c3e72f89f4.jpeg" data-asset-id="c746aa26-794f-4a26-9dd9-c2c3e72f89f4" />
+      <figcaption><span>Ullamco cupidatat laborum eiusmod laborum.</span></figcaption>
+    </figure>
+    <figure class="audio">
+      <audio controls data-file-name="file_example_MP3_700KB" preload="metadata">
+        <source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5" />
+      </audio>
+      <div class="player">
+        <header>
+          <div class="meta">
+            <h4 class="title">file_example_MP3_700KB</h4>
+
+            <div class="time">
+              <span class="current" data-time="00:00"></span>
+              <span class="duration" data-time="00:27"></span>
+            </div>
+          </div>
+
+          <span class="play"></span>
+        </header>
+
+        <footer>
+          <div class="progress-bar">
+            <span></span>
+          </div>
+        </footer>
+      </div>
+      <figcaption><span>Non non et deserunt mollit reprehenderit consectetur est laboris in aliqua irure.</span></figcaption>
+    </figure>
+    <h2>Embeds</h2>
+    <figure class="embed-video">
+      <div class="iframe-container"><iframe src="https://www.youtube.com/embed/VQKMoT-6XSg?rel=0" frameborder="0" allowfullscreen="true" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div>
+      <figcaption><span>Sit cillum minim minim excepteur nostrud Lorem aliquip sint elit reprehenderit aute ipsum minim.</span></figcaption>
+    </figure>
+    <figure class="embed-code">
+      <div class="iframe-container"><iframe src="https://jsfiddle.net/scarabresearch/2bzfrg59/embedded/" frameborder="0" allowfullscreen="false" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div>
+      <figcaption><span></span></figcaption>
+    </figure>
+    <p><br /></p>
+  `)
+    ).trim()
+
+    expect(md)
+      .toBe(`Cupidatat officia aute adipisicing ut aute reprehenderit ea duis. Commodo elit dolore deserunt occaecat esse ut sint ad eu non. Exercitation dolor in aliquip pariatur non exercitation officia reprehenderit laborum ea duis. Magna tempor eu est.
+
+Irure aliqua labore nisi proident\\
+aliqua ullamco\\
+id magna\\
+enim.
+
+## Basic Formats
+
+Do ea esse amet **excepteur** **esse** incididunt irure.
+
+Voluptate *aute magna* sint dolore sunt id tempor.
+
+Quis non commodo ex id in ~~non id cillum duis~~ voluptate pariatur elit.
+
+Excepteur nostrud* reprehenderit amet* adipisicing enim cillum.
+
+Nostrud consequat ***mollit irure esse*** laborum amet cupidatat irure ipsum.
+
+Dolore labore laboris **~~consequat nostrud~~** Lorem irure excepteur incididunt adipisicing id.
+
+Ullamco cillum ***esse anim dolore*** duis adipisicing.
+
+Cillum incididunt ***~~*nostrud sunt occaecat*~~ ***fugiat commodo quis in pariatur exercitation.
+
+Veniam pariatur labore [consectetur](https://google.com) laborum.
+
+> Fugiat consectetur culpa anim enim sit nisi culpa consequat Lorem ipsum.\\
+> \\
+> Qui proident non pariatur veniam est irure.
+
+---
+
+## Lists
+
+1. Consectetur consequat exercitation aute ullamco mollit cillum sunt.
+2. Adipisicing enim laboris dolore mollit.
+
+Qui velit id cupidatat reprehenderit velit sit.
+
+* Eiusmod sunt in ipsum cupidatat sint.
+* Consectetur voluptate ipsum est.
+
+Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum minim velit nisi.
+
+## Image & Audio
+
+<figure class="image"><img src="https://assets-develop.matters.news/embed/c746aa26-794f-4a26-9dd9-c2c3e72f89f4.jpeg" data-asset-id="c746aa26-794f-4a26-9dd9-c2c3e72f89f4"><figcaption><span>Ullamco cupidatat laborum eiusmod laborum.</span></figcaption></figure>
+
+<figure class="audio"><audio controls data-file-name="file_example_MP3_700KB" preload="metadata"><source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5"></audio><div class="player"><header><div class="meta"><h4 class="title">file_example_MP3_700KB</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="00:27"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>Non non et deserunt mollit reprehenderit consectetur est laboris in aliqua irure.</span></figcaption></figure>
+
+## Embeds
+
+<figure class="embed-video"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/VQKMoT-6XSg?rel=0" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>Sit cillum minim minim excepteur nostrud Lorem aliquip sint elit reprehenderit aute ipsum minim.</span></figcaption></figure>
+
+<figure class="embed-code"><div class="iframe-container"><iframe src="https://jsfiddle.net/scarabresearch/2bzfrg59/embedded/" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span></span></figcaption></figure>`)
   })
 })
