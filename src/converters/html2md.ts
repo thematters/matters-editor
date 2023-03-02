@@ -10,7 +10,15 @@ const formatter = unified()
   .use(rehypeRemark, {
     handlers: {
       figure(h, node) {
-        return h(node, 'html', toHtml(node))
+        return h(
+          node,
+          'html',
+          toHtml(node, {
+            closeSelfClosing: true,
+            closeEmptyElements: true,
+            tightSelfClosing: false,
+          })
+        )
       },
     },
   })

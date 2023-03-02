@@ -23,7 +23,11 @@ const formatter = unified()
   .use(rehypeRaw)
   // .use(rehypeSanitize)
   .use(rehypeFormat)
-  .use(rehypeStringify)
+  .use(rehypeStringify, {
+    closeSelfClosing: true,
+    closeEmptyElements: true,
+    tightSelfClosing: false,
+  })
 
 export const md2html = async (md: string): Promise<string> => {
   const result = await formatter.process(md)
