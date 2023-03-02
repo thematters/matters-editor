@@ -295,8 +295,12 @@ describe('HTML to Markdown: Figures', async () => {
           <header>
             <div class="meta">
               <h4 class="title">點數經濟：讓過路客成為回頭客</h4>
-              <div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="39:05"></span></div>
-            </div><span class="play"></span>
+              <div class="time">
+                <span class="current" data-time="00:00"></span>
+                <span class="duration" data-time="39:05"></span>
+              </div>
+            </div>
+            <span class="play"></span>
           </header>
           <footer>
             <div class="progress-bar"><span></span></div>
@@ -453,3 +457,5 @@ Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum mini
     )
   })
 })
+
+// TODO: sanitize

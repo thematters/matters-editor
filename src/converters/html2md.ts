@@ -6,7 +6,7 @@ import { toHtml } from 'hast-util-to-html'
 // import remarkGfm from 'remark-gfm'
 
 const formatter = unified()
-  .use(rehypeParse)
+  .use(rehypeParse, { fragment: true })
   .use(rehypeRemark, {
     handlers: {
       figure(h, node) {
