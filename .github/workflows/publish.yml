@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - develop
+      - feat/new-editor
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
