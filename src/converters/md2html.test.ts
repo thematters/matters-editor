@@ -174,7 +174,7 @@ breaks`)
       )
     ).trim()
     expect(html).toBe(
-      `<p>My favorite search engine is <a href="https://duckduckgo.com">Duck Duck Go</a>.</p>`
+      `<p>My favorite search engine is <a href="https://duckduckgo.com" target="_blank" rel="noopener noreferrer nofollow">Duck Duck Go</a>.</p>`
     )
   })
 
@@ -196,7 +196,7 @@ breaks`)
     ).trim()
 
     expect(html2).toBe(
-      `<p><a href="https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png"><img src="https://mdg.imgix.net/assets/images/shiprock.jpg" alt="An old rock in the desert" title="Shiprock, New Mexico by Beau Rogers"></a></p>`
+      `<p><a href="https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png" target="_blank" rel="noopener noreferrer nofollow"><img src="https://mdg.imgix.net/assets/images/shiprock.jpg" alt="An old rock in the desert" title="Shiprock, New Mexico by Beau Rogers"></a></p>`
     )
   })
 })
@@ -331,7 +331,7 @@ Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum mini
 <p>Dolore labore laboris <strong>consequat nostrud</strong> Lorem irure excepteur incididunt adipisicing id.</p>
 <p>Ullamco cillum <strong><em>esse anim dolore</em></strong> duis adipisicing.</p>
 <p>Cillum incididunt <strong><em>nostrud sunt occaecat</em></strong> fugiat commodo quis in pariatur exercitation.</p>
-<p>Veniam pariatur labore <a href="https://google.com">consectetur</a> laborum.</p>
+<p>Veniam pariatur labore <a href="https://google.com" target="_blank" rel="noopener noreferrer nofollow">consectetur</a> laborum.</p>
 <blockquote>
   <p>Fugiat consectetur culpa anim enim sit nisi culpa consequat Lorem ipsum.<br><br>Qui proident non pariatur veniam est irure.</p>
 </blockquote>

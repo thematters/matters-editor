@@ -3,7 +3,7 @@ import rehypeParse from 'rehype-parse'
 import rehypeRemark from 'rehype-remark'
 import remarkStringify from 'remark-stringify'
 import { toHtml } from 'hast-util-to-html'
-import remarkGfm from 'remark-gfm'
+// import remarkGfm from 'remark-gfm'
 
 const formatter = unified()
   .use(rehypeParse)

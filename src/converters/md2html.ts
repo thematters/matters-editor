@@ -6,19 +6,20 @@ import rehypeRaw from 'rehype-raw'
 // import rehypeSanitize from 'rehype-sanitize'
 import rehypeFormat from 'rehype-format'
 // import remarkGfm from 'remark-gfm'
-// import rehypeRewrite from 'rehype-rewrite'
+import rehypeRewrite from 'rehype-rewrite'
 
 const formatter = unified()
   .use(remarkParse)
   // .use(remarkGfm)
   .use(remarkRehype, { allowDangerousHtml: true })
-  // .use(rehypeRewrite, {
-  //   rewrite: (node, index, parent) => {
-  //     if (node.type == 'element' && node.tagName == 'del') {
-  //       node.tagName = 's'
-  //     }
-  //   },
-  // })
+  .use(rehypeRewrite, {
+    rewrite: (node, index, parent) => {
+      if (node.type == 'element' && node.tagName == 'a' && node.properties) {
+        node.properties.target = '_blank'
+        node.properties.rel = 'noopener noreferrer nofollow'
+      }
+    },
+  })
   .use(rehypeRaw)
   // .use(rehypeSanitize)
   .use(rehypeFormat)

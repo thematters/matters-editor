@@ -1,61 +1,57 @@
 import { test, expect, describe } from 'vitest'
 import { html2md } from './html2md'
+import { md2html } from './md2html'
+
+const html2md2html = async (html: string, md: string) => {
+  const mdResult = await html2md(html)
+  expect(mdResult.trim()).toBe(md.trim())
+
+  const htmlResult = await md2html(mdResult)
+  expect(htmlResult.trim()).toBe(html.trim())
+}
 
 describe('HTML to Markdown: Basic Formats', async () => {
   test('headings', async () => {
-    const md1 = (await html2md('<h1>Heading level 1</h1>')).trim()
-    expect(md1).toBe('# Heading level 1')
-
-    const md2 = (await html2md('<h2>Heading level 2</h2>')).trim()
-    expect(md2).toBe('## Heading level 2')
-
-    const md3 = (await html2md('<h3>Heading level 3</h3>')).trim()
-    expect(md3).toBe('### Heading level 3')
-
-    const md4 = (await html2md('<h4>Heading level 4</h4>')).trim()
-    expect(md4).toBe('#### Heading level 4')
-
-    const md5 = (await html2md('<h5>Heading level 5</h5>')).trim()
-    expect(md5).toBe('##### Heading level 5')
-
-    const md6 = (await html2md('<h6>Heading level 6</h6>')).trim()
-    expect(md6).toBe('###### Heading level 6')
+    await html2md2html('<h1>Heading level 1</h1>', '# Heading level 1')
+    await html2md2html('<h2>Heading level 2</h2>', '## Heading level 2')
+    await html2md2html('<h3>Heading level 3</h3>', '### Heading level 3')
+    await html2md2html('<h4>Heading level 4</h4>', '#### Heading level 4')
+    await html2md2html('<h5>Heading level 5</h5>', '##### Heading level 5')
+    await html2md2html('<h6>Heading level 6</h6>', '###### Heading level 6')
   })
 
   test('italic', async () => {
-    const md = (await html2md('<em>italic</em>')).trim()
-    expect(md).toBe('_italic_')
+    await html2md2html('<p><em>italic</em></p>', '_italic_')
   })
 
   test('bold', async () => {
-    const md = (await html2md('<strong>bold</strong>')).trim()
-    expect(md).toBe('**bold**')
+    await html2md2html('<p><strong>bold</strong></p>', '**bold**')
   })
 
   test('bold & italic', async () => {
     // <em><strong>
-    const md1 = (
-      await html2md('This text is <em><strong>really important</strong></em>.')
-    ).trim()
-    expect(md1).toBe('This text is _**really important**_.')
+    await html2md2html(
+      '<p>This text is <em><strong>really important</strong></em>.</p>',
+      'This text is _**really important**_.'
+    )
 
     // <strong><em>
-    const md2 = (
-      await html2md('This text is <strong><em>really important</em></strong>.')
-    ).trim()
-    expect(md2).toBe('This text is **_really important_**.')
+    await html2md2html(
+      '<p>This text is <strong><em>really important</em></strong>.</p>',
+      'This text is **_really important_**.'
+    )
   })
 
   test('code', async () => {
-    const md1 = (
-      await html2md('At the command prompt, type <code>nano</code>.')
-    ).trim()
-    expect(md1).toBe('At the command prompt, type `nano`.')
+    await html2md2html(
+      '<p>At the command prompt, type <code>nano</code>.</p>',
+      'At the command prompt, type `nano`.'
+    )
 
-    const md2 = (
-      await html2md('<code>Use `code` in your Markdown file.</code>')
-    ).trim()
-    expect(md2).toBe('``Use `code` in your Markdown file.``')
+    await html2md2html(
+      '<p><code>Use `code` in your Markdown file.</code></p>',
+      '``Use `code` in your Markdown file.``'
+    )
   })
 
   test('code blocks', async () => {
@@ -87,61 +83,67 @@ describe('HTML to Markdown: Basic Formats', async () => {
   })
 
   test('line breaks', async () => {
-    const md = (await html2md('line<br/>breaks')).trim().replace('\\\n', ',')
-    expect(md).toBe('line,breaks')
+    await html2md2html('<p>line<br>breaks</p>', 'line\\\nbreaks')
   })
 
   test('horizontal rules', async () => {
-    const md = (await html2md('<hr/>')).trim()
-    expect(md).toBe('---')
+    await html2md2html('<hr>', '---')
   })
 
   test('blockquote', async () => {
-    const md = (
-      await html2md(`
-      <blockquote>
-        <p>Dorothy followed her through many of the beautiful rooms in her castle.</p>
-      </blockquote>
-      `)
-    ).trim()
-    expect(md).toBe(
+    await html2md2html(
+      `
+<blockquote>
+  <p>Dorothy followed her through many of the beautiful rooms in her castle.</p>
+</blockquote>
+      `,
       '> Dorothy followed her through many of the beautiful rooms in her castle.'
     )
   })
 
   test('ordered list', async () => {
-    const md = (
-      await html2md(`
-      <ol>
-        <li>First item</li>
-        <li>Second item</li>
-        <li>Third item</li>
-        <li>Fourth item</li>
-      </ol>`)
-    ).trim()
-    expect(md).toBe(`1. First item
+    await html2md2html(
+      `
+<ol>
+  <li>First item</li>
+  <li>Second item</li>
+  <li>Third item</li>
+  <li>Fourth item</li>
+</ol>
+`,
+      `
+1. First item
 2. Second item
 3. Third item
-4. Fourth item`)
+4. Fourth item
+`
+    )
   })
 
   test('neseted ordered list', async () => {
-    const md = (
-      await html2md(`
-      <ol>
-        <li>First item</li>
-        <li>Second item</li>
-        <li>Third item
-          <ol>
-            <li>Indented item</li>
-            <li>Indented item</li>
-          </ol>
-        </li>
-        <li>Fourth item</li>
-      </ol>
-      `)
-    ).trim()
-    expect(md).toBe(`1. First item
+    await html2md2html(
+      `
+<ol>
+  <li>
+    <p>First item</p>
+  </li>
+  <li>
+    <p>Second item</p>
+  </li>
+  <li>
+    <p>Third item</p>
+    <ol>
+      <li>Indented item</li>
+      <li>Indented item</li>
+    </ol>
+  </li>
+  <li>
+    <p>Fourth item</p>
+  </li>
+</ol>
+`,
+      `
+1. First item
 
 2. Second item
 
@@ -150,42 +152,54 @@ describe('HTML to Markdown: Basic Formats', async () => {
    1. Indented item
    2. Indented item
 
-4. Fourth item`)
+4. Fourth item
+`
+    )
   })
 
   test('unordered list', async () => {
-    const md = (
-      await html2md(`
-      <ul>
-        <li>First item</li>
-        <li>Second item</li>
-        <li>Third item</li>
-        <li>Fourth item</li>
-      </ul>`)
-    ).trim()
-    expect(md).toBe(`* First item
+    await html2md2html(
+      `
+<ul>
+  <li>First item</li>
+  <li>Second item</li>
+  <li>Third item</li>
+  <li>Fourth item</li>
+</ul>
+      `,
+      `
+* First item
 * Second item
 * Third item
-* Fourth item`)
+* Fourth item
+`
+    )
   })
 
   test('nested unordered list', async () => {
-    const md = (
-      await html2md(`
-      <ul>
-        <li>First item</li>
-        <li>Second item</li>
-        <li>Third item
-          <ul>
-            <li>Indented item</li>
-            <li>Indented item</li>
-          </ul>
-        </li>
-        <li>Fourth item</li>
-      </ul>
-      `)
-    ).trim()
-    expect(md).toBe(`* First item
+    await html2md2html(
+      `
+<ul>
+  <li>
+    <p>First item</p>
+  </li>
+  <li>
+    <p>Second item</p>
+  </li>
+  <li>
+    <p>Third item</p>
+    <ul>
+      <li>Indented item</li>
+      <li>Indented item</li>
+    </ul>
+  </li>
+  <li>
+    <p>Fourth item</p>
+  </li>
+</ul>
+      `,
+      `
+* First item
 
 * Second item
 
@@ -194,60 +208,35 @@ describe('HTML to Markdown: Basic Formats', async () => {
   * Indented item
   * Indented item
 
-* Fourth item`)
+* Fourth item
+`
+    )
   })
 
   test('link', async () => {
-    const md = (
-      await html2md(`
+    await html2md2html(
+      `
       <p>My favorite search engine is <a href="https://duckduckgo.com" target="_blank" rel="noopener noreferrer nofollow">Duck Duck Go</a>.</p>
-      `)
-    ).trim()
-    expect(md).toBe(
+      `,
       'My favorite search engine is [Duck Duck Go](https://duckduckgo.com).'
     )
   })
 
   test('image', async () => {
-    const md1 = (
-      await html2md(`
-      <p>
-        <img
-          srcset="https://mdg.imgix.net/assets/images/san-juan-mountains.jpg?auto=format&amp;fit=clip&amp;w=480 480w, https://mdg.imgix.net/assets/images/san-juan-mountains.jpg?auto=format&amp;fit=clip&amp;q=40&amp;w=1080 1080w"
-          src="https://mdg.imgix.net/assets/images/san-juan-mountains.jpg"
-          class="img-fluid"
-          title="San Juan Mountains"
-          alt="The San Juan Mountains are beautiful!"
-          loading="lazy"
-          sizes="100vw"
-        >
-      </p>
-      `)
-    ).trim()
-    expect(md1).toBe(
+    await html2md2html(
+      `
+<p>
+  <img src="https://mdg.imgix.net/assets/images/san-juan-mountains.jpg" alt="The San Juan Mountains are beautiful!" title="San Juan Mountains">
+</p>
+      `,
       '![The San Juan Mountains are beautiful!](https://mdg.imgix.net/assets/images/san-juan-mountains.jpg "San Juan Mountains")'
     )
 
     // linking image
-    const md2 = (
-      await html2md(`
-      <p>
-        <a
-          href="https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png"
-          class="no-underline">
-          <img
-            srcset="https://mdg.imgix.net/assets/images/shiprock.jpg?auto=format&amp;fit=clip&amp;w=480 480w, https://mdg.imgix.net/assets/images/shiprock.jpg?auto=format&amp;fit=clip&amp;q=40&amp;w=1080 1080w"
-            src="https://mdg.imgix.net/assets/images/shiprock.jpg"
-            class="img-fluid"
-            title="Shiprock, New Mexico by Beau Rogers"
-            alt="An old rock in the desert"
-            loading="lazy"
-            sizes="100vw">
-        </a>
-      </p>
-      `)
-    ).trim()
-    expect(md2).toBe(
+    await html2md2html(
+      `
+<p><a href="https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png" target="_blank" rel="noopener noreferrer nofollow"><img src="https://mdg.imgix.net/assets/images/shiprock.jpg" alt="An old rock in the desert" title="Shiprock, New Mexico by Beau Rogers"></a></p>
+      `,
       '[![An old rock in the desert](https://mdg.imgix.net/assets/images/shiprock.jpg "Shiprock, New Mexico by Beau Rogers")](https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png)'
     )
   })
@@ -255,76 +244,52 @@ describe('HTML to Markdown: Basic Formats', async () => {
 
 describe('HTML to Markdown: Figures', async () => {
   test('image figure', async () => {
-    const md = (
-      await html2md(`
-      <figure class="image">
-        <img
-          src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"
-          srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"
-        />
-        <figcaption>
-          <span>caption</span>
-        </figcaption>
-      </figure>
-  `)
-    ).trim()
-
-    expect(md).toBe(
+    await html2md2html(
+      `
+<figure class="image">
+  <img src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png">
+  <figcaption><span>caption</span></figcaption>
+</figure>
+  `,
       '<figure class="image"><img src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"><figcaption><span>caption</span></figcaption></figure>'
     )
   })
 
   test('audio figure', async () => {
-    const md = (
-      await html2md(`
-      <figure class="audio">
-        <audio controls data-file-name="點數經濟：讓過路客成為回頭客">
-          <source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82">
-        </audio>
-        <div class="player">
-          <header>
-            <div class="meta">
-              <h4 class="title">點數經濟：讓過路客成為回頭客</h4>
-              <div class="time">
-                <span class="current" data-time="00:00"></span>
-                <span class="duration" data-time="39:05"></span>
-              </div>
-            </div>
-            <span class="play"></span>
-          </header>
-          <footer>
-            <div class="progress-bar">
-              <span></span>
-            </div>
-          </footer>
-        </div>
-        <figcaption>
-          <span>區塊勢 Podcast</span>
-        </figcaption>
-      </figure>
-  `)
-    ).trim()
-
-    expect(md).toBe(
+    await html2md2html(
+      `
+<figure class="audio">
+  <audio controls data-file-name="點數經濟：讓過路客成為回頭客">
+    <source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82">
+  </audio>
+  <div class="player">
+    <header>
+      <div class="meta">
+        <h4 class="title">點數經濟：讓過路客成為回頭客</h4>
+        <div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="39:05"></span></div>
+      </div><span class="play"></span>
+    </header>
+    <footer>
+      <div class="progress-bar"><span></span></div>
+    </footer>
+  </div>
+  <figcaption><span>區塊勢 Podcast</span></figcaption>
+</figure>
+  `,
       '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="39:05"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>區塊勢 Podcast</span></figcaption></figure>'
     )
   })
 
   test('iframe figure', async () => {
-    const md = (
-      await html2md(`
-      <figure class="embed-code">
-        <div class="iframe-container">
-            <iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
-        </div>
-        <figcaption>
-            <span>完整的JSFiddle代碼</span>
-        </figcaption>
-      </figure>
-  `)
-    ).trim()
-
-    expect(md).toBe(
+    await html2md2html(
+      `
+<figure class="embed-code">
+  <div class="iframe-container">
+    <iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+  </div>
+  <figcaption><span>完整的JSFiddle代碼</span></figcaption>
+</figure>
+  `,
       '<figure class="embed-code"><div class="iframe-container"><iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>完整的JSFiddle代碼</span></figcaption></figure>'
     )
   })
