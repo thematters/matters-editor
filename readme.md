@@ -30,6 +30,20 @@ npm run build
 npm run test
 ```
 
+## Examples
+
+1. Put original HTML file into `./examples/original`
+2. Run `npm run build:examples`
+3. Markdown and HTML (from Markdown) are outputted to `./examples/markdown` and `.examples/html`
+
+## Benchmark
+
+```bash
+npm run benchmark
+```
+
+Results are outputted to `./benchmark/results`
+
 ## TODO
 
 ### Converters
