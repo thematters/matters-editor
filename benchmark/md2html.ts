@@ -5,7 +5,6 @@ import path from 'path'
 import { md2html } from '../src'
 
 const markdownDir = path.resolve('./examples/markdown')
-const htmlDir = path.resolve('./examples/html')
 const mds = {
   500: fs.readFileSync(path.resolve(markdownDir, '500.md'), 'utf-8'),
   1500: fs.readFileSync(path.resolve(markdownDir, '1500.md'), 'utf-8'),

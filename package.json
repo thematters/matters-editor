@@ -28,6 +28,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:examples": "node --loader ts-node/esm --experimental-specifier-resolution=node ./bin/build-examples.ts",
     "preview": "vite preview",
     "format": "prettier --write \"{src,}/**/*.{ts,tsx,json}\"",
     "lint": "tsc && eslint",
