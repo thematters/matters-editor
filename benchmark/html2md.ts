@@ -28,7 +28,12 @@ suite(
   'HTML to Markdown',
   ...adds,
   cycle(),
-  complete(),
+  complete(() => {
+    const used = process.memoryUsage().heapUsed / 1024 / 1024
+    console.log(
+      `\nThe script uses approximately ${Math.round(used * 100) / 100} MB`
+    )
+  }),
   save({ file: 'html2md' }),
   save({ file: 'html2md', format: 'chart.html' })
 )
