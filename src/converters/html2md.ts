@@ -3,6 +3,7 @@ import rehypeParse from 'rehype-parse'
 import rehypeRemark from 'rehype-remark'
 import remarkStringify from 'remark-stringify'
 import { toHtml } from 'hast-util-to-html'
+import { remarkStrikethrough } from './lib/extensions'
 // import remarkGfm from 'remark-gfm'
 
 const formatter = unified()
@@ -22,6 +23,7 @@ const formatter = unified()
       },
     },
   })
+  .use(remarkStrikethrough)
   .use(remarkStringify, {
     bullet: '*',
     listItemIndent: 'one',

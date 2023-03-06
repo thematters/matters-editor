@@ -47,15 +47,19 @@ describe('HTML to Markdown: Basic Formats', async () => {
     await html2md2html('<p><em>italic</em></p>', '_italic_')
   })
 
+  test('strikethrough', async () => {
+    await html2md2html('<p><s>strikethrough</s></p>', '~~strikethrough~~')
+  })
+
   test('bold', async () => {
     await html2md2html('<p><strong>bold</strong></p>', '**bold**')
   })
 
-  test('bold & italic', async () => {
+  test('bold & italic & strikethrough', async () => {
     // <em><strong>
     await html2md2html(
-      '<p>This text is <em><strong>really important</strong></em>.</p>',
-      'This text is _**really important**_.'
+      '<p>This text is <em><strong>really <s>important</s></strong></em>.</p>',
+      'This text is _**really ~~important~~**_.'
     )
 
     // <strong><em>

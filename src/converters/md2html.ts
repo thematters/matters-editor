@@ -5,18 +5,24 @@ import rehypeStringify from 'rehype-stringify'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import rehypeFormat from 'rehype-format'
-// import remarkGfm from 'remark-gfm'
 import rehypeRewrite from 'rehype-rewrite'
+import remarkBreaks from 'remark-breaks'
+
+import { remarkStrikethrough } from './lib/extensions'
 
 const formatter = unified()
   .use(remarkParse)
-  // .use(remarkGfm)
+  .use(remarkBreaks)
+  .use(remarkStrikethrough)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(rehypeRewrite, {
     rewrite: (node, index, parent) => {
       if (node.type == 'element' && node.tagName == 'a' && node.properties) {
         node.properties.target = '_blank'
         node.properties.rel = 'noopener noreferrer nofollow'
+      }
+      if (node.type == 'element' && node.tagName == 'del') {
+        node.tagName = 's'
       }
     },
   })

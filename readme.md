@@ -48,5 +48,5 @@ Results are outputted to `./benchmark/results`
 
 ### Converters
 
-- [ ] strikethrough `<s>`
+- [x] strikethrough `<s>`
 - [ ] underline `<u>`
