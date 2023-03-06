@@ -3,11 +3,18 @@ import rehypeParse from 'rehype-parse'
 import rehypeRemark from 'rehype-remark'
 import remarkStringify from 'remark-stringify'
 import { toHtml } from 'hast-util-to-html'
-import { remarkStrikethrough } from './lib/extensions'
-// import remarkGfm from 'remark-gfm'
+import { remarkStrikethrough } from './plugins'
+import rehypeRewrite from 'rehype-rewrite'
 
 const formatter = unified()
   .use(rehypeParse, { fragment: true })
+  .use(rehypeRewrite, {
+    rewrite: (node, index, parent) => {
+      if (node.type == 'element' && node.tagName == 'u') {
+        node.tagName = 'strong'
+      }
+    },
+  })
   .use(rehypeRemark, {
     handlers: {
       figure(h, node) {

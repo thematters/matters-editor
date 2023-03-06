@@ -55,6 +55,12 @@ describe('HTML to Markdown: Basic Formats', async () => {
     await html2md2html('<p><strong>bold</strong></p>', '**bold**')
   })
 
+  // underline will be converted to bold
+  test('underline', async () => {
+    const mdResult = await html2md('<p><u>underline</u></p>')
+    expect(mdResult.trim()).toBe('**underline**'.trim())
+  })
+
   test('bold & italic & strikethrough', async () => {
     // <em><strong>
     await html2md2html(

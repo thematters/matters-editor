@@ -7,11 +7,15 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import rehypeFormat from 'rehype-format'
 import rehypeRewrite from 'rehype-rewrite'
 import remarkBreaks from 'remark-breaks'
+import remarkDirective from 'remark-directive'
+import remarkDirectiveRehype from 'remark-directive-rehype'
 
-import { remarkStrikethrough } from './lib/extensions'
+import { remarkStrikethrough } from './plugins'
 
 const formatter = unified()
   .use(remarkParse)
+  .use(remarkDirective)
+  .use(remarkDirectiveRehype)
   .use(remarkBreaks)
   .use(remarkStrikethrough)
   .use(remarkRehype, { allowDangerousHtml: true })
