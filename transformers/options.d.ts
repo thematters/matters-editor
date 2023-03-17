@@ -11,7 +11,6 @@ export declare const rehypeRemarkOptions: import('hast-util-to-mdast/lib/types')
 export declare const rehypeStringifyOptions: {
     closeSelfClosing: boolean;
     closeEmptyElements: boolean;
-    tightSelfClosing: boolean;
 };
 export declare const rehypeRewriteOptions: RehypeRewriteOptions;
 export declare const rehypeSanitizeOptions: void | import('hast-util-sanitize/lib').Schema;

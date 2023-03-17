@@ -44483,17 +44483,15 @@ const EX = {
         e,
         "html",
         ZO(e, {
-          closeSelfClosing: !0,
-          closeEmptyElements: !0,
-          tightSelfClosing: !1
+          closeSelfClosing: !1,
+          closeEmptyElements: !0
         })
       );
     }
   }
 }, tR = {
-  closeSelfClosing: !0,
-  closeEmptyElements: !0,
-  tightSelfClosing: !1
+  closeSelfClosing: !1,
+  closeEmptyElements: !0
 }, nR = {
   rewrite: (t, e, n) => {
     t.type == "element" && t.tagName == "a" && t.properties && (t.properties.target = "_blank", t.properties.rel = "noopener noreferrer nofollow"), t.type == "element" && t.tagName == "del" && (t.tagName = "s"), t.type == "element" && t.tagName == "u" && (t.tagName = "strong");
