@@ -9,6 +9,8 @@ import Gapcursor from '@tiptap/extension-gapcursor'
 import HardBreak from '@tiptap/extension-hard-break'
 import Heading from '@tiptap/extension-heading'
 import History from '@tiptap/extension-history'
+import Italic from '@tiptap/extension-italic'
+import Underline from '@tiptap/extension-underline'
 import HorizontalRule from '@tiptap/extension-horizontal-rule'
 import ListItem from '@tiptap/extension-list-item'
 import OrderedList from '@tiptap/extension-ordered-list'
@@ -52,6 +54,8 @@ export const makeArticleEditorExtensions = ({
     }),
     Bold,
     Strike,
+    Underline,
+    Italic,
     Code,
     CodeBlock,
     Blockquote,

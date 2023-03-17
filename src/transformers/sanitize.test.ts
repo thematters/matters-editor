@@ -10,7 +10,7 @@ const expectSanitizeHTML = async (input: string, output: string) => {
  * Tests
  */
 // via https://github.com/leizongmin/js-xss/blob/master/test/test_xss.js
-describe('Basic', async () => {
+describe('Sanitization: basic', async () => {
   test('unknown attributes', async () => {
     await expectSanitizeHTML('<a title xx oo>pp</a>', '<a title="">pp</a>')
     await expectSanitizeHTML('<a title "">pp</a>', '<a title="">pp</a>')
@@ -34,7 +34,7 @@ describe('Basic', async () => {
 })
 
 // https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet
-describe('XSS_Filter_Evasion_Cheat_Sheet', async () => {
+describe('Sanitization: XSS_Filter_Evasion_Cheat_Sheet', async () => {
   test('scripts', async () => {
     await expectSanitizeHTML(
       '></SCRI' +
