@@ -116,7 +116,7 @@ describe('HTML to Markdown: Basic Formats', async () => {
   })
 
   test('line breaks', async () => {
-    await html2md2html('<p>line<br />breaks</p>', 'line\\\nbreaks')
+    await html2md2html('<p>line<br>breaks</p>', 'line\\\nbreaks')
   })
 
   test('horizontal rules', async () => {
@@ -290,7 +290,7 @@ describe('HTML to Markdown: Figures', async () => {
   </figcaption>
 </figure>
   `,
-      '<figure class="image"><img src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" /><figcaption><span>caption</span></figcaption></figure>'
+      '<figure class="image"><img src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"><figcaption><span>caption</span></figcaption></figure>'
     )
   })
 
@@ -299,7 +299,7 @@ describe('HTML to Markdown: Figures', async () => {
       `
       <figure class="audio">
         <audio controls data-file-name="點數經濟：讓過路客成為回頭客">
-          <source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82" />
+          <source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82">
         </audio>
         <div class="player">
           <header>
@@ -319,7 +319,7 @@ describe('HTML to Markdown: Figures', async () => {
         <figcaption><span>區塊勢 Podcast</span></figcaption>
       </figure>
       `,
-      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82" /></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="39:05"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>區塊勢 Podcast</span></figcaption></figure>'
+      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="39:05"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>區塊勢 Podcast</span></figcaption></figure>'
     )
   })
 
@@ -344,7 +344,7 @@ describe('HTML to Markdown: Full Content', async () => {
     await html2md2html(
       `
       <p>Cupidatat officia aute adipisicing ut aute reprehenderit ea duis. Commodo elit dolore deserunt occaecat esse ut sint ad eu non. Exercitation dolor in aliquip pariatur non exercitation officia reprehenderit laborum ea duis. Magna tempor eu est.</p>
-      <p>Irure aliqua labore nisi proident<br />aliqua ullamco<br />id magna<br />enim.</p>
+      <p>Irure aliqua labore nisi proident<br>aliqua ullamco<br>id magna<br>enim.</p>
       <h2>Basic Formats</h2>
       <p>Do ea esse amet <strong>excepteur</strong> <strong>esse</strong> incididunt irure.</p>
       <p>Voluptate <em>aute magna</em> sint dolore sunt id tempor.</p>
@@ -356,7 +356,7 @@ describe('HTML to Markdown: Full Content', async () => {
       <p>Cillum incididunt <strong><em>nostrud sunt occaecat</em></strong> fugiat commodo quis in pariatur exercitation.</p>
       <p>Veniam pariatur labore <a href="https://google.com" target="_blank" rel="noopener noreferrer nofollow">consectetur</a> laborum.</p>
       <blockquote>
-        <p>Fugiat consectetur culpa anim enim sit nisi culpa consequat Lorem ipsum.<br /><br />Qui proident non pariatur veniam est irure.</p>
+        <p>Fugiat consectetur culpa anim enim sit nisi culpa consequat Lorem ipsum.<br><br>Qui proident non pariatur veniam est irure.</p>
       </blockquote>
       <hr>
       <h2>Lists</h2>
@@ -372,14 +372,14 @@ describe('HTML to Markdown: Full Content', async () => {
       <p>Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum minim velit nisi.</p>
       <h2>Image &#x26; Audio</h2>
       <figure class="image">
-        <img src="https://assets-develop.matters.news/embed/c746aa26-794f-4a26-9dd9-c2c3e72f89f4.jpeg" data-asset-id="c746aa26-794f-4a26-9dd9-c2c3e72f89f4" />
+        <img src="https://assets-develop.matters.news/embed/c746aa26-794f-4a26-9dd9-c2c3e72f89f4.jpeg" data-asset-id="c746aa26-794f-4a26-9dd9-c2c3e72f89f4">
         <figcaption>
           <span>Ullamco cupidatat laborum eiusmod laborum.</span>
         </figcaption>
       </figure>
       <figure class="audio">
         <audio controls data-file-name="file_example_MP3_700KB" preload="metadata">
-          <source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5" />
+          <source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5">
         </audio>
         <div class="player">
           <header>
@@ -455,9 +455,9 @@ Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum mini
 
 ## Image & Audio
 
-<figure class="image"><img src="https://assets-develop.matters.news/embed/c746aa26-794f-4a26-9dd9-c2c3e72f89f4.jpeg" data-asset-id="c746aa26-794f-4a26-9dd9-c2c3e72f89f4" /><figcaption><span>Ullamco cupidatat laborum eiusmod laborum.</span></figcaption></figure>
+<figure class="image"><img src="https://assets-develop.matters.news/embed/c746aa26-794f-4a26-9dd9-c2c3e72f89f4.jpeg" data-asset-id="c746aa26-794f-4a26-9dd9-c2c3e72f89f4"><figcaption><span>Ullamco cupidatat laborum eiusmod laborum.</span></figcaption></figure>
 
-<figure class="audio"><audio controls data-file-name="file_example_MP3_700KB" preload="metadata"><source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5" /></audio><div class="player"><header><div class="meta"><h4 class="title">file_example_MP3_700KB</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="00:27"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>Non non et deserunt mollit reprehenderit consectetur est laboris in aliqua irure.</span></figcaption></figure>
+<figure class="audio"><audio controls data-file-name="file_example_MP3_700KB" preload="metadata"><source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5"></audio><div class="player"><header><div class="meta"><h4 class="title">file_example_MP3_700KB</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="00:27"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>Non non et deserunt mollit reprehenderit consectetur est laboris in aliqua irure.</span></figcaption></figure>
 
 ## Embeds
 

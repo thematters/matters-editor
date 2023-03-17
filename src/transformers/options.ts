@@ -22,9 +22,8 @@ export const rehypeRemarkOptions: import('hast-util-to-mdast/lib/types').Options
           node,
           'html',
           toHtml(node, {
-            closeSelfClosing: true,
+            closeSelfClosing: false,
             closeEmptyElements: true,
-            tightSelfClosing: false,
           })
         )
       },
@@ -32,9 +31,8 @@ export const rehypeRemarkOptions: import('hast-util-to-mdast/lib/types').Options
   }
 
 export const rehypeStringifyOptions = {
-  closeSelfClosing: true,
+  closeSelfClosing: false,
   closeEmptyElements: true,
-  tightSelfClosing: false,
 }
 
 export const rehypeRewriteOptions: RehypeRewriteOptions = {

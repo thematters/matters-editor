@@ -45,6 +45,26 @@ describe('Normalization', async () => {
     await expectNormalizeArticleHTML('<p><i>abc</i></p>', '<p><em>abc</em></p>')
   })
 
+  test('self-closed tags', async () => {
+    await expectNormalizeArticleHTML('<p />', '<p></p>')
+
+    await expectNormalizeArticleHTML('<br></br>', '<p><br></p>')
+
+    await expectNormalizeArticleHTML('<hr/>', '<hr>')
+
+    // <img /> -> <img>
+    await expectNormalizeArticleHTML(
+      '<figure class="image"><img src="https://assets.matters.news/embed/c40d5045-0c03-44b6-afe6-93a285ffd1bb.jpeg" /><figcaption>左：女反派。右：女主。</figcaption></figure>',
+      '<figure class="image"><img src="https://assets.matters.news/embed/c40d5045-0c03-44b6-afe6-93a285ffd1bb.jpeg"><figcaption>左：女反派。右：女主。</figcaption></figure>'
+    )
+
+    // <iframe /> -> <iframe></iframe>
+    await expectNormalizeArticleHTML(
+      '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0" /></div><figcaption></figcaption></figure>',
+      '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
+    )
+  })
+
   test('figure: image', async () => {
     // identical
     await expectNormalizeArticleHTML(
