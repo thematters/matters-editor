@@ -1,8 +1,8 @@
 import commonjs from '@rollup/plugin-commonjs'
 import resolve from '@rollup/plugin-node-resolve'
+import terser from '@rollup/plugin-terser'
 import typescript from '@rollup/plugin-typescript'
 import dts from 'rollup-plugin-dts'
-import external from 'rollup-plugin-peer-deps-external'
 
 const packageJson = require('./package.json')
 
@@ -23,11 +23,13 @@ export default [
       },
     ],
     plugins: [
-      external(),
+      // external(),
       resolve(),
       commonjs(),
       typescript({ tsconfig: './tsconfig.json' }),
+      terser(),
     ],
+    external: ['react', 'react-dom'],
   },
   {
     input: 'dist/esm/types/src/index.d.ts',
