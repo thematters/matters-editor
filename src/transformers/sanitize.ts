@@ -11,14 +11,14 @@ import {
   rehypeStringifyOptions,
 } from './options'
 
-export const sanitizeHTML = async (md: string): Promise<string> => {
-  const formatter = unified()
-    .use(rehypeParse, rehypeParseOptions)
-    .use(rehypeRaw)
-    .use(rehypeSanitize, rehypeSanitizeOptions)
-    .use(rehypeFormat)
-    .use(rehypeStringify, rehypeStringifyOptions)
+const formatter = unified()
+  .use(rehypeParse, rehypeParseOptions)
+  .use(rehypeRaw)
+  .use(rehypeSanitize, rehypeSanitizeOptions)
+  .use(rehypeFormat)
+  .use(rehypeStringify, rehypeStringifyOptions)
 
+export const sanitizeHTML = async (md: string): Promise<string> => {
   const result = await formatter.process(md)
   return String(result)
 }

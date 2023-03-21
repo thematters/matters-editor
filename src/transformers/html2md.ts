@@ -11,14 +11,14 @@ import {
   remarkStringifyOptions,
 } from './options'
 
-export const html2md = async (html: string): Promise<string> => {
-  const formatter = unified()
-    .use(rehypeParse, rehypeParseOptions)
-    .use(rehypeRewrite, rehypeRewriteOptions)
-    .use(rehypeRemark, rehypeRemarkOptions)
-    .use(remarkStrikethrough)
-    .use(remarkStringify, remarkStringifyOptions)
+const formatter = unified()
+  .use(rehypeParse, rehypeParseOptions)
+  .use(rehypeRewrite, rehypeRewriteOptions)
+  .use(rehypeRemark, rehypeRemarkOptions)
+  .use(remarkStrikethrough)
+  .use(remarkStringify, remarkStringifyOptions)
 
+export const html2md = async (html: string): Promise<string> => {
   const result = await formatter.process(html)
   return String(result)
 }

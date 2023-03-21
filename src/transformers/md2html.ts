@@ -18,20 +18,20 @@ import {
   remarkRehypeOptions,
 } from './options'
 
-export const md2html = async (md: string): Promise<string> => {
-  const formatter = unified()
-    .use(remarkParse)
-    .use(remarkDirective)
-    .use(remarkDirectiveRehype)
-    .use(remarkBreaks)
-    .use(remarkStrikethrough)
-    .use(remarkRehype, remarkRehypeOptions)
-    .use(rehypeRewrite, rehypeRewriteOptions)
-    .use(rehypeRaw)
-    .use(rehypeSanitize, rehypeSanitizeOptions)
-    .use(rehypeFormat)
-    .use(rehypeStringify, rehypeStringifyOptions)
+const formatter = unified()
+  .use(remarkParse)
+  .use(remarkDirective)
+  .use(remarkDirectiveRehype)
+  .use(remarkBreaks)
+  .use(remarkStrikethrough)
+  .use(remarkRehype, remarkRehypeOptions)
+  .use(rehypeRewrite, rehypeRewriteOptions)
+  .use(rehypeRaw)
+  .use(rehypeSanitize, rehypeSanitizeOptions)
+  .use(rehypeFormat)
+  .use(rehypeStringify, rehypeStringifyOptions)
 
+export const md2html = async (md: string): Promise<string> => {
   const result = await formatter.process(md)
   return String(result)
 }
