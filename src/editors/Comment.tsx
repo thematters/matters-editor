@@ -1,4 +1,3 @@
-import React from 'react'
 import Blockquote from '@tiptap/extension-blockquote'
 import Bold from '@tiptap/extension-bold'
 import BulletList from '@tiptap/extension-bullet-list'
@@ -16,11 +15,11 @@ import Paragraph from '@tiptap/extension-paragraph'
 import Placeholder from '@tiptap/extension-placeholder'
 import Strike from '@tiptap/extension-strike'
 import Text from '@tiptap/extension-text'
-import { EditorContent, EditorOptions, useEditor } from '@tiptap/react'
+import { EditorOptions, useEditor } from '@tiptap/react'
 
 import { Link, Mention, MentionSuggestion } from './extensions'
 
-type CommentEditorProps = {
+type UseCommentEditorProps = {
   content: string
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
@@ -29,7 +28,7 @@ type CommentEditorProps = {
 export const makeCommentEditorExtensions = ({
   placeholder,
   mentionSuggestion,
-}: Pick<CommentEditorProps, 'placeholder' | 'mentionSuggestion'>) => {
+}: Pick<UseCommentEditorProps, 'placeholder' | 'mentionSuggestion'>) => {
   return [
     Document,
     History,
@@ -59,17 +58,17 @@ export const makeCommentEditorExtensions = ({
   ]
 }
 
-export const CommentEditor: React.FC<CommentEditorProps> = ({
+export const useCommentEditor = ({
   content,
   placeholder,
   mentionSuggestion,
   ...editorProps
-}) => {
+}: UseCommentEditorProps) => {
   const editor = useEditor({
     extensions: makeCommentEditorExtensions({ placeholder, mentionSuggestion }),
     content,
     ...editorProps,
   })
 
-  return <EditorContent editor={editor} />
+  return editor
 }

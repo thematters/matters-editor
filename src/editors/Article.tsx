@@ -1,4 +1,3 @@
-import React from 'react'
 import Blockquote from '@tiptap/extension-blockquote'
 import Bold from '@tiptap/extension-bold'
 import BulletList from '@tiptap/extension-bullet-list'
@@ -18,7 +17,7 @@ import Paragraph from '@tiptap/extension-paragraph'
 import Placeholder from '@tiptap/extension-placeholder'
 import Strike from '@tiptap/extension-strike'
 import Text from '@tiptap/extension-text'
-import { EditorContent, EditorOptions, useEditor } from '@tiptap/react'
+import { EditorOptions, useEditor } from '@tiptap/react'
 
 import {
   FigureAudio,
@@ -29,7 +28,7 @@ import {
   MentionSuggestion,
 } from './extensions'
 
-type ArticleEditorProps = {
+type UseArticleEditorProps = {
   content: string
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
@@ -38,7 +37,7 @@ type ArticleEditorProps = {
 export const makeArticleEditorExtensions = ({
   placeholder,
   mentionSuggestion,
-}: Pick<ArticleEditorProps, 'placeholder' | 'mentionSuggestion'>) => {
+}: Pick<UseArticleEditorProps, 'placeholder' | 'mentionSuggestion'>) => {
   return [
     Document,
     History,
@@ -75,17 +74,17 @@ export const makeArticleEditorExtensions = ({
   ]
 }
 
-export const ArticleEditor: React.FC<ArticleEditorProps> = ({
+export const useArticleEdtor = ({
   content,
   placeholder,
   mentionSuggestion,
   ...editorProps
-}) => {
+}: UseArticleEditorProps) => {
   const editor = useEditor({
     extensions: makeArticleEditorExtensions({ placeholder, mentionSuggestion }),
     content,
     ...editorProps,
   })
 
-  return <EditorContent editor={editor} />
+  return editor
 }
