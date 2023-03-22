@@ -18,9 +18,9 @@ async function createPackageFile() {
   const newPackageData = {
     ...packageOthers,
     private: false,
-    typings: './index.d.ts',
-    main: './cjs/index.js',
-    module: './index.js',
+    main: './index.cjs',
+    module: './index.esm.js',
+    types: './index.d.ts',
   }
 
   const targetPath = resolve(distPath, './package.json')
