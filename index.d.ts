@@ -1,6 +1,6 @@
 import * as _tiptap_react from '@tiptap/react';
 import { EditorOptions } from '@tiptap/react';
-export { BubbleMenu, EditorContent, FloatingMenu } from '@tiptap/react';
+export * from '@tiptap/react';
 import * as _tiptap_extension_bold from '@tiptap/extension-bold';
 import { SuggestionOptions } from '@tiptap/suggestion';
 import * as _tiptap_extension_placeholder from '@tiptap/extension-placeholder';
