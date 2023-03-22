@@ -26,7 +26,7 @@ const subfolderPlugins = (folderName) => [
       private: true,
       main: '../index.cjs',
       module: './index.esm.js',
-      types: './index.d.ts',
+      types: '../index.d.ts',
     },
   }),
 ]
