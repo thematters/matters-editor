@@ -1,7 +1,6 @@
 import * as _tiptap_react from '@tiptap/react';
 import { EditorOptions } from '@tiptap/react';
 export * from '@tiptap/react';
-import * as _tiptap_extension_bold from '@tiptap/extension-bold';
 import { SuggestionOptions } from '@tiptap/suggestion';
 import * as _tiptap_extension_placeholder from '@tiptap/extension-placeholder';
 import * as _tiptap_extension_history from '@tiptap/extension-history';
@@ -148,12 +147,43 @@ declare module '@tiptap/core' {
  */
 type MentionSuggestion = Omit<SuggestionOptions, 'editor'>;
 
+/**
+ * Bold extension forked from:
+ *
+ * @see {https://github.com/ueberdosis/tiptap/tree/develop/packages/extension-bold}
+ * @see {https://github.com/ueberdosis/tiptap/tree/develop/packages/extension-italic}
+ * @see {https://github.com/ueberdosis/tiptap/tree/develop/packages/extension-underline}
+ *
+ * This exenstion can normalize italic and underline to bold.
+ */
+interface BoldOptions {
+    HTMLAttributes: Record<string, any>;
+}
+declare module '@tiptap/core' {
+    interface Commands<ReturnType> {
+        bold: {
+            /**
+             * Set a bold mark
+             */
+            setBold: () => ReturnType;
+            /**
+             * Toggle a bold mark
+             */
+            toggleBold: () => ReturnType;
+            /**
+             * Unset a bold mark
+             */
+            unsetBold: () => ReturnType;
+        };
+    }
+}
+
 type UseArticleEditorProps = {
     content: string;
     placeholder?: string;
     mentionSuggestion?: MentionSuggestion;
 } & Partial<EditorOptions>;
-declare const makeArticleEditorExtensions: ({ placeholder, mentionSuggestion, }: Pick<UseArticleEditorProps, 'placeholder' | 'mentionSuggestion'>) => (_tiptap_react.Node<any, any> | _tiptap_react.Extension<any, any> | _tiptap_react.Mark<_tiptap_extension_bold.BoldOptions, any>)[];
+declare const makeArticleEditorExtensions: ({ placeholder, mentionSuggestion, }: Pick<UseArticleEditorProps, 'placeholder' | 'mentionSuggestion'>) => (_tiptap_react.Node<any, any> | _tiptap_react.Mark<BoldOptions, any> | _tiptap_react.Extension<any, any>)[];
 declare const useArticleEdtor: ({ content, placeholder, mentionSuggestion, ...editorProps }: UseArticleEditorProps) => _tiptap_react.Editor | null;
 
 type UseCommentEditorProps = {
@@ -161,7 +191,7 @@ type UseCommentEditorProps = {
     placeholder?: string;
     mentionSuggestion?: MentionSuggestion;
 } & Partial<EditorOptions>;
-declare const makeCommentEditorExtensions: ({ placeholder, mentionSuggestion, }: Pick<UseCommentEditorProps, 'placeholder' | 'mentionSuggestion'>) => (_tiptap_react.Node<any, any> | _tiptap_react.Extension<_tiptap_extension_history.HistoryOptions, any> | _tiptap_react.Extension<_tiptap_extension_placeholder.PlaceholderOptions, any> | _tiptap_react.Mark<_tiptap_extension_bold.BoldOptions, any>)[];
+declare const makeCommentEditorExtensions: ({ placeholder, mentionSuggestion, }: Pick<UseCommentEditorProps, 'placeholder' | 'mentionSuggestion'>) => (_tiptap_react.Node<any, any> | _tiptap_react.Mark<BoldOptions, any> | _tiptap_react.Extension<_tiptap_extension_history.HistoryOptions, any> | _tiptap_react.Extension<_tiptap_extension_placeholder.PlaceholderOptions, any>)[];
 declare const useCommentEditor: ({ content, placeholder, mentionSuggestion, ...editorProps }: UseCommentEditorProps) => _tiptap_react.Editor | null;
 
 declare const html2md: (html: string) => Promise<string>;
