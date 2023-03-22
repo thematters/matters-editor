@@ -7,9 +7,9 @@ import { clickHandler } from './helpers/clickHandler'
 import { pasteHandler } from './helpers/pasteHandler'
 
 /**
- * Link extension
+ * Link extension compitable with the Mention extension, forked from:
  *
- * forked from https://github.com/ueberdosis/tiptap/tree/main/packages/extension-link
+ * @see {@url https://github.com/ueberdosis/tiptap/tree/main/packages/extension-link}
  *
  * The only changes are we altered `parseHTML.tag` to
  * resolve the conflict with Mention extension

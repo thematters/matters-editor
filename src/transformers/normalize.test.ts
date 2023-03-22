@@ -38,11 +38,21 @@ describe('Normalization', async () => {
 
   test('italic', async () => {
     await expectNormalizeArticleHTML(
-      '<p><em>abc</em></p>',
-      '<p><em>abc</em></p>'
+      '<p><strong>abc</strong></p>',
+      '<p><strong>abc</strong></p>'
     )
 
-    await expectNormalizeArticleHTML('<p><i>abc</i></p>', '<p><em>abc</em></p>')
+    await expectNormalizeArticleHTML(
+      '<p><i>abc</i></p>',
+      '<p><strong>abc</strong></p>'
+    )
+  })
+
+  test('underline', async () => {
+    await expectNormalizeArticleHTML(
+      '<p><u>abc</u></p>',
+      '<p><strong>abc</strong></p>'
+    )
   })
 
   test('self-closed tags', async () => {

@@ -1,4 +1,5 @@
-import { Extensions, getSchema } from '@tiptap/core'
+import type { Extensions } from '@tiptap/core'
+import { getSchema } from '@tiptap/core'
 import { DOMParser, DOMSerializer, Node } from '@tiptap/pm/model'
 import { createHTMLDocument, parseHTML, VHTMLDocument } from 'zeed-dom'
 import {
