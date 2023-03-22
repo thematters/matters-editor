@@ -4,6 +4,7 @@ import terser from '@rollup/plugin-terser'
 import typescript from '@rollup/plugin-typescript'
 import autoExternal from 'rollup-plugin-auto-external'
 import dts from 'rollup-plugin-dts'
+import generatePackageJson from 'rollup-plugin-generate-package-json'
 
 const packageJson = require('./package.json')
 
@@ -15,6 +16,19 @@ const plugins = [
   commonjs(),
   typescript({ tsconfig: './tsconfig.json' }),
   terser(),
+]
+
+const subfolderPlugins = (folderName) => [
+  ...plugins,
+  generatePackageJson({
+    baseContents: {
+      name: `${packageJson.name}/${folderName}`,
+      private: true,
+      main: '../index.cjs',
+      module: './index.esm.js',
+      types: './index.d.ts',
+    },
+  }),
 ]
 
 // const external = ['react', 'react-dom']
@@ -37,7 +51,6 @@ export default [
       },
     ],
     plugins,
-    // external,
   },
   // editors
   {
@@ -54,8 +67,7 @@ export default [
         sourcemap,
       },
     ],
-    plugins,
-    // external,
+    plugins: subfolderPlugins('editors'),
   },
   // transformers
   {
@@ -72,8 +84,7 @@ export default [
         sourcemap,
       },
     ],
-    plugins,
-    // external,
+    plugins: subfolderPlugins('transformers'),
   },
   // types
   {

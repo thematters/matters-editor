@@ -1,6 +1,6 @@
 {
   "name": "@matters/matters-editor",
-  "version": "0.2.0-alpha.14",
+  "version": "0.2.0-alpha.15",
   "description": "Editor for matters.news",
   "author": "https://github.com/thematters",
   "homepage": "https://github.com/thematters/matters-editor",
@@ -26,7 +26,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "rollup -c --bundleConfigAsCjs",
+    "build": "rollup -c --bundleConfigAsCjs && npm run post:build",
+    "post:build": "node --loader ts-node/esm --experimental-specifier-resolution=node ./bin/post-build.js",
     "build:examples": "node --loader ts-node/esm --experimental-specifier-resolution=node ./bin/build-examples.ts",
     "format": "prettier --write \"{src,}/**/*.{ts,tsx,json}\"",
     "lint": "tsc && eslint",
@@ -86,6 +87,7 @@
     "@rollup/plugin-node-resolve": "^15.0.1",
     "@rollup/plugin-terser": "^0.4.0",
     "@rollup/plugin-typescript": "^11.0.0",
+    "@types/fs-extra": "^11.0.1",
     "@types/jest": "^29.4.0",
     "@types/natural-compare-lite": "^1.4.0",
     "@types/node": "^18.14.2",
@@ -101,6 +103,7 @@
     "eslint-plugin-promise": "^6.1.1",
     "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-simple-import-sort": "^10.0.0",
+    "fs-extra": "^11.1.1",
     "http-server": "^14.1.1",
     "husky": "^8.0.3",
     "natural-compare-lite": "^1.4.0",
@@ -108,6 +111,7 @@
     "rollup": "^3.20.0",
     "rollup-plugin-auto-external": "^2.0.0",
     "rollup-plugin-dts": "^5.3.0",
+    "rollup-plugin-generate-package-json": "^3.2.0",
     "ts-node": "^10.9.1",
     "tslib": "^2.5.0",
     "typescript": "^4.9.5",
