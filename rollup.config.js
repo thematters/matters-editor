@@ -2,6 +2,7 @@ import commonjs from '@rollup/plugin-commonjs'
 import resolve from '@rollup/plugin-node-resolve'
 import terser from '@rollup/plugin-terser'
 import typescript from '@rollup/plugin-typescript'
+import autoExternal from 'rollup-plugin-auto-external'
 import dts from 'rollup-plugin-dts'
 
 const packageJson = require('./package.json')
@@ -9,14 +10,14 @@ const packageJson = require('./package.json')
 const sourcemap = false
 
 const plugins = [
-  // external(),
+  autoExternal(),
   resolve(),
   commonjs(),
   typescript({ tsconfig: './tsconfig.json' }),
   terser(),
 ]
 
-const external = ['react', 'react-dom']
+// const external = ['react', 'react-dom']
 
 export default [
   // main
@@ -36,7 +37,7 @@ export default [
       },
     ],
     plugins,
-    external,
+    // external,
   },
   // editors
   {
@@ -54,7 +55,7 @@ export default [
       },
     ],
     plugins,
-    external,
+    // external,
   },
   // transformers
   {
@@ -72,7 +73,7 @@ export default [
       },
     ],
     plugins,
-    external,
+    // external,
   },
   // types
   {
