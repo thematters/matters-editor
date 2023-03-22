@@ -1,0 +1,85 @@
+{
+  "name": "@matters/matters-editor",
+  "version": "0.2.0-alpha.15",
+  "description": "Editor for matters.news",
+  "author": "https://github.com/thematters",
+  "homepage": "https://github.com/thematters/matters-editor",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:thematters/matters-editor.git"
+  },
+  "engines": {
+    "node": ">=16.14 <17.0"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./cjs/index.js",
+  "module": "./index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0"
+  },
+  "dependencies": {
+    "@tiptap/core": "^2.0.0-beta.220",
+    "@tiptap/extension-blockquote": "^2.0.0-beta.220",
+    "@tiptap/extension-bullet-list": "^2.0.0-beta.220",
+    "@tiptap/extension-code": "^2.0.0-beta.220",
+    "@tiptap/extension-code-block": "^2.0.0-beta.220",
+    "@tiptap/extension-document": "^2.0.0-beta.220",
+    "@tiptap/extension-gapcursor": "^2.0.0-beta.220",
+    "@tiptap/extension-hard-break": "^2.0.0-beta.220",
+    "@tiptap/extension-heading": "^2.0.0-beta.220",
+    "@tiptap/extension-history": "^2.0.0-beta.220",
+    "@tiptap/extension-horizontal-rule": "^2.0.0-beta.220",
+    "@tiptap/extension-list-item": "^2.0.0-beta.220",
+    "@tiptap/extension-ordered-list": "^2.0.0-beta.220",
+    "@tiptap/extension-paragraph": "^2.0.0-beta.220",
+    "@tiptap/extension-placeholder": "^2.0.0-beta.220",
+    "@tiptap/extension-strike": "^2.0.0-beta.220",
+    "@tiptap/extension-text": "^2.0.0-beta.220",
+    "@tiptap/pm": "^2.0.0-beta.220",
+    "@tiptap/react": "^2.0.0-beta.220",
+    "@tiptap/suggestion": "^2.0.0-beta.220",
+    "hast-util-to-html": "^8.0.4",
+    "linkifyjs": "^4.1.0",
+    "mdast-util-gfm-strikethrough": "^1.0.3",
+    "micromark-extension-gfm-strikethrough": "^1.0.4",
+    "micromark-util-combine-extensions": "^1.0.0",
+    "rehype-format": "^4.0.1",
+    "rehype-parse": "^8.0.4",
+    "rehype-raw": "^6.1.1",
+    "rehype-remark": "^9.1.2",
+    "rehype-rewrite": "^3.0.6",
+    "rehype-sanitize": "^5.0.1",
+    "rehype-stringify": "^9.0.3",
+    "remark-breaks": "^3.0.2",
+    "remark-directive": "^2.0.1",
+    "remark-directive-rehype": "^0.4.2",
+    "remark-parse": "^10.0.1",
+    "remark-rehype": "^10.1.0",
+    "remark-stringify": "^10.0.2",
+    "unified": "^10.1.2",
+    "zeed-dom": "^0.10.3"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "semi": false
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "private": false,
+  "typings": "./index.d.ts"
+}
