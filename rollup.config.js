@@ -6,33 +6,77 @@ import dts from 'rollup-plugin-dts'
 
 const packageJson = require('./package.json')
 
+const sourcemap = false
+
+const plugins = [
+  // external(),
+  resolve(),
+  commonjs(),
+  typescript({ tsconfig: './tsconfig.json' }),
+  terser(),
+]
+
+const external = ['react', 'react-dom']
+
 export default [
+  // main
   {
     input: 'src/index.ts',
     output: [
       {
         file: packageJson.main,
         format: 'cjs',
-        sourcemap: true,
+        sourcemap,
         name: packageJson.name,
       },
       {
         file: packageJson.module,
         format: 'esm',
-        sourcemap: true,
+        sourcemap,
       },
     ],
-    plugins: [
-      // external(),
-      resolve(),
-      commonjs(),
-      typescript({ tsconfig: './tsconfig.json' }),
-      terser(),
-    ],
-    external: ['react', 'react-dom'],
+    plugins,
+    external,
   },
+  // editors
   {
-    input: 'dist/esm/types/src/index.d.ts',
+    input: 'src/editors/index.ts',
+    output: [
+      {
+        file: 'dist/editors/index.cjs',
+        format: 'cjs',
+        sourcemap,
+      },
+      {
+        file: 'dist/editors/index.esm.js',
+        format: 'esm',
+        sourcemap,
+      },
+    ],
+    plugins,
+    external,
+  },
+  // transformers
+  {
+    input: 'src/transformers/index.ts',
+    output: [
+      {
+        file: 'dist/transformers/index.cjs',
+        format: 'cjs',
+        sourcemap,
+      },
+      {
+        file: 'dist/transformers/index.esm.js',
+        format: 'esm',
+        sourcemap,
+      },
+    ],
+    plugins,
+    external,
+  },
+  // types
+  {
+    input: 'dist/types/src/index.d.ts',
     output: [{ file: packageJson.types, format: 'esm' }],
     plugins: [dts.default()],
   },
