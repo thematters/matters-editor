@@ -8,7 +8,7 @@ import generatePackageJson from 'rollup-plugin-generate-package-json'
 
 const packageJson = require('./package.json')
 
-const sourcemap = false
+const sourcemap = true
 
 const plugins = [
   autoExternal(),
