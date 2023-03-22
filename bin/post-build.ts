@@ -39,8 +39,7 @@ async function includeFileInBuild(file: string) {
 async function run() {
   try {
     await createPackageFile()
-    await includeFileInBuild('./README.md')
-    // await includeFileInBuild('../../LICENSE');
+    await includeFileInBuild('./readme.md')
   } catch (err) {
     console.error(err)
     process.exit(1)
