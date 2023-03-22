@@ -3,7 +3,7 @@
   "private": true,
   "main": "../index.cjs",
   "module": "./index.esm.js",
-  "types": "./index.d.ts",
+  "types": "../index.d.ts",
   "dependencies": {
     "@tiptap/core": "^2.0.0-beta.220",
     "@tiptap/extension-blockquote": "^2.0.0-beta.220",
