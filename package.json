@@ -1,6 +1,6 @@
 {
   "name": "@matters/matters-editor",
-  "version": "0.2.0-alpha.18",
+  "version": "0.2.0-alpha.19",
   "description": "Editor for matters.news",
   "author": "https://github.com/thematters",
   "homepage": "https://github.com/thematters/matters-editor",
@@ -13,9 +13,9 @@
   },
   "license": "MIT",
   "type": "module",
-  "main": "./cjs/index.js",
-  "module": "./index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./index.cjs",
+  "module": "./index.esm.js",
+  "types": "./index.d.ts",
   "peerDependencies": {
     "react": ">=17.0.0",
     "react-dom": ">=17.0.0"
@@ -71,6 +71,5 @@
       "path": "./node_modules/cz-conventional-changelog"
     }
   },
-  "private": false,
-  "typings": "./index.d.ts"
+  "private": false
 }
