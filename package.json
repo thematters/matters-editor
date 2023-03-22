@@ -1,6 +1,6 @@
 {
   "name": "@matters/matters-editor",
-  "version": "0.2.0-alpha.17",
+  "version": "0.2.0-alpha.18",
   "description": "Editor for matters.news",
   "author": "https://github.com/thematters",
   "homepage": "https://github.com/thematters/matters-editor",
@@ -16,12 +16,6 @@
   "main": "./cjs/index.js",
   "module": "./index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.esm.js",
-      "require": "./dist/index.cjs"
-    }
-  },
   "peerDependencies": {
     "react": ">=17.0.0",
     "react-dom": ">=17.0.0"
