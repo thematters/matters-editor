@@ -11,27 +11,12 @@ const packageJson = require('./package.json')
 const sourcemap = true
 
 const plugins = [
-  autoExternal(),
+  autoExternal({ dependencies: false }),
   resolve(),
   commonjs(),
   typescript({ tsconfig: './tsconfig.json' }),
-  terser(),
+  // terser(),
 ]
-
-const subfolderPlugins = (folderName) => [
-  ...plugins,
-  generatePackageJson({
-    baseContents: {
-      name: `${packageJson.name}/${folderName}`,
-      private: true,
-      main: '../index.cjs',
-      module: './index.esm.js',
-      types: '../index.d.ts',
-    },
-  }),
-]
-
-// const external = ['react', 'react-dom']
 
 export default [
   // main
@@ -67,7 +52,18 @@ export default [
         sourcemap,
       },
     ],
-    plugins: subfolderPlugins('editors'),
+    plugins: [
+      ...plugins,
+      generatePackageJson({
+        baseContents: {
+          name: `${packageJson.name}/editors`,
+          private: true,
+          main: '../index.cjs',
+          module: './index.esm.js',
+          types: './types/src/editors/index.d.ts',
+        },
+      }),
+    ],
   },
   // transformers
   {
@@ -84,7 +80,18 @@ export default [
         sourcemap,
       },
     ],
-    plugins: subfolderPlugins('transformers'),
+    plugins: [
+      ...plugins,
+      generatePackageJson({
+        baseContents: {
+          name: `${packageJson.name}/transformers`,
+          private: true,
+          main: '../index.cjs',
+          module: './index.esm.js',
+          types: './types/src/editors/index.d.ts',
+        },
+      }),
+    ],
   },
   // types
   {
