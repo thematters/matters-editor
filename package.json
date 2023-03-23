@@ -1,6 +1,6 @@
 {
   "name": "@matters/matters-editor",
-  "version": "0.2.0-alpha.20",
+  "version": "0.2.0-alpha.21",
   "description": "Editor for matters.news",
   "author": "https://github.com/thematters",
   "homepage": "https://github.com/thematters/matters-editor",
@@ -29,7 +29,9 @@
   },
   "peerDependencies": {
     "react": ">=17.0.0",
-    "react-dom": ">=17.0.0",
+    "react-dom": ">=17.0.0"
+  },
+  "dependencies": {
     "@tiptap/core": "^2.0.0-beta.220",
     "@tiptap/extension-blockquote": "^2.0.0-beta.220",
     "@tiptap/extension-bullet-list": "^2.0.0-beta.220",
@@ -49,9 +51,7 @@
     "@tiptap/extension-text": "^2.0.0-beta.220",
     "@tiptap/pm": "^2.0.0-beta.220",
     "@tiptap/react": "^2.0.0-beta.220",
-    "@tiptap/suggestion": "^2.0.0-beta.220"
-  },
-  "dependencies": {
+    "@tiptap/suggestion": "^2.0.0-beta.220",
     "hast-util-to-html": "^8.0.4",
     "linkifyjs": "^4.1.0",
     "mdast-util-gfm-strikethrough": "^1.0.3",
@@ -100,7 +100,6 @@
     "natural-compare-lite": "^1.4.0",
     "prettier": "^2.8.4",
     "rollup": "^3.20.0",
-    "rollup-plugin-auto-external": "^2.0.0",
     "rollup-plugin-dts": "^5.3.0",
     "rollup-plugin-generate-package-json": "^3.2.0",
     "ts-node": "^10.9.1",

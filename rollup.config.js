@@ -2,20 +2,17 @@ import commonjs from '@rollup/plugin-commonjs'
 import resolve from '@rollup/plugin-node-resolve'
 import terser from '@rollup/plugin-terser'
 import typescript from '@rollup/plugin-typescript'
-import autoExternal from 'rollup-plugin-auto-external'
 import dts from 'rollup-plugin-dts'
 import generatePackageJson from 'rollup-plugin-generate-package-json'
 
 const packageJson = require('./package.json')
-
 const sourcemap = true
-
+const external = [...Object.keys(packageJson.peerDependencies), /@tiptap\/*/]
 const plugins = [
-  autoExternal({ dependencies: false }),
   resolve(),
   commonjs(),
   typescript({ tsconfig: './tsconfig.json' }),
-  // terser(),
+  terser(),
 ]
 
 export default [
@@ -36,6 +33,7 @@ export default [
       },
     ],
     plugins,
+    external,
   },
   // editors
   {
@@ -64,6 +62,7 @@ export default [
         },
       }),
     ],
+    external,
   },
   // transformers
   {
@@ -88,10 +87,11 @@ export default [
           private: true,
           main: '../index.cjs',
           module: './index.esm.js',
-          types: './types/src/editors/index.d.ts',
+          types: './types/src/transformers/index.d.ts',
         },
       }),
     ],
+    external,
   },
   // types
   {
