@@ -3,27 +3,5 @@
   "private": true,
   "main": "./index.cjs",
   "module": "./index.esm.js",
-  "types": "./types/src/editors/index.d.ts",
-  "dependencies": {
-    "@tiptap/core": "^2.0.0-beta.220",
-    "@tiptap/extension-blockquote": "^2.0.0-beta.220",
-    "@tiptap/extension-bullet-list": "^2.0.0-beta.220",
-    "@tiptap/extension-code": "^2.0.0-beta.220",
-    "@tiptap/extension-code-block": "^2.0.0-beta.220",
-    "@tiptap/extension-document": "^2.0.0-beta.220",
-    "@tiptap/extension-gapcursor": "^2.0.0-beta.220",
-    "@tiptap/extension-hard-break": "^2.0.0-beta.220",
-    "@tiptap/extension-heading": "^2.0.0-beta.220",
-    "@tiptap/extension-history": "^2.0.0-beta.220",
-    "@tiptap/extension-horizontal-rule": "^2.0.0-beta.220",
-    "@tiptap/extension-list-item": "^2.0.0-beta.220",
-    "@tiptap/extension-ordered-list": "^2.0.0-beta.220",
-    "@tiptap/extension-paragraph": "^2.0.0-beta.220",
-    "@tiptap/extension-placeholder": "^2.0.0-beta.220",
-    "@tiptap/extension-strike": "^2.0.0-beta.220",
-    "@tiptap/extension-text": "^2.0.0-beta.220",
-    "@tiptap/pm": "^2.0.0-beta.220",
-    "@tiptap/react": "^2.0.0-beta.220",
-    "@tiptap/suggestion": "^2.0.0-beta.220"
-  }
+  "types": "./types/src/editors/index.d.ts"
 }
