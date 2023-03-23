@@ -56,7 +56,7 @@ export default [
         baseContents: {
           name: `${packageJson.name}/editors`,
           private: true,
-          main: '../index.cjs',
+          main: './index.cjs',
           module: './index.esm.js',
           types: './types/src/editors/index.d.ts',
         },
@@ -85,7 +85,7 @@ export default [
         baseContents: {
           name: `${packageJson.name}/transformers`,
           private: true,
-          main: '../index.cjs',
+          main: './index.cjs',
           module: './index.esm.js',
           types: './types/src/transformers/index.d.ts',
         },
