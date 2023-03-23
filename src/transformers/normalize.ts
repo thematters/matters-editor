@@ -5,7 +5,7 @@ import { createHTMLDocument, parseHTML, VHTMLDocument } from 'zeed-dom'
 import {
   makeArticleEditorExtensions,
   makeCommentEditorExtensions,
-} from '../editors'
+} from '../extensions'
 
 export const makeNormalizer = (extensions: Extensions) => {
   const schema = getSchema(extensions)
