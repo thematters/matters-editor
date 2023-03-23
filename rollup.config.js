@@ -6,8 +6,11 @@ import dts from 'rollup-plugin-dts'
 import generatePackageJson from 'rollup-plugin-generate-package-json'
 
 const packageJson = require('./package.json')
-const sourcemap = true
-const external = [...Object.keys(packageJson.peerDependencies), /@tiptap\/*/]
+const sourcemap = false
+const external = [
+  ...Object.keys(packageJson.peerDependencies),
+  // /@tiptap\/*/
+]
 const plugins = [
   resolve(),
   commonjs(),
