@@ -2,9 +2,46 @@ import * as _tiptap_react from '@tiptap/react';
 import { EditorOptions } from '@tiptap/react';
 export * from '@tiptap/react';
 import { SuggestionOptions } from '@tiptap/suggestion';
-import * as _tiptap_extension_placeholder from '@tiptap/extension-placeholder';
-import * as _tiptap_extension_history from '@tiptap/extension-history';
 import { Extensions } from '@tiptap/core';
+
+declare module '@tiptap/core' {
+    interface Commands<ReturnType> {
+        bold: {
+            /**
+             * Set a bold mark
+             */
+            setBold: () => ReturnType;
+            /**
+             * Toggle a bold mark
+             */
+            toggleBold: () => ReturnType;
+            /**
+             * Unset a bold mark
+             */
+            unsetBold: () => ReturnType;
+        };
+    }
+}
+
+/**
+ * Mention extension
+ *
+ * @see {https://tiptap.dev/api/nodes/mention}
+ *
+ * ```html
+ * <a
+ *  class="mention"
+ *  href="LINK"
+ *  data-id="ID"
+ *  data-display-name="DISPLAYNAME"
+ *  data-user-name="USERNAME"
+ *  rel="noopener noreferrer nofollow"
+ *  >
+ *   <span>@USERNAME</span>
+ * </a>
+ * ```
+ */
+type MentionSuggestion = Omit<SuggestionOptions, 'editor'>;
 
 /**
  * FigureAudio extension:
@@ -127,71 +164,23 @@ declare module '@tiptap/core' {
     }
 }
 
-/**
- * Mention extension
- *
- * @see {https://tiptap.dev/api/nodes/mention}
- *
- * ```html
- * <a
- *  class="mention"
- *  href="LINK"
- *  data-id="ID"
- *  data-display-name="DISPLAYNAME"
- *  data-user-name="USERNAME"
- *  rel="noopener noreferrer nofollow"
- *  >
- *   <span>@USERNAME</span>
- * </a>
- * ```
- */
-type MentionSuggestion = Omit<SuggestionOptions, 'editor'>;
-
-/**
- * Bold extension forked from:
- *
- * @see {https://github.com/ueberdosis/tiptap/tree/develop/packages/extension-bold}
- * @see {https://github.com/ueberdosis/tiptap/tree/develop/packages/extension-italic}
- * @see {https://github.com/ueberdosis/tiptap/tree/develop/packages/extension-underline}
- *
- * This exenstion can normalize italic and underline to bold.
- */
-interface BoldOptions {
-    HTMLAttributes: Record<string, any>;
-}
-declare module '@tiptap/core' {
-    interface Commands<ReturnType> {
-        bold: {
-            /**
-             * Set a bold mark
-             */
-            setBold: () => ReturnType;
-            /**
-             * Toggle a bold mark
-             */
-            toggleBold: () => ReturnType;
-            /**
-             * Unset a bold mark
-             */
-            unsetBold: () => ReturnType;
-        };
-    }
-}
+type MakeArticleEditorExtensionsProps = {
+    placeholder?: string;
+    mentionSuggestion?: MentionSuggestion;
+};
+type MakeCommentEditorExtensionsProps = {
+    placeholder?: string;
+    mentionSuggestion?: MentionSuggestion;
+};
 
 type UseArticleEditorProps = {
     content: string;
-    placeholder?: string;
-    mentionSuggestion?: MentionSuggestion;
-} & Partial<EditorOptions>;
-declare const makeArticleEditorExtensions: ({ placeholder, mentionSuggestion, }: Pick<UseArticleEditorProps, 'placeholder' | 'mentionSuggestion'>) => (_tiptap_react.Node<any, any> | _tiptap_react.Mark<BoldOptions, any> | _tiptap_react.Extension<any, any>)[];
+} & MakeArticleEditorExtensionsProps & Partial<EditorOptions>;
 declare const useArticleEdtor: ({ content, placeholder, mentionSuggestion, ...editorProps }: UseArticleEditorProps) => _tiptap_react.Editor | null;
 
 type UseCommentEditorProps = {
     content: string;
-    placeholder?: string;
-    mentionSuggestion?: MentionSuggestion;
-} & Partial<EditorOptions>;
-declare const makeCommentEditorExtensions: ({ placeholder, mentionSuggestion, }: Pick<UseCommentEditorProps, 'placeholder' | 'mentionSuggestion'>) => (_tiptap_react.Node<any, any> | _tiptap_react.Mark<BoldOptions, any> | _tiptap_react.Extension<_tiptap_extension_history.HistoryOptions, any> | _tiptap_react.Extension<_tiptap_extension_placeholder.PlaceholderOptions, any>)[];
+} & MakeCommentEditorExtensionsProps & Partial<EditorOptions>;
 declare const useCommentEditor: ({ content, placeholder, mentionSuggestion, ...editorProps }: UseCommentEditorProps) => _tiptap_react.Editor | null;
 
 declare const html2md: (html: string) => Promise<string>;
@@ -204,4 +193,4 @@ declare const makeNormalizer: (extensions: Extensions) => (html: string) => stri
 declare const normalizeArticleHTML: (html: string) => string;
 declare const normalizeCommentHTML: (html: string) => string;
 
-export { html2md, makeArticleEditorExtensions, makeCommentEditorExtensions, makeNormalizer, md2html, normalizeArticleHTML, normalizeCommentHTML, sanitizeHTML, useArticleEdtor, useCommentEditor };
+export { html2md, makeNormalizer, md2html, normalizeArticleHTML, normalizeCommentHTML, sanitizeHTML, useArticleEdtor, useCommentEditor };
