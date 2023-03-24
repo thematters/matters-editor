@@ -7,15 +7,12 @@ import generatePackageJson from 'rollup-plugin-generate-package-json'
 
 const packageJson = require('./package.json')
 const sourcemap = false
-const external = [
-  ...Object.keys(packageJson.peerDependencies),
-  // /@tiptap\/*/
-]
+const external = [...Object.keys(packageJson.peerDependencies), /@tiptap\/*/]
 const plugins = [
   resolve(),
   commonjs(),
   typescript({ tsconfig: './tsconfig.json' }),
-  terser(),
+  // terser(),
 ]
 
 export default [

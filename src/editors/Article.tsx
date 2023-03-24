@@ -3,7 +3,7 @@ import type { EditorOptions } from '@tiptap/react'
 import {
   makeArticleEditorExtensions,
   MakeArticleEditorExtensionsProps,
-} from '../extensions'
+} from './extensions'
 
 type UseArticleEditorProps = {
   content: string
