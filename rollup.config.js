@@ -7,13 +7,29 @@ import generatePackageJson from 'rollup-plugin-generate-package-json'
 
 const packageJson = require('./package.json')
 const sourcemap = false
-const external = [...Object.keys(packageJson.peerDependencies), /@tiptap\/*/]
+const cjsExternal = [...Object.keys(packageJson.peerDependencies)]
+const esmExternal = [
+  ...Object.keys(packageJson.peerDependencies),
+  /@tiptap\/.*/,
+]
 const plugins = [
   resolve(),
   commonjs(),
   typescript({ tsconfig: './tsconfig.json' }),
-  // terser(),
+  terser(),
 ]
+
+const makeGeneratePackageJson = (name) => {
+  return generatePackageJson({
+    baseContents: {
+      name: `${packageJson.name}/${name}`,
+      private: true,
+      main: './index.cjs',
+      module: './index.esm.js',
+      types: `./types/src/${name}/index.d.ts`,
+    },
+  })
+}
 
 export default [
   // main
@@ -26,6 +42,13 @@ export default [
         sourcemap,
         name: packageJson.name,
       },
+    ],
+    plugins,
+    external: cjsExternal,
+  },
+  {
+    input: 'src/index.ts',
+    output: [
       {
         file: packageJson.module,
         format: 'esm',
@@ -33,7 +56,7 @@ export default [
       },
     ],
     plugins,
-    external,
+    external: esmExternal,
   },
   // editors
   {
@@ -44,25 +67,21 @@ export default [
         format: 'cjs',
         sourcemap,
       },
+    ],
+    plugins: [...plugins, makeGeneratePackageJson('editors')],
+    external: cjsExternal,
+  },
+  {
+    input: 'src/editors/index.ts',
+    output: [
       {
         file: 'dist/editors/index.esm.js',
         format: 'esm',
         sourcemap,
       },
     ],
-    plugins: [
-      ...plugins,
-      generatePackageJson({
-        baseContents: {
-          name: `${packageJson.name}/editors`,
-          private: true,
-          main: './index.cjs',
-          module: './index.esm.js',
-          types: './types/src/editors/index.d.ts',
-        },
-      }),
-    ],
-    external,
+    plugins: [...plugins, makeGeneratePackageJson('editors')],
+    external: esmExternal,
   },
   // transformers
   {
@@ -73,25 +92,21 @@ export default [
         format: 'cjs',
         sourcemap,
       },
+    ],
+    plugins: [...plugins, makeGeneratePackageJson('transformers')],
+    external: cjsExternal,
+  },
+  {
+    input: 'src/transformers/index.ts',
+    output: [
       {
         file: 'dist/transformers/index.esm.js',
         format: 'esm',
         sourcemap,
       },
     ],
-    plugins: [
-      ...plugins,
-      generatePackageJson({
-        baseContents: {
-          name: `${packageJson.name}/transformers`,
-          private: true,
-          main: './index.cjs',
-          module: './index.esm.js',
-          types: './types/src/transformers/index.d.ts',
-        },
-      }),
-    ],
-    external,
+    plugins: [...plugins, makeGeneratePackageJson('transformers')],
+    external: esmExternal,
   },
   // types
   {
