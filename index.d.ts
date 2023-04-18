@@ -183,11 +183,11 @@ type UseCommentEditorProps = {
 } & MakeCommentEditorExtensionsProps & Partial<EditorOptions>;
 declare const useCommentEditor: ({ content, placeholder, mentionSuggestion, ...editorProps }: UseCommentEditorProps) => _tiptap_react.Editor | null;
 
-declare const html2md: (html: string) => string;
+declare const html2md: (html: string) => Promise<string>;
 
-declare const md2html: (md: string) => string;
+declare const md2html: (md: string) => Promise<string>;
 
-declare const sanitizeHTML: (md: string) => string;
+declare const sanitizeHTML: (md: string) => Promise<string>;
 
 declare const makeNormalizer: (extensions: Extensions) => (html: string) => string;
 declare const normalizeArticleHTML: (html: string) => string;
