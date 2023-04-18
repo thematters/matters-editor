@@ -18,7 +18,7 @@ const formatter = unified()
   .use(rehypeFormat)
   .use(rehypeStringify, rehypeStringifyOptions)
 
-export const sanitizeHTML = async (md: string): Promise<string> => {
-  const result = await formatter.process(md)
+export const sanitizeHTML = (md: string): string => {
+  const result = formatter.processSync(md)
   return String(result)
 }
