@@ -18,7 +18,7 @@ const formatter = unified()
   .use(remarkStrikethrough)
   .use(remarkStringify, remarkStringifyOptions)
 
-export const html2md = async (html: string): Promise<string> => {
-  const result = await formatter.process(html)
+export const html2md = (html: string): string => {
+  const result = formatter.processSync(html)
   return String(result)
 }

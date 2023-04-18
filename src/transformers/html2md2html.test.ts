@@ -14,82 +14,81 @@ const htmlFormatter = unified()
   .use(rehypeFormat)
   .use(rehypeStringify)
 
-const formatHTML = async (html: string): Promise<string> => {
-  const result = await htmlFormatter.process(html)
+const formatHTML = (html: string): string => {
+  const result = htmlFormatter.processSync(html)
   return String(result)
 }
 
-const html2md2html = async (html: string, md: string) => {
-  html = await formatHTML(html)
+const html2md2html = (html: string, md: string) => {
+  html = formatHTML(html)
 
-  const mdResult = await html2md(html)
+  const mdResult = html2md(html)
 
   expect(mdResult.trim()).toBe(md.trim())
 
-  const htmlResult = await formatHTML(await md2html(mdResult))
+  const htmlResult = formatHTML(md2html(mdResult))
   expect(htmlResult).toBe(html)
 }
 
 /**
  * Tests
  */
-describe('HTML to Markdown: Basic Formats', async () => {
-  test('headings', async () => {
-    await html2md2html('<h1>Heading level 1</h1>', '# Heading level 1')
-    await html2md2html('<h2>Heading level 2</h2>', '## Heading level 2')
-    await html2md2html('<h3>Heading level 3</h3>', '### Heading level 3')
-    await html2md2html('<h4>Heading level 4</h4>', '#### Heading level 4')
-    await html2md2html('<h5>Heading level 5</h5>', '##### Heading level 5')
-    await html2md2html('<h6>Heading level 6</h6>', '###### Heading level 6')
+describe('HTML to Markdown: Basic Formats', () => {
+  test('headings', () => {
+    html2md2html('<h1>Heading level 1</h1>', '# Heading level 1')
+    html2md2html('<h2>Heading level 2</h2>', '## Heading level 2')
+    html2md2html('<h3>Heading level 3</h3>', '### Heading level 3')
+    html2md2html('<h4>Heading level 4</h4>', '#### Heading level 4')
+    html2md2html('<h5>Heading level 5</h5>', '##### Heading level 5')
+    html2md2html('<h6>Heading level 6</h6>', '###### Heading level 6')
   })
 
-  test('italic', async () => {
-    await html2md2html('<p><em>italic</em></p>', '_italic_')
+  test('italic', () => {
+    html2md2html('<p><em>italic</em></p>', '_italic_')
   })
 
-  test('strikethrough', async () => {
-    await html2md2html('<p><s>strikethrough</s></p>', '~~strikethrough~~')
+  test('strikethrough', () => {
+    html2md2html('<p><s>strikethrough</s></p>', '~~strikethrough~~')
   })
 
-  test('bold', async () => {
-    await html2md2html('<p><strong>bold</strong></p>', '**bold**')
+  test('bold', () => {
+    html2md2html('<p><strong>bold</strong></p>', '**bold**')
   })
 
   // underline will be converted to bold
-  test('underline', async () => {
-    const mdResult = await html2md('<p><u>underline</u></p>')
+  test('underline', () => {
+    const mdResult = html2md('<p><u>underline</u></p>')
     expect(mdResult.trim()).toBe('**underline**'.trim())
   })
 
-  test('bold & italic & strikethrough', async () => {
+  test('bold & italic & strikethrough', () => {
     // <em><strong>
-    await html2md2html(
+    html2md2html(
       '<p>This text is <em><strong>really <s>important</s></strong></em>.</p>',
       'This text is _**really ~~important~~**_.'
     )
 
     // <strong><em>
-    await html2md2html(
+    html2md2html(
       '<p>This text is <strong><em>really important</em></strong>.</p>',
       'This text is **_really important_**.'
     )
   })
 
-  test('code', async () => {
-    await html2md2html(
+  test('code', () => {
+    html2md2html(
       '<p>At the command prompt, type <code>nano</code>.</p>',
       'At the command prompt, type `nano`.'
     )
 
-    await html2md2html(
+    html2md2html(
       '<p><code>Use `code` in your Markdown file.</code></p>',
       '``Use `code` in your Markdown file.``'
     )
   })
 
-  test('code blocks', async () => {
-    const md1 = (
-      await html2md(`
+  test('code blocks', () => {
+    const md1 = html2md(`
       <pre>
         <code>
           &lt;html&gt;
@@ -98,33 +97,30 @@ describe('HTML to Markdown: Basic Formats', async () => {
           &lt;/html&gt;
         </code>
       </pre>
-      `)
-    ).replace(/\s/g, '')
+      `).replace(/\s/g, '')
     expect(md1).toBe('```<html><head></head></html>```')
 
-    const md2 = (
-      await html2md(`
+    const md2 = html2md(`
       <pre>
         &lt;html&gt;
         &lt;head&gt;
         &lt;/head&gt;
         &lt;/html&gt;
       </pre>
-      `)
-    ).replace(/\s/g, '')
+      `).replace(/\s/g, '')
     expect(md2).toBe('```<html><head></head></html>```')
   })
 
-  test('line breaks', async () => {
-    await html2md2html('<p>line<br>breaks</p>', 'line\\\nbreaks')
+  test('line breaks', () => {
+    html2md2html('<p>line<br>breaks</p>', 'line\\\nbreaks')
   })
 
-  test('horizontal rules', async () => {
-    await html2md2html('<hr>', '---')
+  test('horizontal rules', () => {
+    html2md2html('<hr>', '---')
   })
 
-  test('blockquote', async () => {
-    await html2md2html(
+  test('blockquote', () => {
+    html2md2html(
       `
       <blockquote>
         <p>Dorothy followed her through many of the beautiful rooms in her castle.</p>
@@ -134,8 +130,8 @@ describe('HTML to Markdown: Basic Formats', async () => {
     )
   })
 
-  test('ordered list', async () => {
-    await html2md2html(
+  test('ordered list', () => {
+    html2md2html(
       `
       <ol>
         <li>First item</li>
@@ -153,8 +149,8 @@ describe('HTML to Markdown: Basic Formats', async () => {
     )
   })
 
-  test('neseted ordered list', async () => {
-    await html2md2html(
+  test('neseted ordered list', () => {
+    html2md2html(
       `
       <ol>
         <li>
@@ -190,8 +186,8 @@ describe('HTML to Markdown: Basic Formats', async () => {
     )
   })
 
-  test('unordered list', async () => {
-    await html2md2html(
+  test('unordered list', () => {
+    html2md2html(
       `
       <ul>
         <li>First item</li>
@@ -209,8 +205,8 @@ describe('HTML to Markdown: Basic Formats', async () => {
     )
   })
 
-  test('nested unordered list', async () => {
-    await html2md2html(
+  test('nested unordered list', () => {
+    html2md2html(
       `
       <ul>
         <li>
@@ -246,8 +242,8 @@ describe('HTML to Markdown: Basic Formats', async () => {
     )
   })
 
-  test('link', async () => {
-    await html2md2html(
+  test('link', () => {
+    html2md2html(
       `
       <p>My favorite search engine is <a href="https://duckduckgo.com" target="_blank" rel="noopener noreferrer nofollow">Duck Duck Go</a>.</p>
       `,
@@ -255,8 +251,8 @@ describe('HTML to Markdown: Basic Formats', async () => {
     )
   })
 
-  test('image', async () => {
-    await html2md2html(
+  test('image', () => {
+    html2md2html(
       `
       <p>
         <img src="https://mdg.imgix.net/assets/images/san-juan-mountains.jpg" alt="The San Juan Mountains are beautiful!" title="San Juan Mountains" />
@@ -266,7 +262,7 @@ describe('HTML to Markdown: Basic Formats', async () => {
     )
 
     // linking image
-    await html2md2html(
+    html2md2html(
       `
       <p>
         <a href="https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png" target="_blank" rel="noopener noreferrer nofollow">
@@ -279,9 +275,9 @@ describe('HTML to Markdown: Basic Formats', async () => {
   })
 })
 
-describe('HTML to Markdown: Figures', async () => {
-  test('image figure', async () => {
-    await html2md2html(
+describe('HTML to Markdown: Figures', () => {
+  test('image figure', () => {
+    html2md2html(
       `
 <figure class="image">
   <img src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" />
@@ -294,8 +290,8 @@ describe('HTML to Markdown: Figures', async () => {
     )
   })
 
-  test('audio figure', async () => {
-    await html2md2html(
+  test('audio figure', () => {
+    html2md2html(
       `
       <figure class="audio">
         <audio controls data-file-name="點數經濟：讓過路客成為回頭客">
@@ -323,8 +319,8 @@ describe('HTML to Markdown: Figures', async () => {
     )
   })
 
-  test('iframe figure', async () => {
-    await html2md2html(
+  test('iframe figure', () => {
+    html2md2html(
       `
       <figure class="embed-code">
         <div class="iframe-container">
@@ -338,10 +334,10 @@ describe('HTML to Markdown: Figures', async () => {
   })
 })
 
-describe('HTML to Markdown: Full Content', async () => {
+describe('HTML to Markdown: Full Content', () => {
   // https://web-develop.matters.news/@btl1/10020-laborum-incididunt
-  test('all formats', async () => {
-    await html2md2html(
+  test('all formats', () => {
+    html2md2html(
       `
       <p>Cupidatat officia aute adipisicing ut aute reprehenderit ea duis. Commodo elit dolore deserunt occaecat esse ut sint ad eu non. Exercitation dolor in aliquip pariatur non exercitation officia reprehenderit laborum ea duis. Magna tempor eu est.</p>
       <p>Irure aliqua labore nisi proident<br>aliqua ullamco<br>id magna<br>enim.</p>

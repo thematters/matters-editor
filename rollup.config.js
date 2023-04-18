@@ -16,7 +16,7 @@ const plugins = [
   resolve(),
   commonjs(),
   typescript({ tsconfig: './tsconfig.json' }),
-  terser(),
+  // terser(),
 ]
 
 const makeGeneratePackageJson = (name) => {

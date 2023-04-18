@@ -14,7 +14,7 @@ const htmlDir = path.resolve('./examples/html')
     const html = fs.readFileSync(path.resolve(originalDir, filename), 'utf-8')
     fs.writeFileSync(
       path.resolve(markdownDir, filename.replace('.html', '.md')),
-      await html2md(html),
+      html2md(html),
       'utf-8'
     )
   }
@@ -25,7 +25,7 @@ const htmlDir = path.resolve('./examples/html')
     const md = fs.readFileSync(path.resolve(markdownDir, filename), 'utf-8')
     fs.writeFileSync(
       path.resolve(htmlDir, filename.replace('.md', '.html')),
-      await md2html(md),
+      md2html(md),
       'utf-8'
     )
   }

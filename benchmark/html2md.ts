@@ -19,7 +19,7 @@ for (let filename of filenames) {
   htmls[filename] = html
   adds.push(
     add(`~${filename.split('.')[0]} characters`, async () => {
-      await html2md(htmls[filename])
+      html2md(htmls[filename])
     })
   )
 }

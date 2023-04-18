@@ -31,7 +31,7 @@ const formatter = unified()
   .use(rehypeFormat)
   .use(rehypeStringify, rehypeStringifyOptions)
 
-export const md2html = async (md: string): Promise<string> => {
-  const result = await formatter.process(md)
+export const md2html = (md: string): string => {
+  const result = formatter.processSync(md)
   return String(result)
 }
