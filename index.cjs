@@ -23860,14 +23860,6 @@ var FigureAudio = Node.create({
                 default: '',
                 parseHTML: function (element) { var _a; return (_a = element.querySelector('.title')) === null || _a === void 0 ? void 0 : _a.textContent; },
             },
-            duration: {
-                default: '00:00',
-                parseHTML: function (element) {
-                    var _a;
-                    var $duration = element.querySelector('.duration');
-                    return (_a = $duration === null || $duration === void 0 ? void 0 : $duration.dataset) === null || _a === void 0 ? void 0 : _a.time;
-                },
-            },
         };
     },
     parseHTML: function () {
@@ -23909,13 +23901,7 @@ var FigureAudio = Node.create({
                             'div',
                             { class: 'time' },
                             ['span', { class: 'current', 'data-time': '00:00' }],
-                            [
-                                'span',
-                                {
-                                    class: 'duration',
-                                    'data-time': HTMLAttributes.duration,
-                                },
-                            ],
+                            ['span', { class: 'duration', 'data-time': '--:--' }],
                         ],
                     ],
                     ['span', { class: 'play' }],

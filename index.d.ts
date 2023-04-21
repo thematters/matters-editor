@@ -79,7 +79,6 @@ declare module '@tiptap/core' {
                 src: string;
                 caption?: string;
                 title: string;
-                duration: string;
             }) => ReturnType;
         };
     }
