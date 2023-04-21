@@ -15,10 +15,14 @@ export const useCommentEditor = ({
   mentionSuggestion,
   ...editorProps
 }: UseCommentEditorProps) => {
+  const { extensions, ...restProps } = editorProps
   const editor = useEditor({
-    extensions: makeCommentEditorExtensions({ placeholder, mentionSuggestion }),
+    extensions: [
+      ...makeCommentEditorExtensions({ placeholder, mentionSuggestion }),
+      ...(extensions || []),
+    ],
     content,
-    ...editorProps,
+    ...restProps,
   })
 
   return editor
