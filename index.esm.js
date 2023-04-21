@@ -2929,13 +2929,15 @@ var makeCommentEditorExtensions = function (_a) {
 
 var useArticleEdtor = function (_a) {
     var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
-    var editor = useEditor(__assign({ extensions: makeArticleEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), content: content }, editorProps));
+    var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
+    var editor = useEditor(__assign({ extensions: __spreadArray(__spreadArray([], makeArticleEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions || []), true), content: content }, restProps));
     return editor;
 };
 
 var useCommentEditor = function (_a) {
     var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
-    var editor = useEditor(__assign({ extensions: makeCommentEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), content: content }, editorProps));
+    var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
+    var editor = useEditor(__assign({ extensions: __spreadArray(__spreadArray([], makeCommentEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions || []), true), content: content }, restProps));
     return editor;
 };
 
