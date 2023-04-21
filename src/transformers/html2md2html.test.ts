@@ -303,7 +303,7 @@ describe('HTML to Markdown: Figures', () => {
               <h4 class="title">點數經濟：讓過路客成為回頭客</h4>
               <div class="time">
                 <span class="current" data-time="00:00"></span>
-                <span class="duration" data-time="39:05"></span>
+                <span class="duration" data-time="--:--"></span>
               </div>
             </div>
             <span class="play"></span>
@@ -315,7 +315,7 @@ describe('HTML to Markdown: Figures', () => {
         <figcaption><span>區塊勢 Podcast</span></figcaption>
       </figure>
       `,
-      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="39:05"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>區塊勢 Podcast</span></figcaption></figure>'
+      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>區塊勢 Podcast</span></figcaption></figure>'
     )
   })
 
@@ -381,7 +381,7 @@ describe('HTML to Markdown: Full Content', () => {
           <header>
             <div class="meta">
               <h4 class="title">file_example_MP3_700KB</h4>
-              <div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="00:27"></span></div>
+              <div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div>
             </div><span class="play"></span>
           </header>
           <footer>
@@ -453,7 +453,7 @@ Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum mini
 
 <figure class="image"><img src="https://assets-develop.matters.news/embed/c746aa26-794f-4a26-9dd9-c2c3e72f89f4.jpeg" data-asset-id="c746aa26-794f-4a26-9dd9-c2c3e72f89f4"><figcaption><span>Ullamco cupidatat laborum eiusmod laborum.</span></figcaption></figure>
 
-<figure class="audio"><audio controls data-file-name="file_example_MP3_700KB" preload="metadata"><source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5"></audio><div class="player"><header><div class="meta"><h4 class="title">file_example_MP3_700KB</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="00:27"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>Non non et deserunt mollit reprehenderit consectetur est laboris in aliqua irure.</span></figcaption></figure>
+<figure class="audio"><audio controls data-file-name="file_example_MP3_700KB" preload="metadata"><source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5"></audio><div class="player"><header><div class="meta"><h4 class="title">file_example_MP3_700KB</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>Non non et deserunt mollit reprehenderit consectetur est laboris in aliqua irure.</span></figcaption></figure>
 
 ## Embeds
 

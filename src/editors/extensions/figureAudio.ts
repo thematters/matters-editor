@@ -38,7 +38,6 @@ declare module '@tiptap/core' {
         src: string
         caption?: string
         title: string
-        duration: string
       }) => ReturnType
     }
   }
@@ -61,13 +60,6 @@ export const FigureAudio = Node.create({
       title: {
         default: '',
         parseHTML: (element) => element.querySelector('.title')?.textContent,
-      },
-      duration: {
-        default: '00:00',
-        parseHTML: (element) => {
-          const $duration = element.querySelector('.duration') as HTMLElement
-          return $duration?.dataset?.time
-        },
       },
     }
   },
@@ -111,13 +103,7 @@ export const FigureAudio = Node.create({
               'div',
               { class: 'time' },
               ['span', { class: 'current', 'data-time': '00:00' }],
-              [
-                'span',
-                {
-                  class: 'duration',
-                  'data-time': HTMLAttributes.duration,
-                },
-              ],
+              ['span', { class: 'duration', 'data-time': '--:--' }],
             ],
           ],
           ['span', { class: 'play' }],
