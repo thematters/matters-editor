@@ -57664,7 +57664,7 @@ const Text$1 = Node.create({
 var FigureAudio = Node.create({
     name: 'figureAudio',
     group: 'block',
-    content: 'inline*',
+    content: 'text*',
     draggable: true,
     isolating: true,
     addAttributes: function () {
@@ -57944,7 +57944,7 @@ var normalizeEmbedURL = function (url) {
 var FigureEmbed = Node.create({
     name: 'figureEmbed',
     group: 'block',
-    content: 'inline*',
+    content: 'text*',
     draggable: true,
     isolating: true,
     addAttributes: function () {
@@ -58031,7 +58031,7 @@ var FigureEmbed = Node.create({
 var FigureImage = Node.create({
     name: 'figureImage',
     group: 'block',
-    content: 'inline*',
+    content: 'text*',
     draggable: true,
     isolating: true,
     addAttributes: function () {
