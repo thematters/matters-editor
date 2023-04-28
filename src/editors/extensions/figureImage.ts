@@ -25,7 +25,7 @@ declare module '@tiptap/core' {
 export const FigureImage = Node.create({
   name: 'figureImage',
   group: 'block',
-  content: 'inline*',
+  content: 'text*',
   draggable: true,
   isolating: true,
 

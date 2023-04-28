@@ -46,7 +46,7 @@ declare module '@tiptap/core' {
 export const FigureAudio = Node.create({
   name: 'figureAudio',
   group: 'block',
-  content: 'inline*',
+  content: 'text*',
   draggable: true,
   isolating: true,
 

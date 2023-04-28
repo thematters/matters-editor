@@ -240,7 +240,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
 export const FigureEmbed = Node.create({
   name: 'figureEmbed',
   group: 'block',
-  content: 'inline*',
+  content: 'text*',
   draggable: true,
   isolating: true,
 
