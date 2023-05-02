@@ -149,12 +149,11 @@ var FigureAudio = Node.create({
                         content: caption ? [{ type: 'text', text: caption }] : [],
                     })
                         // set cursor at end of caption field
-                        .command(function (_a) {
-                        var tr = _a.tr, commands = _a.commands;
-                        var doc = tr.doc, selection = tr.selection;
-                        var position = doc.resolve(selection.to - 2).end();
-                        return commands.setTextSelection(position);
-                    })
+                        // .command(({ tr, commands }) => {
+                        //   const { doc, selection } = tr
+                        //   const position = doc.resolve(selection.to - 2).end()
+                        //   return commands.setTextSelection(position)
+                        // })
                         .run());
                 };
             },
@@ -408,12 +407,11 @@ var FigureEmbed = Node.create({
                         content: caption ? [{ type: 'text', text: caption }] : [],
                     })
                         // set cursor at end of caption field
-                        .command(function (_a) {
-                        var tr = _a.tr, commands = _a.commands;
-                        var doc = tr.doc, selection = tr.selection;
-                        var position = doc.resolve(selection.to - 2).end();
-                        return commands.setTextSelection(position);
-                    })
+                        // .command(({ tr, commands }) => {
+                        //   const { doc, selection } = tr
+                        //   const position = doc.resolve(selection.to - 2).end()
+                        //   return commands.setTextSelection(position)
+                        // })
                         .run());
                 };
             },
@@ -491,12 +489,11 @@ var FigureImage = Node.create({
                         content: caption ? [{ type: 'text', text: caption }] : [],
                     })
                         // set cursor at end of caption field
-                        .command(function (_a) {
-                        var tr = _a.tr, commands = _a.commands;
-                        var doc = tr.doc, selection = tr.selection;
-                        var position = doc.resolve(selection.to - 2).end();
-                        return commands.setTextSelection(position);
-                    })
+                        // .command(({ tr, commands }) => {
+                        //   const { doc, selection } = tr
+                        //   const position = doc.resolve(selection.to - 2).end()
+                        //   return commands.setTextSelection(position)
+                        // })
                         .run());
                 };
             },
