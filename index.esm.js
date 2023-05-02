@@ -146,19 +146,19 @@ var FigureAudio = Node.create({
                 var caption = _a.caption, attrs = __rest(_a, ["caption"]);
                 return function (_a) {
                     var chain = _a.chain;
-                    return (chain()
-                        .insertContent({
-                        type: _this.name,
-                        attrs: attrs,
-                        content: caption ? [{ type: 'text', text: caption }] : [],
-                    })
-                        // set cursor at end of caption field
-                        // .command(({ tr, commands }) => {
-                        //   const { doc, selection } = tr
-                        //   const position = doc.resolve(selection.to - 2).end()
-                        //   return commands.setTextSelection(position)
-                        // })
-                        .run());
+                    return chain()
+                        .insertContent([
+                        {
+                            type: _this.name,
+                            attrs: attrs,
+                            content: caption ? [{ type: 'text', text: caption }] : [],
+                        },
+                        {
+                            type: 'paragraph',
+                            content: [],
+                        },
+                    ])
+                        .run();
                 };
             },
         };
@@ -404,19 +404,19 @@ var FigureEmbed = Node.create({
                 var caption = _a.caption, attrs = __rest(_a, ["caption"]);
                 return function (_a) {
                     var chain = _a.chain;
-                    return (chain()
-                        .insertContent({
-                        type: _this.name,
-                        attrs: attrs,
-                        content: caption ? [{ type: 'text', text: caption }] : [],
-                    })
-                        // set cursor at end of caption field
-                        // .command(({ tr, commands }) => {
-                        //   const { doc, selection } = tr
-                        //   const position = doc.resolve(selection.to - 2).end()
-                        //   return commands.setTextSelection(position)
-                        // })
-                        .run());
+                    return chain()
+                        .insertContent([
+                        {
+                            type: _this.name,
+                            attrs: attrs,
+                            content: caption ? [{ type: 'text', text: caption }] : [],
+                        },
+                        {
+                            type: 'paragraph',
+                            content: [],
+                        },
+                    ])
+                        .run();
                 };
             },
         };
@@ -486,19 +486,19 @@ var FigureImage = Node.create({
                 var caption = _a.caption, attrs = __rest(_a, ["caption"]);
                 return function (_a) {
                     var chain = _a.chain;
-                    return (chain()
-                        .insertContent({
-                        type: _this.name,
-                        attrs: attrs,
-                        content: caption ? [{ type: 'text', text: caption }] : [],
-                    })
-                        // set cursor at end of caption field
-                        // .command(({ tr, commands }) => {
-                        //   const { doc, selection } = tr
-                        //   const position = doc.resolve(selection.to - 2).end()
-                        //   return commands.setTextSelection(position)
-                        // })
-                        .run());
+                    return chain()
+                        .insertContent([
+                        {
+                            type: _this.name,
+                            attrs: attrs,
+                            content: caption ? [{ type: 'text', text: caption }] : [],
+                        },
+                        {
+                            type: 'paragraph',
+                            content: [],
+                        },
+                    ])
+                        .run();
                 };
             },
         };
