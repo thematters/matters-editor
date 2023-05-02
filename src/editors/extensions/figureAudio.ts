@@ -127,12 +127,12 @@ export const FigureAudio = Node.create({
                 content: caption ? [{ type: 'text', text: caption }] : [],
               })
               // set cursor at end of caption field
-              .command(({ tr, commands }) => {
-                const { doc, selection } = tr
-                const position = doc.resolve(selection.to - 2).end()
+              // .command(({ tr, commands }) => {
+              //   const { doc, selection } = tr
+              //   const position = doc.resolve(selection.to - 2).end()
 
-                return commands.setTextSelection(position)
-              })
+              //   return commands.setTextSelection(position)
+              // })
               .run()
           )
         },
