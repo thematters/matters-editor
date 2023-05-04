@@ -237,8 +237,10 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
   return fallbackReturn
 }
 
+const pluginName = 'figureEmbed'
+
 export const FigureEmbed = Node.create({
-  name: 'figureEmbed',
+  name: pluginName,
   group: 'block',
   content: 'text*',
   draggable: true,
@@ -312,9 +314,9 @@ export const FigureEmbed = Node.create({
               },
               {
                 type: 'paragraph',
-                content: [],
               },
             ])
+            .focus()
             .run()
         },
     }
@@ -325,6 +327,31 @@ export const FigureEmbed = Node.create({
       new Plugin({
         key: new PluginKey('removePastedFigureEmbed'),
         props: {
+          handleKeyDown(view, event) {
+            const anchorParent = view.state.selection.$anchor.parent
+            const isFigure = anchorParent.type.name === pluginName
+            const isEmptyFigcaption = anchorParent.content.size <= 0
+
+            // @ts-ignore
+            const editor = view.dom.editor as Editor
+
+            // backSpace to remove if the figcaption is empty
+            if (event.key === 'BackSpace') {
+              if (isEmptyFigcaption && isFigure) {
+                editor.commands.deleteNode(pluginName)
+              }
+            }
+
+            // enter to insert a new paragraph
+            if (event.key === 'Enter') {
+              editor
+                .chain()
+                .selectTextblockEnd()
+                .insertContent({ type: 'paragraph' })
+                .run()
+            }
+          },
+
           transformPastedHTML(html) {
             // remove
             html = html.replace(
