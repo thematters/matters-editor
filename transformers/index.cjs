@@ -57661,8 +57661,9 @@ const Text$1 = Node.create({
     group: 'inline',
 });
 
+var pluginName$2 = 'figureAudio';
 var FigureAudio = Node.create({
-    name: 'figureAudio',
+    name: pluginName$2,
     group: 'block',
     content: 'text*',
     draggable: true,
@@ -57744,9 +57745,9 @@ var FigureAudio = Node.create({
                         },
                         {
                             type: 'paragraph',
-                            content: [],
                         },
                     ])
+                        .focus()
                         .run();
                 };
             },
@@ -57757,6 +57758,27 @@ var FigureAudio = Node.create({
             new Plugin({
                 key: new PluginKey('removePastedFigureAudio'),
                 props: {
+                    handleKeyDown: function (view, event) {
+                        var anchorParent = view.state.selection.$anchor.parent;
+                        var isFigure = anchorParent.type.name === pluginName$2;
+                        var isEmptyFigcaption = anchorParent.content.size <= 0;
+                        // @ts-ignore
+                        var editor = view.dom.editor;
+                        // backSpace to remove if the figcaption is empty
+                        if (event.key === 'BackSpace') {
+                            if (isEmptyFigcaption && isFigure) {
+                                editor.commands.deleteNode(pluginName$2);
+                            }
+                        }
+                        // enter to insert a new paragraph
+                        if (event.key === 'Enter') {
+                            editor
+                                .chain()
+                                .selectTextblockEnd()
+                                .insertContent({ type: 'paragraph' })
+                                .run();
+                        }
+                    },
                     transformPastedHTML: function (html) {
                         // remove
                         html = html.replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '');
@@ -57940,8 +57962,9 @@ var normalizeEmbedURL = function (url) {
     }
     return fallbackReturn;
 };
+var pluginName$1 = 'figureEmbed';
 var FigureEmbed = Node.create({
-    name: 'figureEmbed',
+    name: pluginName$1,
     group: 'block',
     content: 'text*',
     draggable: true,
@@ -58002,9 +58025,9 @@ var FigureEmbed = Node.create({
                         },
                         {
                             type: 'paragraph',
-                            content: [],
                         },
                     ])
+                        .focus()
                         .run();
                 };
             },
@@ -58015,6 +58038,27 @@ var FigureEmbed = Node.create({
             new Plugin({
                 key: new PluginKey('removePastedFigureEmbed'),
                 props: {
+                    handleKeyDown: function (view, event) {
+                        var anchorParent = view.state.selection.$anchor.parent;
+                        var isFigure = anchorParent.type.name === pluginName$1;
+                        var isEmptyFigcaption = anchorParent.content.size <= 0;
+                        // @ts-ignore
+                        var editor = view.dom.editor;
+                        // backSpace to remove if the figcaption is empty
+                        if (event.key === 'BackSpace') {
+                            if (isEmptyFigcaption && isFigure) {
+                                editor.commands.deleteNode(pluginName$1);
+                            }
+                        }
+                        // enter to insert a new paragraph
+                        if (event.key === 'Enter') {
+                            editor
+                                .chain()
+                                .selectTextblockEnd()
+                                .insertContent({ type: 'paragraph' })
+                                .run();
+                        }
+                    },
                     transformPastedHTML: function (html) {
                         // remove
                         html = html.replace(/<figure.*class=.embed.*[\n]*.*?<\/figure>/g, '');
@@ -58026,6 +58070,7 @@ var FigureEmbed = Node.create({
     },
 });
 
+var pluginName = 'figureImage';
 var FigureImage = Node.create({
     name: 'figureImage',
     group: 'block',
@@ -58084,9 +58129,9 @@ var FigureImage = Node.create({
                         },
                         {
                             type: 'paragraph',
-                            content: [],
                         },
                     ])
+                        .focus()
                         .run();
                 };
             },
@@ -58097,6 +58142,27 @@ var FigureImage = Node.create({
             new Plugin({
                 key: new PluginKey('removePastedFigureImage'),
                 props: {
+                    handleKeyDown: function (view, event) {
+                        var anchorParent = view.state.selection.$anchor.parent;
+                        var isFigure = anchorParent.type.name === pluginName;
+                        var isEmptyFigcaption = anchorParent.content.size <= 0;
+                        // @ts-ignore
+                        var editor = view.dom.editor;
+                        // backSpace to remove if the figcaption is empty
+                        if (event.key === 'BackSpace') {
+                            if (isEmptyFigcaption && isFigure) {
+                                editor.commands.deleteNode(pluginName);
+                            }
+                        }
+                        // enter to insert a new paragraph
+                        if (event.key === 'Enter') {
+                            editor
+                                .chain()
+                                .selectTextblockEnd()
+                                .insertContent({ type: 'paragraph' })
+                                .run();
+                        }
+                    },
                     transformPastedHTML: function (html) {
                         // remove
                         html = html.replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '');
