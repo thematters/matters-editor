@@ -171,11 +171,12 @@ var FigureAudio = Node.create({
                         var isEmptyFigcaption = anchorParent.content.size <= 0;
                         // @ts-ignore
                         var editor = view.dom.editor;
+                        if (!isFigure) {
+                            return;
+                        }
                         // backSpace to remove if the figcaption is empty
-                        if (event.key === 'BackSpace') {
-                            if (isEmptyFigcaption && isFigure) {
-                                editor.commands.deleteNode(pluginName$2);
-                            }
+                        if (event.key === 'BackSpace' && isEmptyFigcaption) {
+                            editor.commands.deleteNode(pluginName$2);
                         }
                         // enter to insert a new paragraph
                         if (event.key === 'Enter') {
@@ -451,11 +452,12 @@ var FigureEmbed = Node.create({
                         var isEmptyFigcaption = anchorParent.content.size <= 0;
                         // @ts-ignore
                         var editor = view.dom.editor;
+                        if (!isFigure) {
+                            return;
+                        }
                         // backSpace to remove if the figcaption is empty
-                        if (event.key === 'BackSpace') {
-                            if (isEmptyFigcaption && isFigure) {
-                                editor.commands.deleteNode(pluginName$1);
-                            }
+                        if (event.key === 'BackSpace' && isEmptyFigcaption) {
+                            editor.commands.deleteNode(pluginName$1);
                         }
                         // enter to insert a new paragraph
                         if (event.key === 'Enter') {
@@ -555,11 +557,12 @@ var FigureImage = Node.create({
                         var isEmptyFigcaption = anchorParent.content.size <= 0;
                         // @ts-ignore
                         var editor = view.dom.editor;
+                        if (!isFigure) {
+                            return;
+                        }
                         // backSpace to remove if the figcaption is empty
-                        if (event.key === 'BackSpace') {
-                            if (isEmptyFigcaption && isFigure) {
-                                editor.commands.deleteNode(pluginName);
-                            }
+                        if (event.key === 'BackSpace' && isEmptyFigcaption) {
+                            editor.commands.deleteNode(pluginName);
                         }
                         // enter to insert a new paragraph
                         if (event.key === 'Enter') {
