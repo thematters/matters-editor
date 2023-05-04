@@ -151,11 +151,13 @@ export const FigureAudio = Node.create({
             // @ts-ignore
             const editor = view.dom.editor as Editor
 
+            if (!isFigure) {
+              return
+            }
+
             // backSpace to remove if the figcaption is empty
-            if (event.key === 'BackSpace') {
-              if (isEmptyFigcaption && isFigure) {
-                editor.commands.deleteNode(pluginName)
-              }
+            if (event.key === 'BackSpace' && isEmptyFigcaption) {
+              editor.commands.deleteNode(pluginName)
             }
 
             // enter to insert a new paragraph
