@@ -98,29 +98,38 @@ export const FigureImage = Node.create({
         key: new PluginKey('removePastedFigureImage'),
         props: {
           handleKeyDown(view, event) {
+            const isBackSpace = event.key === 'BackSpace'
+            const isEnter = event.key === 'Enter'
+
+            if (!isBackSpace || !isEnter) {
+              return
+            }
+
             const anchorParent = view.state.selection.$anchor.parent
-            const isFigure = anchorParent.type.name === pluginName
+            const isCurrentPlugin = anchorParent.type.name === pluginName
             const isEmptyFigcaption = anchorParent.content.size <= 0
+
+            if (!isCurrentPlugin) {
+              return
+            }
 
             // @ts-ignore
             const editor = view.dom.editor as Editor
 
-            if (!isFigure) {
+            // backSpace to remove if the figcaption is empty
+            if (isBackSpace && isEmptyFigcaption) {
+              editor.commands.deleteNode(pluginName)
               return
             }
 
-            // backSpace to remove if the figcaption is empty
-            if (event.key === 'BackSpace' && isEmptyFigcaption) {
-              editor.commands.deleteNode(pluginName)
-            }
-
             // enter to insert a new paragraph
-            if (event.key === 'Enter') {
+            if (isEnter) {
               editor
                 .chain()
                 .selectTextblockEnd()
                 .insertContent({ type: 'paragraph' })
                 .run()
+              return
             }
           },
 

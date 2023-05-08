@@ -331,6 +331,12 @@ export const FigureEmbed = Node.create({
             const anchorParent = view.state.selection.$anchor.parent
             const isFigure = anchorParent.type.name === pluginName
             const isEmptyFigcaption = anchorParent.content.size <= 0
+            const isBackSpace = event.key === 'BackSpace'
+            const isEnter = event.key === 'Enter'
+
+            if (!isBackSpace || !isEnter) {
+              return
+            }
 
             // @ts-ignore
             const editor = view.dom.editor as Editor
@@ -340,17 +346,19 @@ export const FigureEmbed = Node.create({
             }
 
             // backSpace to remove if the figcaption is empty
-            if (event.key === 'BackSpace' && isEmptyFigcaption) {
+            if (isBackSpace && isEmptyFigcaption) {
               editor.commands.deleteNode(pluginName)
+              return
             }
 
             // enter to insert a new paragraph
-            if (event.key === 'Enter') {
+            if (isEnter) {
               editor
                 .chain()
                 .selectTextblockEnd()
                 .insertContent({ type: 'paragraph' })
                 .run()
+              return
             }
           },
 
