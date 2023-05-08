@@ -43448,25 +43448,32 @@ var FigureAudio = Node.create({
                 key: new PluginKey('removePastedFigureAudio'),
                 props: {
                     handleKeyDown: function (view, event) {
-                        var anchorParent = view.state.selection.$anchor.parent;
-                        var isFigure = anchorParent.type.name === pluginName$2;
-                        var isEmptyFigcaption = anchorParent.content.size <= 0;
-                        // @ts-ignore
-                        var editor = view.dom.editor;
-                        if (!isFigure) {
+                        var isBackSpace = event.key === 'BackSpace';
+                        var isEnter = event.key === 'Enter';
+                        if (!isBackSpace || !isEnter) {
                             return;
                         }
+                        var anchorParent = view.state.selection.$anchor.parent;
+                        var isCurrentPlugin = anchorParent.type.name === pluginName$2;
+                        var isEmptyFigcaption = anchorParent.content.size <= 0;
+                        if (!isCurrentPlugin) {
+                            return;
+                        }
+                        // @ts-ignore
+                        var editor = view.dom.editor;
                         // backSpace to remove if the figcaption is empty
-                        if (event.key === 'BackSpace' && isEmptyFigcaption) {
+                        if (isBackSpace && isEmptyFigcaption) {
                             editor.commands.deleteNode(pluginName$2);
+                            return;
                         }
                         // enter to insert a new paragraph
-                        if (event.key === 'Enter') {
+                        if (isEnter) {
                             editor
                                 .chain()
                                 .selectTextblockEnd()
                                 .insertContent({ type: 'paragraph' })
                                 .run();
+                            return;
                         }
                     },
                     transformPastedHTML: function (html) {
@@ -43732,22 +43739,29 @@ var FigureEmbed = Node.create({
                         var anchorParent = view.state.selection.$anchor.parent;
                         var isFigure = anchorParent.type.name === pluginName$1;
                         var isEmptyFigcaption = anchorParent.content.size <= 0;
+                        var isBackSpace = event.key === 'BackSpace';
+                        var isEnter = event.key === 'Enter';
+                        if (!isBackSpace || !isEnter) {
+                            return;
+                        }
                         // @ts-ignore
                         var editor = view.dom.editor;
                         if (!isFigure) {
                             return;
                         }
                         // backSpace to remove if the figcaption is empty
-                        if (event.key === 'BackSpace' && isEmptyFigcaption) {
+                        if (isBackSpace && isEmptyFigcaption) {
                             editor.commands.deleteNode(pluginName$1);
+                            return;
                         }
                         // enter to insert a new paragraph
-                        if (event.key === 'Enter') {
+                        if (isEnter) {
                             editor
                                 .chain()
                                 .selectTextblockEnd()
                                 .insertContent({ type: 'paragraph' })
                                 .run();
+                            return;
                         }
                     },
                     transformPastedHTML: function (html) {
@@ -43834,25 +43848,32 @@ var FigureImage = Node.create({
                 key: new PluginKey('removePastedFigureImage'),
                 props: {
                     handleKeyDown: function (view, event) {
-                        var anchorParent = view.state.selection.$anchor.parent;
-                        var isFigure = anchorParent.type.name === pluginName;
-                        var isEmptyFigcaption = anchorParent.content.size <= 0;
-                        // @ts-ignore
-                        var editor = view.dom.editor;
-                        if (!isFigure) {
+                        var isBackSpace = event.key === 'BackSpace';
+                        var isEnter = event.key === 'Enter';
+                        if (!isBackSpace || !isEnter) {
                             return;
                         }
+                        var anchorParent = view.state.selection.$anchor.parent;
+                        var isCurrentPlugin = anchorParent.type.name === pluginName;
+                        var isEmptyFigcaption = anchorParent.content.size <= 0;
+                        if (!isCurrentPlugin) {
+                            return;
+                        }
+                        // @ts-ignore
+                        var editor = view.dom.editor;
                         // backSpace to remove if the figcaption is empty
-                        if (event.key === 'BackSpace' && isEmptyFigcaption) {
+                        if (isBackSpace && isEmptyFigcaption) {
                             editor.commands.deleteNode(pluginName);
+                            return;
                         }
                         // enter to insert a new paragraph
-                        if (event.key === 'Enter') {
+                        if (isEnter) {
                             editor
                                 .chain()
                                 .selectTextblockEnd()
                                 .insertContent({ type: 'paragraph' })
                                 .run();
+                            return;
                         }
                     },
                     transformPastedHTML: function (html) {
