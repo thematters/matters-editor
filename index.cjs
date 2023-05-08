@@ -23714,65 +23714,6 @@ const Paragraph = Node.create({
     },
 });
 
-const Placeholder = Extension.create({
-    name: 'placeholder',
-    addOptions() {
-        return {
-            emptyEditorClass: 'is-editor-empty',
-            emptyNodeClass: 'is-empty',
-            placeholder: 'Write something …',
-            showOnlyWhenEditable: true,
-            showOnlyCurrent: true,
-            includeChildren: false,
-        };
-    },
-    addProseMirrorPlugins() {
-        return [
-            new Plugin({
-                key: new PluginKey('placeholder'),
-                props: {
-                    decorations: ({ doc, selection }) => {
-                        const active = this.editor.isEditable || !this.options.showOnlyWhenEditable;
-                        const { anchor } = selection;
-                        const decorations = [];
-                        if (!active) {
-                            return null;
-                        }
-                        // only calculate isEmpty once due to its performance impacts (see issue #3360)
-                        const emptyDocInstance = doc.type.createAndFill();
-                        const isEditorEmpty = (emptyDocInstance === null || emptyDocInstance === void 0 ? void 0 : emptyDocInstance.sameMarkup(doc))
-                            && emptyDocInstance.content.findDiffStart(doc.content) === null;
-                        doc.descendants((node, pos) => {
-                            const hasAnchor = anchor >= pos && anchor <= pos + node.nodeSize;
-                            const isEmpty = !node.isLeaf && !node.childCount;
-                            if ((hasAnchor || !this.options.showOnlyCurrent) && isEmpty) {
-                                const classes = [this.options.emptyNodeClass];
-                                if (isEditorEmpty) {
-                                    classes.push(this.options.emptyEditorClass);
-                                }
-                                const decoration = Decoration.node(pos, pos + node.nodeSize, {
-                                    class: classes.join(' '),
-                                    'data-placeholder': typeof this.options.placeholder === 'function'
-                                        ? this.options.placeholder({
-                                            editor: this.editor,
-                                            node,
-                                            pos,
-                                            hasAnchor,
-                                        })
-                                        : this.options.placeholder,
-                                });
-                                decorations.push(decoration);
-                            }
-                            return this.options.includeChildren;
-                        });
-                        return DecorationSet.create(doc, decorations);
-                    },
-                },
-            }),
-        ];
-    },
-});
-
 const inputRegex = /(?:^|\s)((?:~~)((?:[^~]+))(?:~~))$/;
 const pasteRegex = /(?:^|\s)((?:~~)((?:[^~]+))(?:~~))/g;
 const Strike = Mark.create({
@@ -26934,14 +26875,14 @@ var Bold = Mark.create({
 });
 
 var makeArticleEditorExtensions = function (_a) {
-    var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
+    _a.placeholder; var mentionSuggestion = _a.mentionSuggestion;
     return [
         Document,
         History,
         Gapcursor,
-        Placeholder.configure({
-            placeholder: placeholder,
-        }),
+        // Placeholder.configure({
+        //   placeholder,
+        // }),
         // Basic Formats
         Text$1,
         Paragraph,
@@ -26969,13 +26910,13 @@ var makeArticleEditorExtensions = function (_a) {
     ];
 };
 var makeCommentEditorExtensions = function (_a) {
-    var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
+    _a.placeholder; var mentionSuggestion = _a.mentionSuggestion;
     return [
         Document,
         History,
-        Placeholder.configure({
-            placeholder: placeholder,
-        }),
+        // Placeholder.configure({
+        //   placeholder,
+        // }),
         // Basic Formats
         Text$1,
         Paragraph,

@@ -13,7 +13,6 @@ import HorizontalRule from '@tiptap/extension-horizontal-rule';
 import ListItem from '@tiptap/extension-list-item';
 import OrderedList from '@tiptap/extension-ordered-list';
 import Paragraph from '@tiptap/extension-paragraph';
-import Placeholder from '@tiptap/extension-placeholder';
 import Strike from '@tiptap/extension-strike';
 import Text$1 from '@tiptap/extension-text';
 import { Node, combineTransactionSteps, getChangedRanges, getMarksBetween, findChildrenInRange, getAttributes, Mark, mergeAttributes, markPasteRule, markInputRule } from '@tiptap/core';
@@ -2933,14 +2932,14 @@ var Bold = Mark.create({
 });
 
 var makeArticleEditorExtensions = function (_a) {
-    var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
+    _a.placeholder; var mentionSuggestion = _a.mentionSuggestion;
     return [
         Document,
         History,
         Gapcursor,
-        Placeholder.configure({
-            placeholder: placeholder,
-        }),
+        // Placeholder.configure({
+        //   placeholder,
+        // }),
         // Basic Formats
         Text$1,
         Paragraph,
@@ -2968,13 +2967,13 @@ var makeArticleEditorExtensions = function (_a) {
     ];
 };
 var makeCommentEditorExtensions = function (_a) {
-    var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
+    _a.placeholder; var mentionSuggestion = _a.mentionSuggestion;
     return [
         Document,
         History,
-        Placeholder.configure({
-            placeholder: placeholder,
-        }),
+        // Placeholder.configure({
+        //   placeholder,
+        // }),
         // Basic Formats
         Text$1,
         Paragraph,
