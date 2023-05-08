@@ -101,7 +101,7 @@ export const FigureImage = Node.create({
             const isBackSpace = event.key === 'BackSpace'
             const isEnter = event.key === 'Enter'
 
-            if (!isBackSpace || !isEnter) {
+            if (!isBackSpace && !isEnter) {
               return
             }
 

@@ -328,22 +328,23 @@ export const FigureEmbed = Node.create({
         key: new PluginKey('removePastedFigureEmbed'),
         props: {
           handleKeyDown(view, event) {
-            const anchorParent = view.state.selection.$anchor.parent
-            const isFigure = anchorParent.type.name === pluginName
-            const isEmptyFigcaption = anchorParent.content.size <= 0
             const isBackSpace = event.key === 'BackSpace'
             const isEnter = event.key === 'Enter'
 
-            if (!isBackSpace || !isEnter) {
+            if (!isBackSpace && !isEnter) {
+              return
+            }
+
+            const anchorParent = view.state.selection.$anchor.parent
+            const isCurrentPlugin = anchorParent.type.name === pluginName
+            const isEmptyFigcaption = anchorParent.content.size <= 0
+
+            if (!isCurrentPlugin) {
               return
             }
 
             // @ts-ignore
             const editor = view.dom.editor as Editor
-
-            if (!isFigure) {
-              return
-            }
 
             // backSpace to remove if the figcaption is empty
             if (isBackSpace && isEmptyFigcaption) {
