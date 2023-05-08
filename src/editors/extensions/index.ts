@@ -11,7 +11,7 @@ import HorizontalRule from '@tiptap/extension-horizontal-rule'
 import ListItem from '@tiptap/extension-list-item'
 import OrderedList from '@tiptap/extension-ordered-list'
 import Paragraph from '@tiptap/extension-paragraph'
-import Placeholder from '@tiptap/extension-placeholder'
+// import Placeholder from '@tiptap/extension-placeholder'
 import Strike from '@tiptap/extension-strike'
 import Text from '@tiptap/extension-text'
 
@@ -42,9 +42,9 @@ export const makeArticleEditorExtensions = ({
     Document,
     History,
     Gapcursor,
-    Placeholder.configure({
-      placeholder,
-    }),
+    // Placeholder.configure({
+    //   placeholder,
+    // }),
     // Basic Formats
     Text,
     Paragraph,
@@ -84,9 +84,9 @@ export const makeCommentEditorExtensions = ({
   return [
     Document,
     History,
-    Placeholder.configure({
-      placeholder,
-    }),
+    // Placeholder.configure({
+    //   placeholder,
+    // }),
     // Basic Formats
     Text,
     Paragraph,
