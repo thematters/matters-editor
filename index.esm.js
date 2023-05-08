@@ -171,7 +171,7 @@ var FigureAudio = Node.create({
                     handleKeyDown: function (view, event) {
                         var isBackSpace = event.key === 'BackSpace';
                         var isEnter = event.key === 'Enter';
-                        if (!isBackSpace || !isEnter) {
+                        if (!isBackSpace && !isEnter) {
                             return;
                         }
                         var anchorParent = view.state.selection.$anchor.parent;
@@ -457,19 +457,19 @@ var FigureEmbed = Node.create({
                 key: new PluginKey('removePastedFigureEmbed'),
                 props: {
                     handleKeyDown: function (view, event) {
-                        var anchorParent = view.state.selection.$anchor.parent;
-                        var isFigure = anchorParent.type.name === pluginName$1;
-                        var isEmptyFigcaption = anchorParent.content.size <= 0;
                         var isBackSpace = event.key === 'BackSpace';
                         var isEnter = event.key === 'Enter';
-                        if (!isBackSpace || !isEnter) {
+                        if (!isBackSpace && !isEnter) {
+                            return;
+                        }
+                        var anchorParent = view.state.selection.$anchor.parent;
+                        var isCurrentPlugin = anchorParent.type.name === pluginName$1;
+                        var isEmptyFigcaption = anchorParent.content.size <= 0;
+                        if (!isCurrentPlugin) {
                             return;
                         }
                         // @ts-ignore
                         var editor = view.dom.editor;
-                        if (!isFigure) {
-                            return;
-                        }
                         // backSpace to remove if the figcaption is empty
                         if (isBackSpace && isEmptyFigcaption) {
                             editor.commands.deleteNode(pluginName$1);
@@ -571,7 +571,7 @@ var FigureImage = Node.create({
                     handleKeyDown: function (view, event) {
                         var isBackSpace = event.key === 'BackSpace';
                         var isEnter = event.key === 'Enter';
-                        if (!isBackSpace || !isEnter) {
+                        if (!isBackSpace && !isEnter) {
                             return;
                         }
                         var anchorParent = view.state.selection.$anchor.parent;
