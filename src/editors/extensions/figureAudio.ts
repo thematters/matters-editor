@@ -145,8 +145,8 @@ export const FigureAudio = Node.create({
         key: new PluginKey('removePastedFigureAudio'),
         props: {
           handleKeyDown(view, event) {
-            const isBackSpace = event.key === 'BackSpace'
-            const isEnter = event.key === 'Enter'
+            const isBackSpace = event.key.toLowerCase() === 'backspace'
+            const isEnter = event.key.toLowerCase() === 'enter'
 
             if (!isBackSpace && !isEnter) {
               return
