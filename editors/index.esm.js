@@ -17,6 +17,7 @@ import Strike from '@tiptap/extension-strike';
 import Text$1 from '@tiptap/extension-text';
 import { Node, combineTransactionSteps, getChangedRanges, getMarksBetween, findChildrenInRange, getAttributes, Mark, mergeAttributes, markPasteRule, markInputRule } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { GapCursor } from '@tiptap/pm/gapcursor';
 import Suggestion from '@tiptap/suggestion';
 
 /******************************************************************************
@@ -183,13 +184,18 @@ var FigureAudio = Node.create({
                             editor.commands.deleteNode(pluginName$2);
                             return;
                         }
-                        // enter to insert a new paragraph
+                        // set gapcursor to insert a new paragraph
                         if (isEnter) {
-                            editor
-                                .chain()
-                                .selectTextblockEnd()
-                                .insertContent({ type: 'paragraph' })
-                                .run();
+                            var _a = editor.state.selection, from = _a.from, to = _a.to;
+                            var resolvedPos = editor.state.doc.resolve(from + 1);
+                            if (from !== to) {
+                                return;
+                            }
+                            // @ts-ignore
+                            if (GapCursor.valid(resolvedPos)) {
+                                var selection = new GapCursor(resolvedPos);
+                                view.dispatch(view.state.tr.setSelection(selection));
+                            }
                             return;
                         }
                     },
@@ -471,13 +477,18 @@ var FigureEmbed = Node.create({
                             editor.commands.deleteNode(pluginName$1);
                             return;
                         }
-                        // enter to insert a new paragraph
+                        // set gapcursor to insert a new paragraph
                         if (isEnter) {
-                            editor
-                                .chain()
-                                .selectTextblockEnd()
-                                .insertContent({ type: 'paragraph' })
-                                .run();
+                            var _a = editor.state.selection, from = _a.from, to = _a.to;
+                            var resolvedPos = editor.state.doc.resolve(from + 1);
+                            if (from !== to) {
+                                return;
+                            }
+                            // @ts-ignore
+                            if (GapCursor.valid(resolvedPos)) {
+                                var selection = new GapCursor(resolvedPos);
+                                view.dispatch(view.state.tr.setSelection(selection));
+                            }
                             return;
                         }
                     },
@@ -583,13 +594,18 @@ var FigureImage = Node.create({
                             editor.commands.deleteNode(pluginName);
                             return;
                         }
-                        // enter to insert a new paragraph
+                        // set gapcursor to insert a new paragraph
                         if (isEnter) {
-                            editor
-                                .chain()
-                                .selectTextblockEnd()
-                                .insertContent({ type: 'paragraph' })
-                                .run();
+                            var _a = editor.state.selection, from = _a.from, to = _a.to;
+                            var resolvedPos = editor.state.doc.resolve(from + 1);
+                            if (from !== to) {
+                                return;
+                            }
+                            // @ts-ignore
+                            if (GapCursor.valid(resolvedPos)) {
+                                var selection = new GapCursor(resolvedPos);
+                                view.dispatch(view.state.tr.setSelection(selection));
+                            }
                             return;
                         }
                     },

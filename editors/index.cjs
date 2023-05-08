@@ -23898,13 +23898,18 @@ var FigureAudio = Node.create({
                             editor.commands.deleteNode(pluginName$2);
                             return;
                         }
-                        // enter to insert a new paragraph
+                        // set gapcursor to insert a new paragraph
                         if (isEnter) {
-                            editor
-                                .chain()
-                                .selectTextblockEnd()
-                                .insertContent({ type: 'paragraph' })
-                                .run();
+                            var _a = editor.state.selection, from = _a.from, to = _a.to;
+                            var resolvedPos = editor.state.doc.resolve(from + 1);
+                            if (from !== to) {
+                                return;
+                            }
+                            // @ts-ignore
+                            if (GapCursor.valid(resolvedPos)) {
+                                var selection = new GapCursor(resolvedPos);
+                                view.dispatch(view.state.tr.setSelection(selection));
+                            }
                             return;
                         }
                     },
@@ -24186,13 +24191,18 @@ var FigureEmbed = Node.create({
                             editor.commands.deleteNode(pluginName$1);
                             return;
                         }
-                        // enter to insert a new paragraph
+                        // set gapcursor to insert a new paragraph
                         if (isEnter) {
-                            editor
-                                .chain()
-                                .selectTextblockEnd()
-                                .insertContent({ type: 'paragraph' })
-                                .run();
+                            var _a = editor.state.selection, from = _a.from, to = _a.to;
+                            var resolvedPos = editor.state.doc.resolve(from + 1);
+                            if (from !== to) {
+                                return;
+                            }
+                            // @ts-ignore
+                            if (GapCursor.valid(resolvedPos)) {
+                                var selection = new GapCursor(resolvedPos);
+                                view.dispatch(view.state.tr.setSelection(selection));
+                            }
                             return;
                         }
                     },
@@ -24298,13 +24308,18 @@ var FigureImage = Node.create({
                             editor.commands.deleteNode(pluginName);
                             return;
                         }
-                        // enter to insert a new paragraph
+                        // set gapcursor to insert a new paragraph
                         if (isEnter) {
-                            editor
-                                .chain()
-                                .selectTextblockEnd()
-                                .insertContent({ type: 'paragraph' })
-                                .run();
+                            var _a = editor.state.selection, from = _a.from, to = _a.to;
+                            var resolvedPos = editor.state.doc.resolve(from + 1);
+                            if (from !== to) {
+                                return;
+                            }
+                            // @ts-ignore
+                            if (GapCursor.valid(resolvedPos)) {
+                                var selection = new GapCursor(resolvedPos);
+                                view.dispatch(view.state.tr.setSelection(selection));
+                            }
                             return;
                         }
                     },
