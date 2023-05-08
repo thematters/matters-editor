@@ -43448,8 +43448,8 @@ var FigureAudio = Node.create({
                 key: new PluginKey('removePastedFigureAudio'),
                 props: {
                     handleKeyDown: function (view, event) {
-                        var isBackSpace = event.key === 'BackSpace';
-                        var isEnter = event.key === 'Enter';
+                        var isBackSpace = event.key.toLowerCase() === 'backspace';
+                        var isEnter = event.key.toLowerCase() === 'enter';
                         if (!isBackSpace && !isEnter) {
                             return;
                         }
@@ -43741,8 +43741,8 @@ var FigureEmbed = Node.create({
                 key: new PluginKey('removePastedFigureEmbed'),
                 props: {
                     handleKeyDown: function (view, event) {
-                        var isBackSpace = event.key === 'BackSpace';
-                        var isEnter = event.key === 'Enter';
+                        var isBackSpace = event.key.toLowerCase() === 'backspace';
+                        var isEnter = event.key.toLowerCase() === 'enter';
                         if (!isBackSpace && !isEnter) {
                             return;
                         }
@@ -43858,8 +43858,8 @@ var FigureImage = Node.create({
                 key: new PluginKey('removePastedFigureImage'),
                 props: {
                     handleKeyDown: function (view, event) {
-                        var isBackSpace = event.key === 'BackSpace';
-                        var isEnter = event.key === 'Enter';
+                        var isBackSpace = event.key.toLowerCase() === 'backspace';
+                        var isEnter = event.key.toLowerCase() === 'enter';
                         if (!isBackSpace && !isEnter) {
                             return;
                         }
