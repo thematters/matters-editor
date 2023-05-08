@@ -1,5 +1,6 @@
 import { Node } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { GapCursor } from '@tiptap/pm/gapcursor'
 
 /**
  * FigureAudio extension:
@@ -168,13 +169,21 @@ export const FigureAudio = Node.create({
               return
             }
 
-            // enter to insert a new paragraph
+            // set gapcursor to insert a new paragraph
             if (isEnter) {
-              editor
-                .chain()
-                .selectTextblockEnd()
-                .insertContent({ type: 'paragraph' })
-                .run()
+              const { from, to } = editor.state.selection
+              const resolvedPos = editor.state.doc.resolve(from + 1)
+
+              if (from !== to) {
+                return
+              }
+
+              // @ts-ignore
+              if (GapCursor.valid(resolvedPos)) {
+                const selection = new GapCursor(resolvedPos)
+                view.dispatch(view.state.tr.setSelection(selection))
+              }
+
               return
             }
           },
