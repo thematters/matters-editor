@@ -11,7 +11,7 @@ import HorizontalRule from '@tiptap/extension-horizontal-rule'
 import ListItem from '@tiptap/extension-list-item'
 import OrderedList from '@tiptap/extension-ordered-list'
 import Paragraph from '@tiptap/extension-paragraph'
-// import Placeholder from '@tiptap/extension-placeholder'
+import Placeholder from '@tiptap/extension-placeholder'
 import Strike from '@tiptap/extension-strike'
 import Text from '@tiptap/extension-text'
 
@@ -38,13 +38,13 @@ export const makeArticleEditorExtensions = ({
   placeholder,
   mentionSuggestion,
 }: MakeArticleEditorExtensionsProps) => {
-  return [
+  const extensions = [
     Document,
     History,
     Gapcursor,
-    // Placeholder.configure({
-    //   placeholder,
-    // }),
+    Placeholder.configure({
+      placeholder,
+    }),
     // Basic Formats
     Text,
     Paragraph,
@@ -66,10 +66,13 @@ export const makeArticleEditorExtensions = ({
     FigureImage,
     FigureAudio,
     FigureEmbed,
-    Mention.configure({
-      suggestion: mentionSuggestion,
-    }),
   ]
+
+  if (mentionSuggestion) {
+    extensions.push(Mention.configure({ suggestion: mentionSuggestion }))
+  }
+
+  return extensions
 }
 
 export type MakeCommentEditorExtensionsProps = {
@@ -81,12 +84,12 @@ export const makeCommentEditorExtensions = ({
   placeholder,
   mentionSuggestion,
 }: MakeCommentEditorExtensionsProps) => {
-  return [
+  const extensions = [
     Document,
     History,
-    // Placeholder.configure({
-    //   placeholder,
-    // }),
+    Placeholder.configure({
+      placeholder,
+    }),
     // Basic Formats
     Text,
     Paragraph,
@@ -102,8 +105,11 @@ export const makeCommentEditorExtensions = ({
     BulletList,
     // Custom Formats
     Link,
-    Mention.configure({
-      suggestion: mentionSuggestion,
-    }),
   ]
+
+  if (mentionSuggestion) {
+    extensions.push(Mention.configure({ suggestion: mentionSuggestion }))
+  }
+
+  return extensions
 }
