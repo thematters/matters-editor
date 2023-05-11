@@ -35,6 +35,7 @@ declare module '@tiptap/core' {
                 src: string;
                 caption?: string;
                 title: string;
+                position?: number;
             }) => ReturnType;
         };
     }

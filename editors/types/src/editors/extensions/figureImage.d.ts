@@ -17,6 +17,7 @@ declare module '@tiptap/core' {
             setFigureImage: (options: {
                 src: string;
                 caption?: string;
+                position?: number;
             }) => ReturnType;
         };
     }

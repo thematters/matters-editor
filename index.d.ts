@@ -79,6 +79,7 @@ declare module '@tiptap/core' {
                 src: string;
                 caption?: string;
                 title: string;
+                position?: number;
             }) => ReturnType;
         };
     }
@@ -110,6 +111,7 @@ declare module '@tiptap/core' {
             setFigureEmbed: (options: {
                 src: string;
                 caption?: string;
+                position?: number;
             }) => ReturnType;
         };
     }
@@ -133,6 +135,7 @@ declare module '@tiptap/core' {
             setFigureImage: (options: {
                 src: string;
                 caption?: string;
+                position?: number;
             }) => ReturnType;
         };
     }

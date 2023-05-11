@@ -25,6 +25,7 @@ declare module '@tiptap/core' {
             setFigureEmbed: (options: {
                 src: string;
                 caption?: string;
+                position?: number;
             }) => ReturnType;
         };
     }

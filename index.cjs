@@ -23916,11 +23916,10 @@ var FigureAudio = Node.create({
         var _this = this;
         return {
             setFigureAudio: function (_a) {
-                var caption = _a.caption, attrs = __rest(_a, ["caption"]);
+                var caption = _a.caption, position = _a.position, attrs = __rest(_a, ["caption", "position"]);
                 return function (_a) {
                     var chain = _a.chain;
-                    return chain()
-                        .insertContent([
+                    var insertContent = [
                         {
                             type: _this.name,
                             attrs: attrs,
@@ -23929,9 +23928,11 @@ var FigureAudio = Node.create({
                         {
                             type: 'paragraph',
                         },
-                    ])
-                        .focus()
-                        .run();
+                    ];
+                    if (!position) {
+                        return chain().insertContent(insertContent).focus().run();
+                    }
+                    return chain().insertContentAt(position, insertContent).focus().run();
                 };
             },
         };
@@ -23958,22 +23959,24 @@ var FigureAudio = Node.create({
                         var editor = view.dom.editor;
                         // backSpace to remove if the figcaption is empty
                         if (isBackSpace && isEmptyFigcaption) {
-                            editor.commands.deleteNode(pluginName$2);
+                            // FIXME: setTimeOut to avoid repetitive deletion
+                            setTimeout(function () {
+                                editor.commands.deleteNode(pluginName$2);
+                            });
                             return;
                         }
                         // insert a new paragraph
                         if (isEnter) {
-                            var _c = editor.state.selection, $from = _c.$from, $to = _c.$to;
-                            var isTextAfter = ((_b = (_a = $to.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                            var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
+                            var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
                             // skip if figcaption text is selected
                             // or has text after current selection
-                            if ($from !== $to || isTextAfter) {
+                            if ($from !== $to_1 || isTextAfter) {
                                 return;
                             }
-                            var resolvedNextPos_1 = editor.state.doc.resolve($to.pos + 1);
                             // FIXME: setTimeOut to avoid repetitive paragraph insertion
                             setTimeout(function () {
-                                editor.commands.insertContentAt(resolvedNextPos_1.pos, {
+                                editor.commands.insertContentAt($to_1.pos + 1, {
                                     type: 'paragraph',
                                 });
                             });
@@ -24214,11 +24217,10 @@ var FigureEmbed = Node.create({
         var _this = this;
         return {
             setFigureEmbed: function (_a) {
-                var caption = _a.caption, attrs = __rest(_a, ["caption"]);
+                var caption = _a.caption, position = _a.position, attrs = __rest(_a, ["caption", "position"]);
                 return function (_a) {
                     var chain = _a.chain;
-                    return chain()
-                        .insertContent([
+                    var insertContent = [
                         {
                             type: _this.name,
                             attrs: attrs,
@@ -24227,9 +24229,11 @@ var FigureEmbed = Node.create({
                         {
                             type: 'paragraph',
                         },
-                    ])
-                        .focus()
-                        .run();
+                    ];
+                    if (!position) {
+                        return chain().insertContent(insertContent).focus().run();
+                    }
+                    return chain().insertContentAt(position, insertContent).focus().run();
                 };
             },
         };
@@ -24256,22 +24260,24 @@ var FigureEmbed = Node.create({
                         var editor = view.dom.editor;
                         // backSpace to remove if the figcaption is empty
                         if (isBackSpace && isEmptyFigcaption) {
-                            editor.commands.deleteNode(pluginName$1);
+                            // FIXME: setTimeOut to avoid repetitive deletion
+                            setTimeout(function () {
+                                editor.commands.deleteNode(pluginName$1);
+                            });
                             return;
                         }
                         // insert a new paragraph
                         if (isEnter) {
-                            var _c = editor.state.selection, $from = _c.$from, $to = _c.$to;
-                            var isTextAfter = ((_b = (_a = $to.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                            var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
+                            var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
                             // skip if figcaption text is selected
                             // or has text after current selection
-                            if ($from !== $to || isTextAfter) {
+                            if ($from !== $to_1 || isTextAfter) {
                                 return;
                             }
-                            var resolvedNextPos_1 = editor.state.doc.resolve($to.pos + 1);
                             // FIXME: setTimeOut to avoid repetitive paragraph insertion
                             setTimeout(function () {
-                                editor.commands.insertContentAt(resolvedNextPos_1.pos, {
+                                editor.commands.insertContentAt($to_1.pos + 1, {
                                     type: 'paragraph',
                                 });
                             });
@@ -24336,11 +24342,10 @@ var FigureImage = Node.create({
         var _this = this;
         return {
             setFigureImage: function (_a) {
-                var caption = _a.caption, attrs = __rest(_a, ["caption"]);
+                var caption = _a.caption, position = _a.position, attrs = __rest(_a, ["caption", "position"]);
                 return function (_a) {
                     var chain = _a.chain;
-                    return chain()
-                        .insertContent([
+                    var insertContent = [
                         {
                             type: _this.name,
                             attrs: attrs,
@@ -24349,9 +24354,11 @@ var FigureImage = Node.create({
                         {
                             type: 'paragraph',
                         },
-                    ])
-                        .focus()
-                        .run();
+                    ];
+                    if (!position) {
+                        return chain().insertContent(insertContent).focus().run();
+                    }
+                    return chain().insertContentAt(position, insertContent).focus().run();
                 };
             },
         };
@@ -24378,22 +24385,24 @@ var FigureImage = Node.create({
                         var editor = view.dom.editor;
                         // backSpace to remove if the figcaption is empty
                         if (isBackSpace && isEmptyFigcaption) {
-                            editor.commands.deleteNode(pluginName);
+                            // FIXME: setTimeOut to avoid repetitive deletion
+                            setTimeout(function () {
+                                editor.commands.deleteNode(pluginName);
+                            });
                             return;
                         }
                         // insert a new paragraph
                         if (isEnter) {
-                            var _c = editor.state.selection, $from = _c.$from, $to = _c.$to;
-                            var isTextAfter = ((_b = (_a = $to.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                            var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
+                            var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
                             // skip if figcaption text is selected
                             // or has text after current selection
-                            if ($from !== $to || isTextAfter) {
+                            if ($from !== $to_1 || isTextAfter) {
                                 return;
                             }
-                            var resolvedNextPos_1 = editor.state.doc.resolve($to.pos + 1);
                             // FIXME: setTimeOut to avoid repetitive paragraph insertion
                             setTimeout(function () {
-                                editor.commands.insertContentAt(resolvedNextPos_1.pos, {
+                                editor.commands.insertContentAt($to_1.pos + 1, {
                                     type: 'paragraph',
                                 });
                             });
