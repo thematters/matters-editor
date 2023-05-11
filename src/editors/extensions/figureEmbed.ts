@@ -25,7 +25,11 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     figureEmbed: {
-      setFigureEmbed: (options: { src: string; caption?: string }) => ReturnType
+      setFigureEmbed: (options: {
+        src: string
+        caption?: string
+        position?: number
+      }) => ReturnType
     }
   }
 }
@@ -303,21 +307,24 @@ export const FigureEmbed = Node.create({
   addCommands() {
     return {
       setFigureEmbed:
-        ({ caption, ...attrs }) =>
+        ({ caption, position, ...attrs }) =>
         ({ chain }) => {
-          return chain()
-            .insertContent([
-              {
-                type: this.name,
-                attrs,
-                content: caption ? [{ type: 'text', text: caption }] : [],
-              },
-              {
-                type: 'paragraph',
-              },
-            ])
-            .focus()
-            .run()
+          const insertContent = [
+            {
+              type: this.name,
+              attrs,
+              content: caption ? [{ type: 'text', text: caption }] : [],
+            },
+            {
+              type: 'paragraph',
+            },
+          ]
+
+          if (!position) {
+            return chain().insertContent(insertContent).focus().run()
+          }
+
+          return chain().insertContentAt(position, insertContent).focus().run()
         },
     }
   },
@@ -348,7 +355,10 @@ export const FigureEmbed = Node.create({
 
             // backSpace to remove if the figcaption is empty
             if (isBackSpace && isEmptyFigcaption) {
-              editor.commands.deleteNode(pluginName)
+              // FIXME: setTimeOut to avoid repetitive deletion
+              setTimeout(() => {
+                editor.commands.deleteNode(pluginName)
+              })
               return
             }
 
@@ -363,11 +373,9 @@ export const FigureEmbed = Node.create({
                 return
               }
 
-              const resolvedNextPos = editor.state.doc.resolve($to.pos + 1)
-
               // FIXME: setTimeOut to avoid repetitive paragraph insertion
               setTimeout(() => {
-                editor.commands.insertContentAt(resolvedNextPos.pos, {
+                editor.commands.insertContentAt($to.pos + 1, {
                   type: 'paragraph',
                 })
               })

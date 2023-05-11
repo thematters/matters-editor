@@ -38,6 +38,7 @@ declare module '@tiptap/core' {
         src: string
         caption?: string
         title: string
+        position?: number
       }) => ReturnType
     }
   }
@@ -119,21 +120,24 @@ export const FigureAudio = Node.create({
   addCommands() {
     return {
       setFigureAudio:
-        ({ caption, ...attrs }) =>
+        ({ caption, position, ...attrs }) =>
         ({ chain }) => {
-          return chain()
-            .insertContent([
-              {
-                type: this.name,
-                attrs,
-                content: caption ? [{ type: 'text', text: caption }] : [],
-              },
-              {
-                type: 'paragraph',
-              },
-            ])
-            .focus()
-            .run()
+          const insertContent = [
+            {
+              type: this.name,
+              attrs,
+              content: caption ? [{ type: 'text', text: caption }] : [],
+            },
+            {
+              type: 'paragraph',
+            },
+          ]
+
+          if (!position) {
+            return chain().insertContent(insertContent).focus().run()
+          }
+
+          return chain().insertContentAt(position, insertContent).focus().run()
         },
     }
   },
@@ -164,7 +168,10 @@ export const FigureAudio = Node.create({
 
             // backSpace to remove if the figcaption is empty
             if (isBackSpace && isEmptyFigcaption) {
-              editor.commands.deleteNode(pluginName)
+              // FIXME: setTimeOut to avoid repetitive deletion
+              setTimeout(() => {
+                editor.commands.deleteNode(pluginName)
+              })
               return
             }
 
@@ -179,11 +186,9 @@ export const FigureAudio = Node.create({
                 return
               }
 
-              const resolvedNextPos = editor.state.doc.resolve($to.pos + 1)
-
               // FIXME: setTimeOut to avoid repetitive paragraph insertion
               setTimeout(() => {
-                editor.commands.insertContentAt(resolvedNextPos.pos, {
+                editor.commands.insertContentAt($to.pos + 1, {
                   type: 'paragraph',
                 })
               })
