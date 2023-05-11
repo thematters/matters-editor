@@ -57759,6 +57759,7 @@ var FigureAudio = Node.create({
                 key: new PluginKey('removePastedFigureAudio'),
                 props: {
                     handleKeyDown: function (view, event) {
+                        var _a, _b;
                         var isBackSpace = event.key.toLowerCase() === 'backspace';
                         var isEnter = event.key.toLowerCase() === 'enter';
                         if (!isBackSpace && !isEnter) {
@@ -57777,18 +57778,22 @@ var FigureAudio = Node.create({
                             editor.commands.deleteNode(pluginName$2);
                             return;
                         }
-                        // set gapcursor to insert a new paragraph
+                        // insert a new paragraph
                         if (isEnter) {
-                            var _a = editor.state.selection, from = _a.from, to = _a.to;
-                            var resolvedPos = editor.state.doc.resolve(from + 1);
-                            if (from !== to) {
+                            var _c = editor.state.selection, $from = _c.$from, $to = _c.$to;
+                            var isTextAfter = ((_b = (_a = $to.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                            // skip if figcaption text is selected
+                            // or has text after current selection
+                            if ($from !== $to || isTextAfter) {
                                 return;
                             }
-                            // @ts-ignore
-                            if (GapCursor.valid(resolvedPos)) {
-                                var selection = new GapCursor(resolvedPos);
-                                view.dispatch(view.state.tr.setSelection(selection));
-                            }
+                            var resolvedNextPos_1 = editor.state.doc.resolve($to.pos + 1);
+                            // FIXME: setTimeOut to avoid repetitive paragraph insertion
+                            setTimeout(function () {
+                                editor.commands.insertContentAt(resolvedNextPos_1.pos, {
+                                    type: 'paragraph',
+                                });
+                            });
                             return;
                         }
                     },
@@ -58052,6 +58057,7 @@ var FigureEmbed = Node.create({
                 key: new PluginKey('removePastedFigureEmbed'),
                 props: {
                     handleKeyDown: function (view, event) {
+                        var _a, _b;
                         var isBackSpace = event.key.toLowerCase() === 'backspace';
                         var isEnter = event.key.toLowerCase() === 'enter';
                         if (!isBackSpace && !isEnter) {
@@ -58070,18 +58076,22 @@ var FigureEmbed = Node.create({
                             editor.commands.deleteNode(pluginName$1);
                             return;
                         }
-                        // set gapcursor to insert a new paragraph
+                        // insert a new paragraph
                         if (isEnter) {
-                            var _a = editor.state.selection, from = _a.from, to = _a.to;
-                            var resolvedPos = editor.state.doc.resolve(from + 1);
-                            if (from !== to) {
+                            var _c = editor.state.selection, $from = _c.$from, $to = _c.$to;
+                            var isTextAfter = ((_b = (_a = $to.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                            // skip if figcaption text is selected
+                            // or has text after current selection
+                            if ($from !== $to || isTextAfter) {
                                 return;
                             }
-                            // @ts-ignore
-                            if (GapCursor.valid(resolvedPos)) {
-                                var selection = new GapCursor(resolvedPos);
-                                view.dispatch(view.state.tr.setSelection(selection));
-                            }
+                            var resolvedNextPos_1 = editor.state.doc.resolve($to.pos + 1);
+                            // FIXME: setTimeOut to avoid repetitive paragraph insertion
+                            setTimeout(function () {
+                                editor.commands.insertContentAt(resolvedNextPos_1.pos, {
+                                    type: 'paragraph',
+                                });
+                            });
                             return;
                         }
                     },
@@ -58169,6 +58179,7 @@ var FigureImage = Node.create({
                 key: new PluginKey('removePastedFigureImage'),
                 props: {
                     handleKeyDown: function (view, event) {
+                        var _a, _b;
                         var isBackSpace = event.key.toLowerCase() === 'backspace';
                         var isEnter = event.key.toLowerCase() === 'enter';
                         if (!isBackSpace && !isEnter) {
@@ -58187,18 +58198,22 @@ var FigureImage = Node.create({
                             editor.commands.deleteNode(pluginName);
                             return;
                         }
-                        // set gapcursor to insert a new paragraph
+                        // insert a new paragraph
                         if (isEnter) {
-                            var _a = editor.state.selection, from = _a.from, to = _a.to;
-                            var resolvedPos = editor.state.doc.resolve(from + 1);
-                            if (from !== to) {
+                            var _c = editor.state.selection, $from = _c.$from, $to = _c.$to;
+                            var isTextAfter = ((_b = (_a = $to.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                            // skip if figcaption text is selected
+                            // or has text after current selection
+                            if ($from !== $to || isTextAfter) {
                                 return;
                             }
-                            // @ts-ignore
-                            if (GapCursor.valid(resolvedPos)) {
-                                var selection = new GapCursor(resolvedPos);
-                                view.dispatch(view.state.tr.setSelection(selection));
-                            }
+                            var resolvedNextPos_1 = editor.state.doc.resolve($to.pos + 1);
+                            // FIXME: setTimeOut to avoid repetitive paragraph insertion
+                            setTimeout(function () {
+                                editor.commands.insertContentAt(resolvedNextPos_1.pos, {
+                                    type: 'paragraph',
+                                });
+                            });
                             return;
                         }
                     },
