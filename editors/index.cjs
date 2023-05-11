@@ -26685,33 +26685,32 @@ var Mention = Node.create({
                 allowedPrefixes: null,
                 pluginKey: MentionPluginKey,
                 command: function (_a) {
-                    var _b, _c, _d;
+                    var _b, _c;
                     var editor = _a.editor, range = _a.range, props = _a.props;
-                    var _e = editor.view.state.selection, $from = _e.$from, $to = _e.$to;
-                    var isNewLine = $from.parentOffset === 1;
-                    var nodeBefore = $to.nodeBefore;
-                    var nodeAfter = $to.nodeAfter;
-                    var hasBeforeSpace = (_b = nodeBefore === null || nodeBefore === void 0 ? void 0 : nodeBefore.text) === null || _b === void 0 ? void 0 : _b.startsWith(' ');
-                    var hasAfterSpace = (_c = nodeAfter === null || nodeAfter === void 0 ? void 0 : nodeAfter.text) === null || _c === void 0 ? void 0 : _c.startsWith(' ');
-                    var insertContent = [];
-                    if (!isNewLine && !hasBeforeSpace) {
-                        insertContent.push({
+                    // FIXME: fix incorrect `range.to`
+                    range.to = editor.state.selection.to;
+                    // increase range.to by one when the next node is of type "text"
+                    // and starts with a space character
+                    var nodeAfter = editor.view.state.selection.$to.nodeAfter;
+                    var overrideSpace = (_b = nodeAfter === null || nodeAfter === void 0 ? void 0 : nodeAfter.text) === null || _b === void 0 ? void 0 : _b.startsWith(' ');
+                    if (overrideSpace) {
+                        range.to += 1;
+                    }
+                    editor
+                        .chain()
+                        .focus()
+                        .insertContentAt(range, [
+                        {
+                            type: _this.name,
+                            attrs: props,
+                        },
+                        {
                             type: 'text',
                             text: ' ',
-                        });
-                    }
-                    insertContent.push({
-                        type: _this.name,
-                        attrs: props,
-                    });
-                    if (!hasAfterSpace) {
-                        insertContent.push({
-                            type: 'text',
-                            text: ' ',
-                        });
-                    }
-                    editor.chain().focus().insertContentAt(range, insertContent).run();
-                    (_d = window.getSelection()) === null || _d === void 0 ? void 0 : _d.collapseToEnd();
+                        },
+                    ])
+                        .run();
+                    (_c = window.getSelection()) === null || _c === void 0 ? void 0 : _c.collapseToEnd();
                 },
                 allow: function (_a) {
                     var state = _a.state, range = _a.range;
