@@ -21,10 +21,7 @@ jobs:
         uses: bahmutov/npm-install@v1
 
       - name: Build project
-        run: npm run build
-
-      # - name: Make HTML
-      #   run: cp ./demo/converter.html ./dist/index.html
+        run: npm run build:demo
 
       - name: Upload production-ready build files
         uses: actions/upload-artifact@v3
