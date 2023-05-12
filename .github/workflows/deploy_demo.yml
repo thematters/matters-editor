@@ -23,14 +23,14 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Make HTML
-        run: cp ./demo/converter.html ./dist/index.html
+      # - name: Make HTML
+      #   run: cp ./demo/converter.html ./dist/index.html
 
       - name: Upload production-ready build files
         uses: actions/upload-artifact@v3
         with:
           name: production-files
-          path: ./dist
+          path: ./demo
 
   deploy:
     name: Deploy
@@ -42,9 +42,9 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: production-files
-          path: ./dist
+          path: ./demo
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ./demo

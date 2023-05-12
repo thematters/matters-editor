@@ -6,6 +6,19 @@
 npm i @matters/matters-editor
 ```
 
+## Development
+
+```bash
+# dev
+npm run dev
+
+# build
+npm run build
+
+# test
+npm run test
+```
+
 ## Editor
 
 The editor core, built with [TipTap](https://tiptap.dev) & [ProseMirror](https://prosemirror.net/), using by [thematters/matters-web](https://github.com/thematters/matters-web).
@@ -81,26 +94,23 @@ Below formats are supported to convert between Markdown and HTML:
 - Image (`<img>`) <-> `![alt text](https://example.com/a.jpg "title")`;
 - Figure (`<figure>`) <-> Raw `<figure>`;
 
-## Development
+### Examples
 
-```bash
-# dev
-npm run dev
-
-# build
-npm run build
-
-# test
-npm run test
-```
-
-## Examples
+Try HTML <=> Markdowns converters in CLI:
 
 1. Put original HTML file into `./examples/original`
 2. Run `npm run build:examples`
 3. Markdown and HTML (from Markdown) are outputted to `./examples/markdown` and `.examples/html`
 
-## Benchmark
+Build demo:
+
+```bash
+npm run demo:transformers
+```
+
+Or try live demo: https://thematters.github.io/matters-editor/transfomers
+
+### Benchmark
 
 ```bash
 npm run benchmark

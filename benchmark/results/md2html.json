@@ -1,43 +1,43 @@
 {
   "name": "Markdown to HTML",
-  "date": "2023-03-03T07:42:31.435Z",
+  "date": "2023-05-12T08:27:28.205Z",
   "version": null,
   "results": [
     {
       "name": "~500 characters",
-      "ops": 356,
-      "margin": 5.2,
+      "ops": 499,
+      "margin": 2.37,
       "percentSlower": 0
     },
     {
       "name": "~1500 characters",
-      "ops": 116,
-      "margin": 5.49,
-      "percentSlower": 67.42
+      "ops": 151,
+      "margin": 1.27,
+      "percentSlower": 69.74
     },
     {
       "name": "~2600 characters",
-      "ops": 230,
-      "margin": 5.23,
-      "percentSlower": 35.39
+      "ops": 284,
+      "margin": 1.53,
+      "percentSlower": 43.09
     },
     {
       "name": "~10000 characters",
-      "ops": 84,
-      "margin": 4.07,
-      "percentSlower": 76.4
+      "ops": 108,
+      "margin": 4.15,
+      "percentSlower": 78.36
     },
     {
       "name": "~16000 characters",
-      "ops": 78,
-      "margin": 3.2,
-      "percentSlower": 78.09
+      "ops": 92,
+      "margin": 4.86,
+      "percentSlower": 81.56
     },
     {
       "name": "~38000 characters",
-      "ops": 26,
-      "margin": 3.71,
-      "percentSlower": 92.7
+      "ops": 31,
+      "margin": 4.52,
+      "percentSlower": 93.79
     }
   ],
   "fastest": {

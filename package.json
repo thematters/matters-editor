@@ -18,13 +18,14 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "rollup -c --bundleConfigAsCjs && npm run post:build",
+    "build:demo": "rollup --config demo/rollup.config.js --bundleConfigAsCjs",
     "post:build": "node --loader ts-node/esm --experimental-specifier-resolution=node ./bin/post-build.js",
     "build:examples": "node --loader ts-node/esm --experimental-specifier-resolution=node ./bin/build-examples.ts",
     "format": "prettier --write \"{src,}/**/*.{ts,tsx,json}\"",
     "lint": "tsc && eslint",
     "test": "vitest --run",
     "prepare": "husky install",
-    "demo:converter": "npm run build && cp ./demo/converter.html ./dist/index.html && http-server ./dist -o",
+    "demo:transformers": "npm run build:demo && http-server ./demo",
     "benchmark": "node --loader ts-node/esm --experimental-specifier-resolution=node ./benchmark/index.ts"
   },
   "peerDependencies": {
@@ -76,6 +77,7 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^24.0.1",
     "@rollup/plugin-node-resolve": "^15.0.1",
+    "@rollup/plugin-replace": "^5.0.2",
     "@rollup/plugin-terser": "^0.4.0",
     "@rollup/plugin-typescript": "^11.0.0",
     "@types/fs-extra": "^11.0.1",
