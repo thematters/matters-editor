@@ -1,25 +1,69 @@
 # Matters Editor
 
-## Usage
-
-Install
+## Installation
 
 ```bash
 npm i @matters/matters-editor
 ```
 
-### Converters
+## Editor
 
-#### Usage
+The editor core, built with [TipTap](https://tiptap.dev) & [ProseMirror](https://prosemirror.net/), using by [thematters/matters-web](https://github.com/thematters/matters-web).
+
+```tsx
+import {
+  EditorContent,
+  useArticleEdtor,
+  useCommentEditor,
+} from '@matters/matters-editor'
+
+const Editor = () => {
+  const editor = useArticleEdtor({
+    editable: true,
+    placeholder: 'Write your article here...',
+    content: '', // initial content
+    onUpdate: async ({ editor, transaction }) => {
+      const content = editor.getHTML()
+      // update({ content })
+    },
+    // mentionSuggestion, // if you want to enable mention extension
+    // extensions: [...], // provides your custom extensions
+  })
+
+  return <EditorContent editor={editor} />
+}
+```
+
+## Transformers
+
+Transformers (using by [thematters/matters-server](https://github.com/thematters/matters-server)) export below functions:
+
+- `md2html`: Convert Markdown to HTML
+- `html2md`: Convert HTML to Markdown
+- `sanitizeHTML`: Sanitize HTML
+- `normalizeArticleHTML`: Normalize article HTML
+- `normalizeCommentHTML`: Normalize comment HTML
 
 ```ts
-import { md2html, html2md } from '@matters/matters-editor'
+import {
+  md2html,
+  html2md,
+  sanitizeHTML,
+  normalizeArticleHTML,
+  normalizeCommentHTML,
+} from '@matters/matters-editor'
 
 const html = md2html('**hello, world**')
 const markdown = html2md(html)
+
+const sanitizedHTML = sanitizeHTML('<script>alert("hello, world")</script>')
+const articleHTML = normalizeArticleHTML('<p>hello, world</p>')
+const comemntHTML = normalizeCommentHTML('<p>hello, world</p>')
 ```
 
-#### Formats
+### Formats
+
+Below formats are supported to convert between Markdown and HTML:
 
 - Headings (`<h1>` to `<h6>`) <-> `#` to `######`;
 - Bold (`<bold>`) <-> `**`;
