@@ -71,7 +71,9 @@ export const rehypeSanitizeOptions:
     img: ['src', 'srcSet', 'data*'],
     audio: ['controls', 'data*', ['preload', 'metadata']],
     source: ['src', 'type', 'data*'],
-    figure: [['className', 'image', 'audio', 'embed-code', 'embed-video']],
+    figure: [
+      ['className', 'image', 'audio', 'embed', 'embed-code', 'embed-video'],
+    ],
     div: [
       [
         'className',
