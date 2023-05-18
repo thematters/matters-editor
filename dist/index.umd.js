@@ -52560,7 +52560,9 @@ img.ProseMirror-separator {
           'source',
       ], false),
       protocols: __assign(__assign({}, defaultSchema.protocols), { href: ['http', 'https', 'mailto', 'tel'] }),
-      attributes: __assign(__assign({}, defaultSchema.attributes), { a: ['href', 'ref', 'target'], img: ['src', 'srcSet', 'data*'], audio: ['controls', 'data*', ['preload', 'metadata']], source: ['src', 'type', 'data*'], figure: [['className', 'image', 'audio', 'embed-code', 'embed-video']], div: [
+      attributes: __assign(__assign({}, defaultSchema.attributes), { a: ['href', 'ref', 'target'], img: ['src', 'srcSet', 'data*'], audio: ['controls', 'data*', ['preload', 'metadata']], source: ['src', 'type', 'data*'], figure: [
+              ['className', 'image', 'audio', 'embed', 'embed-code', 'embed-video'],
+          ], div: [
               [
                   'className',
                   'player',
