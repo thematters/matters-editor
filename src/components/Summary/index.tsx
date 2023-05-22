@@ -2,7 +2,7 @@ import autosize from 'autosize'
 import classNames from 'classnames'
 import React from 'react'
 
-import { KEYCODES } from '../../enums/common'
+import { KEYCODES, MAX_ARTICE_SUMMARY_LENGTH } from '../../enums/common'
 import { Texts } from '../../enums/text'
 
 /**
@@ -72,7 +72,7 @@ const MattersEditorSummary: React.FC<Props> = ({
   })
   const counterClasses = classNames({
     counter: true,
-    error: length > 200,
+    error: length > MAX_ARTICE_SUMMARY_LENGTH,
   })
 
   return (
@@ -88,7 +88,9 @@ const MattersEditorSummary: React.FC<Props> = ({
         onKeyPress={handleKeyPress}
       />
       {!readOnly && (
-        <section className={counterClasses}>({length}/200)</section>
+        <section className={counterClasses}>
+          ({length}/{MAX_ARTICE_SUMMARY_LENGTH})
+        </section>
       )}
     </section>
   )

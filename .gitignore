@@ -107,3 +107,4 @@ sources.list
 src/themes/*.json
 
 .parcel-cache
+types/**/*
