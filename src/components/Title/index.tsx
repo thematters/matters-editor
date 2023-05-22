@@ -1,6 +1,7 @@
 import classNames from 'classnames'
 import React from 'react'
 import { Texts } from '../../enums/text'
+import { MAX_ARTICE_TITLE_LENGTH } from '../../enums/common'
 
 /**
  * This is an optional component belonged to the edoitor.
@@ -21,10 +22,6 @@ interface Props {
   update: (params: { title: any }) => void
 }
 
-const getValidTitleValue = (value: any, fallback: any): string => {
-  return value && value !== fallback ? value : ''
-}
-
 const MattersEditorTitle: React.FC<Props> = ({
   defaultValue,
   readOnly,
@@ -43,6 +40,8 @@ const MattersEditorTitle: React.FC<Props> = ({
 
   React.useEffect(() => setValue(defaultValue), [defaultValue])
 
+  const title = value.slice(0, MAX_ARTICE_TITLE_LENGTH)
+
   return (
     <header className={classes}>
       <input
@@ -51,7 +50,7 @@ const MattersEditorTitle: React.FC<Props> = ({
         placeholder={texts.TITLE_PLACEHOLDER}
         onChange={handleChange}
         onBlur={handleBlur}
-        value={getValidTitleValue(value, texts.TITLE_FALLBACK)}
+        value={title}
       />
     </header>
   )
