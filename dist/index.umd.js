@@ -24106,7 +24106,12 @@ img.ProseMirror-separator {
               { class: 'audio' },
               [
                   'audio',
-                  { controls: true },
+                  {
+                      controls: true,
+                      // for backward compatibility
+                      // can be removed when fully switch to new editor
+                      'data-file-name': HTMLAttributes.title,
+                  },
                   [
                       'source',
                       {
@@ -24222,6 +24227,16 @@ img.ProseMirror-separator {
       },
   });
 
+  var Provider;
+  (function (Provider) {
+      Provider["YouTube"] = "youtube";
+      Provider["Vimeo"] = "vimeo";
+      Provider["Bilibili"] = "bilibili";
+      // Twitter = 'twitter',
+      Provider["Instagram"] = "instagram";
+      Provider["JSFiddle"] = "jsfiddle";
+      Provider["CodePen"] = "codepen";
+  })(Provider || (Provider = {}));
   var normalizeEmbedURL = function (url) {
       var fallbackReturn = {
           url: '',
@@ -24273,7 +24288,7 @@ img.ProseMirror-separator {
           }
           return {
               url: "https://www.youtube.com/embed/".concat(id) + (qs ? "?=".concat(qs) : ''),
-              provider: 'youtube',
+              provider: Provider.YouTube,
               allowfullscreen: true,
               sandbox: [],
           };
@@ -24290,7 +24305,7 @@ img.ProseMirror-separator {
           var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
           return {
               url: "https://player.vimeo.com/video/".concat(id),
-              provider: 'vimeo',
+              provider: Provider.Vimeo,
               allowfullscreen: true,
               sandbox: [],
           };
@@ -24322,7 +24337,7 @@ img.ProseMirror-separator {
           }
           return {
               url: "https://player.bilibili.com/player.html?bvid=".concat(id),
-              provider: 'bilibili',
+              provider: Provider.Bilibili,
               allowfullscreen: true,
               sandbox: [],
           };
@@ -24343,7 +24358,7 @@ img.ProseMirror-separator {
               .slice(-1)[0];
           return {
               url: "https://www.instagram.com/p/".concat(id, "/embed"),
-              provider: 'instagram',
+              provider: Provider.Instagram,
               allowfullscreen: false,
               sandbox: [],
           };
@@ -24368,7 +24383,7 @@ img.ProseMirror-separator {
           var id = parts.length === 1 ? parts[0] : parts[1];
           return {
               url: "https://jsfiddle.net/".concat(id, "/embedded/"),
-              provider: 'jsfiddle',
+              provider: Provider.JSFiddle,
               allowfullscreen: false,
               sandbox: [],
           };
@@ -24387,7 +24402,7 @@ img.ProseMirror-separator {
           var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
           return {
               url: "https://codepen.io/".concat(author, "/embed/preview/").concat(id),
-              provider: 'codepen',
+              provider: Provider.CodePen,
               allowfullscreen: false,
               sandbox: [],
           };
@@ -24425,9 +24440,20 @@ img.ProseMirror-separator {
       renderHTML: function (_a) {
           var HTMLAttributes = _a.HTMLAttributes;
           var _b = normalizeEmbedURL(HTMLAttributes.src), url = _b.url, provider = _b.provider, allowfullscreen = _b.allowfullscreen, sandbox = _b.sandbox;
+          // for backward compatibility
+          // can be removed when fully switch to new editor
+          var isVideo = [
+              Provider.YouTube,
+              Provider.Vimeo,
+              Provider.Bilibili,
+          ].includes(provider);
+          var isCode = [Provider.JSFiddle, Provider.CodePen].includes(provider);
+          var className = __spreadArray(__spreadArray([
+              'embed'
+          ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
           return [
               'figure',
-              __assign({ class: 'embed' }, (provider ? { 'data-provider': provider } : {})),
+              __assign({ class: className }, (provider ? { 'data-provider': provider } : {})),
               [
                   'div',
                   { class: 'iframe-container' },
