@@ -68,7 +68,7 @@ describe('Normalization', () => {
     // <iframe /> -> <iframe></iframe>
     expectNormalizeArticleHTML(
       '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0" /></div><figcaption></figcaption></figure>',
-      '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
     )
   })
 
@@ -102,24 +102,24 @@ describe('Normalization', () => {
     // identical
     expectNormalizeArticleHTML(
       '<figure class="audio"><audio controls><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>',
-      '<figure class="audio"><audio controls><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>'
+      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>'
     )
 
     // backward compatible
     expectNormalizeArticleHTML(
       '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>區塊勢 Podcast</span></figcaption></figure>',
-      '<figure class="audio"><audio controls><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>'
+      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>'
     )
 
     expectNormalizeArticleHTML(
       '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82"></audio><figcaption><span>區塊勢 Podcast</span></figcaption></figure>',
-      '<figure class="audio"><audio controls><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title"></h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>'
+      '<figure class="audio"><audio controls data-file-name=""><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title"></h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>'
     )
 
     // unknown attributes
     expectNormalizeArticleHTML(
       '<figure class="audio" something unknown><audio controls><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>',
-      '<figure class="audio"><audio controls><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>'
+      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption>區塊勢 Podcast</figcaption></figure>'
     )
 
     // unmatch
@@ -132,20 +132,20 @@ describe('Normalization', () => {
   test('figure: embeds', () => {
     // identical
     expectNormalizeArticleHTML(
-      '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
-      '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
     )
 
     // backward compatible
     expectNormalizeArticleHTML(
       '<figure class="embed-video"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" frameborder="0" allowfullscreen="true" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span></span></figcaption></figure>',
-      '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
     )
 
     // unknown attributes
     expectNormalizeArticleHTML(
       '<figure class="embed" something unknown data-provider="youtube" style="font-size: 500"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
-      '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
     )
 
     // unmatch
@@ -168,7 +168,7 @@ describe('Normalization', () => {
     youtubeUrls.forEach((url) => {
       expectNormalizeArticleHTML(
         `<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="${url}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`,
-        `<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="${youtubeTargetUrl}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`
+        `<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="${youtubeTargetUrl}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`
       )
     })
   })
@@ -186,7 +186,7 @@ describe('Normalization', () => {
     vimeoUrls.forEach((url) => {
       expectNormalizeArticleHTML(
         `<figure class="embed" data-provider="vimeo"><div class="iframe-container"><iframe src="${url}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`,
-        `<figure class="embed" data-provider="vimeo"><div class="iframe-container"><iframe src="${vimeoTargetUrl}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`
+        `<figure class="embed embed-video" data-provider="vimeo"><div class="iframe-container"><iframe src="${vimeoTargetUrl}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`
       )
     })
   })
@@ -206,7 +206,7 @@ describe('Normalization', () => {
     bilibiliUrls.forEach((url) => {
       expectNormalizeArticleHTML(
         `<figure class="embed" data-provider="bilibili"><div class="iframe-container"><iframe src="${url}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`,
-        `<figure class="embed" data-provider="bilibili"><div class="iframe-container"><iframe src="${bilibiliTargetUrl}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`
+        `<figure class="embed embed-video" data-provider="bilibili"><div class="iframe-container"><iframe src="${bilibiliTargetUrl}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`
       )
     })
   })
@@ -245,7 +245,7 @@ describe('Normalization', () => {
     jsfiddleUrls.forEach((url) => {
       expectNormalizeArticleHTML(
         `<figure class="embed" data-provider="jsfiddle"><div class="iframe-container"><iframe src="${url}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`,
-        `<figure class="embed" data-provider="jsfiddle"><div class="iframe-container"><iframe src="${jsfiddleTargetUrl}" loading="lazy" frameborder="0"></iframe></div><figcaption></figcaption></figure>`
+        `<figure class="embed embed-code" data-provider="jsfiddle"><div class="iframe-container"><iframe src="${jsfiddleTargetUrl}" loading="lazy" frameborder="0"></iframe></div><figcaption></figcaption></figure>`
       )
     })
   })
@@ -263,7 +263,7 @@ describe('Normalization', () => {
     codepenUrls.forEach((url) => {
       expectNormalizeArticleHTML(
         `<figure class="embed" data-provider="codepen"><div class="iframe-container"><iframe src="${url}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`,
-        `<figure class="embed" data-provider="codepen"><div class="iframe-container"><iframe src="${codepenTargetUrl}" loading="lazy" frameborder="0"></iframe></div><figcaption></figcaption></figure>`
+        `<figure class="embed embed-code" data-provider="codepen"><div class="iframe-container"><iframe src="${codepenTargetUrl}" loading="lazy" frameborder="0"></iframe></div><figcaption></figcaption></figure>`
       )
     })
   })

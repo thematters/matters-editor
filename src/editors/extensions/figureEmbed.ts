@@ -34,12 +34,6 @@ declare module '@tiptap/core' {
   }
 }
 
-// if (value.match(/http(s)?:\/\/jsfiddle.net\//)) {
-//   return `https://jsfiddle.net/${getPath(value)}/embedded/`
-// }
-// if (value.match(/http(s)?:\/\/(button\.)?like\.co\//)) {
-//   return URL_LIKE_BUTTON
-// }
 type NormalizeEmbedURLReturn = {
   url: string
   provider?:
@@ -53,6 +47,17 @@ type NormalizeEmbedURLReturn = {
   allowfullscreen: boolean
   sandbox: Array<'allow-scripts' | 'allow-same-origin' | 'allow-popups'>
 }
+
+enum Provider {
+  YouTube = 'youtube',
+  Vimeo = 'vimeo',
+  Bilibili = 'bilibili',
+  // Twitter = 'twitter',
+  Instagram = 'instagram',
+  JSFiddle = 'jsfiddle',
+  CodePen = 'codepen',
+}
+
 export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
   const fallbackReturn: NormalizeEmbedURLReturn = {
     url: '',
@@ -109,7 +114,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
 
     return {
       url: `https://www.youtube.com/embed/${id}` + (qs ? `?=${qs}` : ''),
-      provider: 'youtube',
+      provider: Provider.YouTube,
       allowfullscreen: true,
       sandbox: [],
     }
@@ -129,7 +134,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
     const id = pathname.replace(/\/$/, '').split('/').slice(-1)[0]
     return {
       url: `https://player.vimeo.com/video/${id}`,
-      provider: 'vimeo',
+      provider: Provider.Vimeo,
       allowfullscreen: true,
       sandbox: [],
     }
@@ -163,7 +168,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
 
     return {
       url: `https://player.bilibili.com/player.html?bvid=${id}`,
-      provider: 'bilibili',
+      provider: Provider.Bilibili,
       allowfullscreen: true,
       sandbox: [],
     }
@@ -186,7 +191,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
       .slice(-1)[0]
     return {
       url: `https://www.instagram.com/p/${id}/embed`,
-      provider: 'instagram',
+      provider: Provider.Instagram,
       allowfullscreen: false,
       sandbox: [],
     }
@@ -212,7 +217,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
     const id = parts.length === 1 ? parts[0] : parts[1]
     return {
       url: `https://jsfiddle.net/${id}/embedded/`,
-      provider: 'jsfiddle',
+      provider: Provider.JSFiddle,
       allowfullscreen: false,
       sandbox: [],
     }
@@ -232,7 +237,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
     const id = pathname.replace(/\/$/, '').split('/').slice(-1)[0]
     return {
       url: `https://codepen.io/${author}/embed/preview/${id}`,
-      provider: 'codepen',
+      provider: Provider.CodePen,
       allowfullscreen: false,
       sandbox: [],
     }
@@ -279,9 +284,25 @@ export const FigureEmbed = Node.create({
       HTMLAttributes.src
     )
 
+    // for backward compatibility
+    // can be removed when fully switch to new editor
+    const isVideo = [
+      Provider.YouTube,
+      Provider.Vimeo,
+      Provider.Bilibili,
+    ].includes(provider as Provider)
+    const isCode = [Provider.JSFiddle, Provider.CodePen].includes(
+      provider as Provider
+    )
+    const className = [
+      'embed',
+      ...(isVideo ? [`embed-video`] : []),
+      ...(isCode ? [`embed-code`] : []),
+    ].join(' ')
+
     return [
       'figure',
-      { class: 'embed', ...(provider ? { 'data-provider': provider } : {}) },
+      { class: className, ...(provider ? { 'data-provider': provider } : {}) },
       [
         'div',
         { class: 'iframe-container' },
@@ -306,26 +327,24 @@ export const FigureEmbed = Node.create({
 
   addCommands() {
     return {
-      setFigureEmbed:
-        ({ caption, position, ...attrs }) =>
-        ({ chain }) => {
-          const insertContent = [
-            {
-              type: this.name,
-              attrs,
-              content: caption ? [{ type: 'text', text: caption }] : [],
-            },
-            {
-              type: 'paragraph',
-            },
-          ]
+      setFigureEmbed: ({ caption, position, ...attrs }) => ({ chain }) => {
+        const insertContent = [
+          {
+            type: this.name,
+            attrs,
+            content: caption ? [{ type: 'text', text: caption }] : [],
+          },
+          {
+            type: 'paragraph',
+          },
+        ]
 
-          if (!position) {
-            return chain().insertContent(insertContent).focus().run()
-          }
+        if (!position) {
+          return chain().insertContent(insertContent).focus().run()
+        }
 
-          return chain().insertContentAt(position, insertContent).focus().run()
-        },
+        return chain().insertContentAt(position, insertContent).focus().run()
+      },
     }
   },
 

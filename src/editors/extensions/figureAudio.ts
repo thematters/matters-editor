@@ -82,7 +82,12 @@ export const FigureAudio = Node.create({
       { class: 'audio' },
       [
         'audio',
-        { controls: true },
+        {
+          controls: true,
+          // for backward compatibility
+          // can be removed when fully switch to new editor
+          'data-file-name': HTMLAttributes.title,
+        },
         [
           'source',
           {
@@ -119,26 +124,24 @@ export const FigureAudio = Node.create({
 
   addCommands() {
     return {
-      setFigureAudio:
-        ({ caption, position, ...attrs }) =>
-        ({ chain }) => {
-          const insertContent = [
-            {
-              type: this.name,
-              attrs,
-              content: caption ? [{ type: 'text', text: caption }] : [],
-            },
-            {
-              type: 'paragraph',
-            },
-          ]
+      setFigureAudio: ({ caption, position, ...attrs }) => ({ chain }) => {
+        const insertContent = [
+          {
+            type: this.name,
+            attrs,
+            content: caption ? [{ type: 'text', text: caption }] : [],
+          },
+          {
+            type: 'paragraph',
+          },
+        ]
 
-          if (!position) {
-            return chain().insertContent(insertContent).focus().run()
-          }
+        if (!position) {
+          return chain().insertContent(insertContent).focus().run()
+        }
 
-          return chain().insertContentAt(position, insertContent).focus().run()
-        },
+        return chain().insertContentAt(position, insertContent).focus().run()
+      },
     }
   },
 
