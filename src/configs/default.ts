@@ -11,11 +11,11 @@ export const FORMAT_CONFIG = [
   // inline
   'bold',
   'code',
-  'italic',
+  // 'italic',
   'link',
   'strike',
   'script',
-  'underline',
+  // 'underline',
 
   // block
   'header',
@@ -41,7 +41,14 @@ export const FORMAT_CONFIG = [
 
 export const MODULE_CONFIG = {
   toolbar: [
-    [{ header: '2' }, 'bold', 'italic', 'strike', 'underline', 'code-block'],
+    [
+      { header: '2' },
+      'bold',
+      // 'italic',
+      'strike',
+      // 'underline',
+      'code-block',
+    ],
     ['blockquote', { list: 'ordered' }, { list: 'bullet' }, 'link'],
   ],
   clipboard: {

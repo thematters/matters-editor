@@ -3,8 +3,8 @@ import * as config from './default'
 export const FORMAT_CONFIG = [
   // inline
   'bold',
-  'italic',
-  'underline',
+  // 'italic',
+  // 'underline',
 
   // block
   'blockquote',
@@ -22,7 +22,11 @@ export const FORMAT_CONFIG = [
 export const MODULE_CONFIG = {
   ...config.MODULE_CONFIG,
   toolbar: [
-    ['bold', 'italic', 'underline'],
+    [
+      'bold',
+      // 'italic',
+      // 'underline'
+    ],
     ['blockquote', { list: 'ordered' }, { list: 'bullet' }, 'link'],
   ],
 }
