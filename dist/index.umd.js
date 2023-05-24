@@ -24274,7 +24274,7 @@ img.ProseMirror-separator {
       ].includes(hostname);
       if (isYouTube) {
           var v = searchParams.get('v');
-          var t = searchParams.get('t');
+          var t = searchParams.get('t') || searchParams.get('start');
           var qs = new URLSearchParams(__assign({ rel: '0' }, (t ? { start: t } : {}))).toString();
           var id = '';
           if (v) {
@@ -24287,7 +24287,7 @@ img.ProseMirror-separator {
               id = pathname.split('/')[1];
           }
           return {
-              url: "https://www.youtube.com/embed/".concat(id) + (qs ? "?=".concat(qs) : ''),
+              url: "https://www.youtube.com/embed/".concat(id) + (qs ? "?".concat(qs) : ''),
               provider: Provider.YouTube,
               allowfullscreen: true,
               sandbox: [],
