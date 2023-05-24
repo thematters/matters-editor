@@ -97,7 +97,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
   ].includes(hostname)
   if (isYouTube) {
     const v = searchParams.get('v')
-    const t = searchParams.get('t')
+    const t = searchParams.get('t') || searchParams.get('start')
     const qs = new URLSearchParams({
       rel: '0',
       ...(t ? { start: t } : {}),
@@ -113,7 +113,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
     }
 
     return {
-      url: `https://www.youtube.com/embed/${id}` + (qs ? `?=${qs}` : ''),
+      url: `https://www.youtube.com/embed/${id}` + (qs ? `?${qs}` : ''),
       provider: Provider.YouTube,
       allowfullscreen: true,
       sandbox: [],
@@ -327,24 +327,26 @@ export const FigureEmbed = Node.create({
 
   addCommands() {
     return {
-      setFigureEmbed: ({ caption, position, ...attrs }) => ({ chain }) => {
-        const insertContent = [
-          {
-            type: this.name,
-            attrs,
-            content: caption ? [{ type: 'text', text: caption }] : [],
-          },
-          {
-            type: 'paragraph',
-          },
-        ]
+      setFigureEmbed:
+        ({ caption, position, ...attrs }) =>
+        ({ chain }) => {
+          const insertContent = [
+            {
+              type: this.name,
+              attrs,
+              content: caption ? [{ type: 'text', text: caption }] : [],
+            },
+            {
+              type: 'paragraph',
+            },
+          ]
 
-        if (!position) {
-          return chain().insertContent(insertContent).focus().run()
-        }
+          if (!position) {
+            return chain().insertContent(insertContent).focus().run()
+          }
 
-        return chain().insertContentAt(position, insertContent).focus().run()
-      },
+          return chain().insertContentAt(position, insertContent).focus().run()
+        },
     }
   },
 

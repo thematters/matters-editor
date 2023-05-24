@@ -67,8 +67,8 @@ describe('Normalization', () => {
 
     // <iframe /> -> <iframe></iframe>
     expectNormalizeArticleHTML(
-      '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0" /></div><figcaption></figcaption></figure>',
-      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
+      '<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" loading="lazy" allowfullscreen frameborder="0" /></div><figcaption></figcaption></figure>',
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
     )
   })
 
@@ -132,25 +132,25 @@ describe('Normalization', () => {
   test('figure: embeds', () => {
     // identical
     expectNormalizeArticleHTML(
-      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
-      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
     )
 
     // backward compatible
     expectNormalizeArticleHTML(
       '<figure class="embed-video"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" frameborder="0" allowfullscreen="true" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span></span></figcaption></figure>',
-      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
     )
 
     // unknown attributes
     expectNormalizeArticleHTML(
-      '<figure class="embed" something unknown data-provider="youtube" style="font-size: 500"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
-      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
+      '<figure class="embed" something unknown data-provider="youtube" style="font-size: 500"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
+      '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>'
     )
 
     // unmatch
     expectNormalizeArticleHTML(
-      '<figure class="unknown class embed" something unknown data-provider="youtube" style="font-size: 500"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
+      '<figure class="unknown class embed" something unknown data-provider="youtube" style="font-size: 500"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
       '<p></p>'
     )
   })
@@ -164,7 +164,7 @@ describe('Normalization', () => {
       'https://youtu.be/Zk7DppcfaMY/',
       'https://youtu.be/Zk7DppcfaMY?abc=123',
     ]
-    const youtubeTargetUrl = 'https://www.youtube.com/embed/Zk7DppcfaMY?=rel=0'
+    const youtubeTargetUrl = 'https://www.youtube.com/embed/Zk7DppcfaMY?rel=0'
     youtubeUrls.forEach((url) => {
       expectNormalizeArticleHTML(
         `<figure class="embed" data-provider="youtube"><div class="iframe-container"><iframe src="${url}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`,
