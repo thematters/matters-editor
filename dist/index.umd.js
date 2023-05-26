@@ -52586,7 +52586,7 @@ img.ProseMirror-separator {
           'source',
       ], false),
       protocols: __assign(__assign({}, defaultSchema.protocols), { href: ['http', 'https', 'mailto', 'tel'] }),
-      attributes: __assign(__assign({}, defaultSchema.attributes), { a: ['href', 'ref', 'target'], img: ['src', 'srcSet', 'data*'], audio: ['controls', 'data*', ['preload', 'metadata']], source: ['src', 'type', 'data*'], figure: [
+      attributes: __assign(__assign({}, defaultSchema.attributes), { a: ['href', 'ref', 'target', 'className', 'data*'], img: ['src', 'srcSet', 'data*'], audio: ['controls', 'data*', ['preload', 'metadata']], source: ['src', 'type', 'data*'], figure: [
               ['className', 'image', 'audio', 'embed', 'embed-code', 'embed-video'],
           ], div: [
               [
@@ -68991,12 +68991,12 @@ img.ProseMirror-separator {
   };
   var normalizeArticleHTML = function (html) {
       var extensions = makeArticleEditorExtensions({});
-      var normalizer = makeNormalizer(extensions);
+      var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
       return normalizer(html);
   };
   var normalizeCommentHTML = function (html) {
       var extensions = makeCommentEditorExtensions({});
-      var normalizer = makeNormalizer(extensions);
+      var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
       return normalizer(html);
   };
 
