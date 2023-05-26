@@ -3,6 +3,7 @@ import { getSchema } from '@tiptap/core'
 import { DOMParser, DOMSerializer, Node } from '@tiptap/pm/model'
 import { createHTMLDocument, parseHTML, VHTMLDocument } from 'zeed-dom'
 import {
+  Mention,
   makeArticleEditorExtensions,
   makeCommentEditorExtensions,
 } from '../editors/extensions'
@@ -29,12 +30,12 @@ export const makeNormalizer = (extensions: Extensions) => {
 
 export const normalizeArticleHTML = (html: string): string => {
   const extensions = makeArticleEditorExtensions({})
-  const normalizer = makeNormalizer(extensions)
+  const normalizer = makeNormalizer([...extensions, Mention])
   return normalizer(html)
 }
 
 export const normalizeCommentHTML = (html: string): string => {
   const extensions = makeCommentEditorExtensions({})
-  const normalizer = makeNormalizer(extensions)
+  const normalizer = makeNormalizer([...extensions, Mention])
   return normalizer(html)
 }

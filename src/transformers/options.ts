@@ -67,7 +67,7 @@ export const rehypeSanitizeOptions:
   },
   attributes: {
     ...defaultSchema.attributes,
-    a: ['href', 'ref', 'target'],
+    a: ['href', 'ref', 'target', 'className', 'data*'],
     img: ['src', 'srcSet', 'data*'],
     audio: ['controls', 'data*', ['preload', 'metadata']],
     source: ['src', 'type', 'data*'],
