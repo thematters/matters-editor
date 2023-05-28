@@ -167,6 +167,7 @@ export const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
     }
 
     return {
+      // url: `https://player.bilibili.com/player.html?bvid=${id}&autoplay=0`,
       url: `https://player.bilibili.com/player.html?bvid=${id}`,
       provider: Provider.Bilibili,
       allowfullscreen: true,

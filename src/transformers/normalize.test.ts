@@ -203,6 +203,8 @@ describe('Normalization', () => {
     ]
     const bilibiliTargetUrl =
       'https://player.bilibili.com/player.html?bvid=BV1bW411n7fY'
+    // 'https://player.bilibili.com/player.html?bvid=BV1bW411n7fY&autoplay=0'
+
     bilibiliUrls.forEach((url) => {
       expectNormalizeArticleHTML(
         `<figure class="embed" data-provider="bilibili"><div class="iframe-container"><iframe src="${url}" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>`,
