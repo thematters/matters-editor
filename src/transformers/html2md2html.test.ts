@@ -5,6 +5,7 @@ import { unified } from 'unified'
 import rehypeStringify from 'rehype-stringify'
 import rehypeFormat from 'rehype-format'
 import rehypeParse from 'rehype-parse'
+import { stripIndent } from 'common-tags'
 
 /**
  * Utils
@@ -113,6 +114,30 @@ describe('HTML to Markdown: Basic Formats', () => {
 
   test('line breaks', () => {
     html2md2html('<p>line<br>breaks</p>', 'line\\\nbreaks')
+    html2md2html(
+      '<p>line<br>breaks</p>',
+      stripIndent`
+        line\\
+        breaks
+      `
+    )
+    html2md2html('<p><br></p>', '<p><br></p>')
+    html2md2html('<p><br/></p>', '<p><br></p>')
+    html2md2html('<p><br><br></p>', '<p><br><br></p>')
+    html2md2html(
+      '<p>a<br>b<br>c</p>',
+      stripIndent`
+        a\\
+        b\\
+        c
+      `
+    )
+    html2md2html('<h1><br></h1>', '<h1><br></h1>')
+    html2md2html('<h2><br></h2>', '<h2><br></h2>')
+    html2md2html('<h3><br></h3>', '<h3><br></h3>')
+    html2md2html('<h4><br></h4>', '<h4><br></h4>')
+    html2md2html('<h5><br></h5>', '<h5><br></h5>')
+    html2md2html('<h6><br></h6>', '<h6><br></h6>')
   })
 
   test('horizontal rules', () => {
@@ -140,12 +165,12 @@ describe('HTML to Markdown: Basic Formats', () => {
         <li>Fourth item</li>
       </ol>
       `,
+      stripIndent`
+        1. First item
+        2. Second item
+        3. Third item
+        4. Fourth item
       `
-1. First item
-2. Second item
-3. Third item
-4. Fourth item
-`
     )
   })
 
@@ -171,18 +196,18 @@ describe('HTML to Markdown: Basic Formats', () => {
         </li>
       </ol>
       `,
+      stripIndent`
+        1. First item
+
+        2. Second item
+
+        3. Third item
+
+           1. Indented item
+           2. Indented item
+
+        4. Fourth item
       `
-1. First item
-
-2. Second item
-
-3. Third item
-
-   1. Indented item
-   2. Indented item
-
-4. Fourth item
-`
     )
   })
 
@@ -196,12 +221,12 @@ describe('HTML to Markdown: Basic Formats', () => {
         <li>Fourth item</li>
       </ul>
       `,
+      stripIndent`
+        * First item
+        * Second item
+        * Third item
+        * Fourth item
       `
-* First item
-* Second item
-* Third item
-* Fourth item
-`
     )
   })
 
@@ -227,18 +252,18 @@ describe('HTML to Markdown: Basic Formats', () => {
         </li>
       </ul>
       `,
+      stripIndent`
+        * First item
+
+        * Second item
+
+        * Third item
+
+          * Indented item
+          * Indented item
+
+        * Fourth item
       `
-* First item
-
-* Second item
-
-* Third item
-
-  * Indented item
-  * Indented item
-
-* Fourth item
-`
     )
   })
 
@@ -404,62 +429,64 @@ describe('HTML to Markdown: Full Content', () => {
         <figcaption><span></span></figcaption>
       </figure>
       `,
-      `Cupidatat officia aute adipisicing ut aute reprehenderit ea duis. Commodo elit dolore deserunt occaecat esse ut sint ad eu non. Exercitation dolor in aliquip pariatur non exercitation officia reprehenderit laborum ea duis. Magna tempor eu est.
+      stripIndent`
+        Cupidatat officia aute adipisicing ut aute reprehenderit ea duis. Commodo elit dolore deserunt occaecat esse ut sint ad eu non. Exercitation dolor in aliquip pariatur non exercitation officia reprehenderit laborum ea duis. Magna tempor eu est.
 
-Irure aliqua labore nisi proident\\
-aliqua ullamco\\
-id magna\\
-enim.
+        Irure aliqua labore nisi proident\\
+        aliqua ullamco\\
+        id magna\\
+        enim.
 
-## Basic Formats
+        ## Basic Formats
 
-Do ea esse amet **excepteur** **esse** incididunt irure.
+        Do ea esse amet **excepteur** **esse** incididunt irure.
 
-Voluptate _aute magna_ sint dolore sunt id tempor.
+        Voluptate _aute magna_ sint dolore sunt id tempor.
 
-Quis non commodo ex id in non id cillum duis voluptate pariatur elit.
+        Quis non commodo ex id in non id cillum duis voluptate pariatur elit.
 
-Excepteur nostrud _reprehenderit amet_ adipisicing enim cillum.
+        Excepteur nostrud _reprehenderit amet_ adipisicing enim cillum.
 
-Nostrud consequat **_mollit irure esse_** laborum amet cupidatat irure ipsum.
+        Nostrud consequat **_mollit irure esse_** laborum amet cupidatat irure ipsum.
 
-Dolore labore laboris **consequat nostrud** Lorem irure excepteur incididunt adipisicing id.
+        Dolore labore laboris **consequat nostrud** Lorem irure excepteur incididunt adipisicing id.
 
-Ullamco cillum **_esse anim dolore_** duis adipisicing.
+        Ullamco cillum **_esse anim dolore_** duis adipisicing.
 
-Cillum incididunt **_nostrud sunt occaecat_** fugiat commodo quis in pariatur exercitation.
+        Cillum incididunt **_nostrud sunt occaecat_** fugiat commodo quis in pariatur exercitation.
 
-Veniam pariatur labore [consectetur](https://google.com) laborum.
+        Veniam pariatur labore [consectetur](https://google.com) laborum.
 
-> Fugiat consectetur culpa anim enim sit nisi culpa consequat Lorem ipsum.\\
-> \\
-> Qui proident non pariatur veniam est irure.
+        > Fugiat consectetur culpa anim enim sit nisi culpa consequat Lorem ipsum.\\
+        > \\
+        > Qui proident non pariatur veniam est irure.
 
----
+        ---
 
-## Lists
+        ## Lists
 
-1. Consectetur consequat exercitation aute ullamco mollit cillum sunt.
-2. Adipisicing enim laboris dolore mollit.
+        1. Consectetur consequat exercitation aute ullamco mollit cillum sunt.
+        2. Adipisicing enim laboris dolore mollit.
 
-Qui velit id cupidatat reprehenderit velit sit.
+        Qui velit id cupidatat reprehenderit velit sit.
 
-* Eiusmod sunt in ipsum cupidatat sint.
-* Consectetur voluptate ipsum est.
+        * Eiusmod sunt in ipsum cupidatat sint.
+        * Consectetur voluptate ipsum est.
 
-Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum minim velit nisi.
+        Anim aute id labore exercitation reprehenderit ut sunt sit excepteur cillum minim velit nisi.
 
-## Image & Audio
+        ## Image & Audio
 
-<figure class="image"><img src="https://assets-develop.matters.news/embed/c746aa26-794f-4a26-9dd9-c2c3e72f89f4.jpeg" data-asset-id="c746aa26-794f-4a26-9dd9-c2c3e72f89f4"><figcaption><span>Ullamco cupidatat laborum eiusmod laborum.</span></figcaption></figure>
+        <figure class="image"><img src="https://assets-develop.matters.news/embed/c746aa26-794f-4a26-9dd9-c2c3e72f89f4.jpeg" data-asset-id="c746aa26-794f-4a26-9dd9-c2c3e72f89f4"><figcaption><span>Ullamco cupidatat laborum eiusmod laborum.</span></figcaption></figure>
 
-<figure class="audio"><audio controls data-file-name="file_example_MP3_700KB" preload="metadata"><source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5"></audio><div class="player"><header><div class="meta"><h4 class="title">file_example_MP3_700KB</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>Non non et deserunt mollit reprehenderit consectetur est laboris in aliqua irure.</span></figcaption></figure>
+        <figure class="audio"><audio controls data-file-name="file_example_MP3_700KB" preload="metadata"><source src="https://assets-develop.matters.news/embedaudio/b320f5ce-2828-4358-9e71-aab3cf2a3ce5.mpga" type="audio/mpeg" data-asset-id="b320f5ce-2828-4358-9e71-aab3cf2a3ce5"></audio><div class="player"><header><div class="meta"><h4 class="title">file_example_MP3_700KB</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>Non non et deserunt mollit reprehenderit consectetur est laboris in aliqua irure.</span></figcaption></figure>
 
-## Embeds
+        ## Embeds
 
-<figure class="embed-video"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/VQKMoT-6XSg?rel=0" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>Sit cillum minim minim excepteur nostrud Lorem aliquip sint elit reprehenderit aute ipsum minim.</span></figcaption></figure>
+        <figure class="embed-video"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/VQKMoT-6XSg?rel=0" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>Sit cillum minim minim excepteur nostrud Lorem aliquip sint elit reprehenderit aute ipsum minim.</span></figcaption></figure>
 
-<figure class="embed-code"><div class="iframe-container"><iframe src="https://jsfiddle.net/scarabresearch/2bzfrg59/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span></span></figcaption></figure>`
+        <figure class="embed-code"><div class="iframe-container"><iframe src="https://jsfiddle.net/scarabresearch/2bzfrg59/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span></span></figcaption></figure>
+`
     )
   })
 })
