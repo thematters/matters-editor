@@ -56,7 +56,11 @@ export const makeArticleEditorExtensions = ({
     Code,
     CodeBlock,
     Blockquote,
-    HardBreak,
+    HardBreak.configure({
+      HTMLAttributes: {
+        class: 'smart',
+      },
+    }),
     HorizontalRule,
     OrderedList,
     ListItem,
@@ -98,7 +102,11 @@ export const makeCommentEditorExtensions = ({
     Code,
     CodeBlock,
     Blockquote,
-    HardBreak,
+    HardBreak.configure({
+      HTMLAttributes: {
+        class: 'smart',
+      },
+    }),
     HorizontalRule,
     ListItem,
     OrderedList,
