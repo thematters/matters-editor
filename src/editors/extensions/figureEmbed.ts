@@ -256,6 +256,9 @@ export const FigureEmbed = Node.create({
   draggable: true,
   isolating: true,
 
+  // disallows all marks for figcaption
+  marks: '',
+
   addAttributes() {
     return {
       class: {

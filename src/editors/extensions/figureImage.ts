@@ -35,6 +35,9 @@ export const FigureImage = Node.create({
   draggable: true,
   isolating: true,
 
+  // disallows all marks for figcaption
+  marks: '',
+
   addAttributes() {
     return {
       class: {

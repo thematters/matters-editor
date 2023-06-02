@@ -53,6 +53,9 @@ export const FigureAudio = Node.create({
   draggable: true,
   isolating: true,
 
+  // disallows all marks for figcaption
+  marks: '',
+
   addAttributes() {
     return {
       src: {
@@ -124,24 +127,26 @@ export const FigureAudio = Node.create({
 
   addCommands() {
     return {
-      setFigureAudio: ({ caption, position, ...attrs }) => ({ chain }) => {
-        const insertContent = [
-          {
-            type: this.name,
-            attrs,
-            content: caption ? [{ type: 'text', text: caption }] : [],
-          },
-          {
-            type: 'paragraph',
-          },
-        ]
+      setFigureAudio:
+        ({ caption, position, ...attrs }) =>
+        ({ chain }) => {
+          const insertContent = [
+            {
+              type: this.name,
+              attrs,
+              content: caption ? [{ type: 'text', text: caption }] : [],
+            },
+            {
+              type: 'paragraph',
+            },
+          ]
 
-        if (!position) {
-          return chain().insertContent(insertContent).focus().run()
-        }
+          if (!position) {
+            return chain().insertContent(insertContent).focus().run()
+          }
 
-        return chain().insertContentAt(position, insertContent).focus().run()
-      },
+          return chain().insertContentAt(position, insertContent).focus().run()
+        },
     }
   },
 
