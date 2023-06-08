@@ -29,7 +29,7 @@ declare module '@tiptap/core' {
 const pluginName = 'figureImage'
 
 export const FigureImage = Node.create({
-  name: 'figureImage',
+  name: pluginName,
   group: 'block',
   content: 'text*',
   draggable: true,
@@ -159,10 +159,9 @@ export const FigureImage = Node.create({
 
           transformPastedHTML(html) {
             // remove
-            html = html.replace(
-              /<figure.*class=.image.*[\n]*.*?<\/figure>/g,
-              ''
-            )
+            html = html
+              .replace(/\n/g, '')
+              .replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '')
             return html
           },
         },

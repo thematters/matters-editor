@@ -207,10 +207,9 @@ export const FigureAudio = Node.create({
 
           transformPastedHTML(html) {
             // remove
-            html = html.replace(
-              /<figure.*class=.audio.*[\n]*.*?<\/figure>/g,
-              ''
-            )
+            html = html
+              .replace(/\n/g, '')
+              .replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '')
             return html
           },
         },

@@ -411,10 +411,9 @@ export const FigureEmbed = Node.create({
 
           transformPastedHTML(html) {
             // remove
-            html = html.replace(
-              /<figure.*class=.embed.*[\n]*.*?<\/figure>/g,
-              ''
-            )
+            html = html
+              .replace(/\n/g, '')
+              .replace(/<figure.*class=.embed.*[\n]*.*?<\/figure>/g, '')
             return html
           },
         },
