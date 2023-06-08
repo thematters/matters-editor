@@ -22683,60 +22683,6 @@ img.ProseMirror-separator {
       },
   });
 
-  const HorizontalRule = Node.create({
-      name: 'horizontalRule',
-      addOptions() {
-          return {
-              HTMLAttributes: {},
-          };
-      },
-      group: 'block',
-      parseHTML() {
-          return [{ tag: 'hr' }];
-      },
-      renderHTML({ HTMLAttributes }) {
-          return ['hr', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes)];
-      },
-      addCommands() {
-          return {
-              setHorizontalRule: () => ({ chain }) => {
-                  return (chain()
-                      .insertContent({ type: this.name })
-                      // set cursor after horizontal rule
-                      .command(({ tr, dispatch }) => {
-                      var _a;
-                      if (dispatch) {
-                          const { $to } = tr.selection;
-                          const posAfter = $to.end();
-                          if ($to.nodeAfter) {
-                              tr.setSelection(TextSelection.create(tr.doc, $to.pos));
-                          }
-                          else {
-                              // add node after horizontal rule if it’s the end of the document
-                              const node = (_a = $to.parent.type.contentMatch.defaultType) === null || _a === void 0 ? void 0 : _a.create();
-                              if (node) {
-                                  tr.insert(posAfter, node);
-                                  tr.setSelection(TextSelection.create(tr.doc, posAfter));
-                              }
-                          }
-                          tr.scrollIntoView();
-                      }
-                      return true;
-                  })
-                      .run());
-              },
-          };
-      },
-      addInputRules() {
-          return [
-              nodeInputRule({
-                  find: /^(?:---|—-|___\s|\*\*\*\s)$/,
-                  type: this.type,
-              }),
-          ];
-      },
-  });
-
   const ListItem$1 = Node.create({
       name: 'listItem',
       addOptions() {
@@ -23079,6 +23025,8 @@ img.ProseMirror-separator {
       content: 'text*',
       draggable: true,
       isolating: true,
+      // disallows all marks for figcaption
+      marks: '',
       addAttributes: function () {
           return {
               src: {
@@ -23218,7 +23166,9 @@ img.ProseMirror-separator {
                       },
                       transformPastedHTML: function (html) {
                           // remove
-                          html = html.replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '');
+                          html = html
+                              .replace(/\n/g, '')
+                              .replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '');
                           return html;
                       },
                   },
@@ -23417,6 +23367,8 @@ img.ProseMirror-separator {
       content: 'text*',
       draggable: true,
       isolating: true,
+      // disallows all marks for figcaption
+      marks: '',
       addAttributes: function () {
           return {
               class: {
@@ -23541,7 +23493,9 @@ img.ProseMirror-separator {
                       },
                       transformPastedHTML: function (html) {
                           // remove
-                          html = html.replace(/<figure.*class=.embed.*[\n]*.*?<\/figure>/g, '');
+                          html = html
+                              .replace(/\n/g, '')
+                              .replace(/<figure.*class=.embed.*[\n]*.*?<\/figure>/g, '');
                           return html;
                       },
                   },
@@ -23552,11 +23506,13 @@ img.ProseMirror-separator {
 
   var pluginName = 'figureImage';
   var FigureImage = Node.create({
-      name: 'figureImage',
+      name: pluginName,
       group: 'block',
       content: 'text*',
       draggable: true,
       isolating: true,
+      // disallows all marks for figcaption
+      marks: '',
       addAttributes: function () {
           return {
               class: {
@@ -23666,7 +23622,9 @@ img.ProseMirror-separator {
                       },
                       transformPastedHTML: function (html) {
                           // remove
-                          html = html.replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '');
+                          html = html
+                              .replace(/\n/g, '')
+                              .replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '');
                           return html;
                       },
                   },
@@ -26226,6 +26184,49 @@ img.ProseMirror-separator {
       },
   });
 
+  var HorizontalRule = Node.create({
+      name: 'horizontalRule',
+      addOptions: function () {
+          return {
+              HTMLAttributes: {},
+          };
+      },
+      group: 'block',
+      parseHTML: function () {
+          return [{ tag: 'hr' }];
+      },
+      renderHTML: function (_a) {
+          var HTMLAttributes = _a.HTMLAttributes;
+          return ['hr', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes)];
+      },
+      addCommands: function () {
+          var _this = this;
+          return {
+              setHorizontalRule: function () {
+                  return function (_a) {
+                      var chain = _a.chain;
+                      return chain()
+                          .insertContent([
+                          { type: _this.name },
+                          {
+                              type: 'paragraph',
+                          },
+                      ])
+                          .run();
+                  };
+              },
+          };
+      },
+      addInputRules: function () {
+          return [
+              nodeInputRule({
+                  find: /^(?:---|—-|___\s|\*\*\*\s)$/,
+                  type: this.type,
+              }),
+          ];
+      },
+  });
+
   var makeArticleEditorExtensions = function (_a) {
       var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
       var extensions = [
@@ -26246,7 +26247,11 @@ img.ProseMirror-separator {
           Code,
           CodeBlock,
           Blockquote,
-          HardBreak,
+          HardBreak.configure({
+              HTMLAttributes: {
+                  class: 'smart',
+              },
+          }),
           HorizontalRule,
           OrderedList,
           ListItem$1,
@@ -26278,7 +26283,11 @@ img.ProseMirror-separator {
           Code,
           CodeBlock,
           Blockquote,
-          HardBreak,
+          HardBreak.configure({
+              HTMLAttributes: {
+                  class: 'smart',
+              },
+          }),
           HorizontalRule,
           ListItem$1,
           OrderedList,
@@ -45819,20 +45828,22 @@ img.ProseMirror-separator {
   }
 
   /**
-   * @typedef {import('micromark-util-types').NormalizedExtension} NormalizedExtension
    * @typedef {import('micromark-util-types').Extension} Extension
-   * @typedef {import('micromark-util-types').Construct} Construct
+   * @typedef {import('micromark-util-types').Handles} Handles
    * @typedef {import('micromark-util-types').HtmlExtension} HtmlExtension
+   * @typedef {import('micromark-util-types').NormalizedExtension} NormalizedExtension
    */
 
 
   const hasOwnProperty$1 = {}.hasOwnProperty;
 
   /**
-   * Combine several syntax extensions into one.
+   * Combine multiple syntax extensions into one.
    *
-   * @param {Extension[]} extensions List of syntax extensions.
-   * @returns {NormalizedExtension} A single combined extension.
+   * @param {Array<Extension>} extensions
+   *   List of syntax extensions.
+   * @returns {NormalizedExtension}
+   *   A single combined extension.
    */
   function combineExtensions(extensions) {
     /** @type {NormalizedExtension} */
@@ -45849,29 +45860,35 @@ img.ProseMirror-separator {
   /**
    * Merge `extension` into `all`.
    *
-   * @param {NormalizedExtension} all Extension to merge into.
-   * @param {Extension} extension Extension to merge.
+   * @param {NormalizedExtension} all
+   *   Extension to merge into.
+   * @param {Extension} extension
+   *   Extension to merge.
    * @returns {void}
    */
   function syntaxExtension(all, extension) {
-    /** @type {string} */
+    /** @type {keyof Extension} */
     let hook;
 
     for (hook in extension) {
       const maybe = hasOwnProperty$1.call(all, hook) ? all[hook] : undefined;
+      /** @type {Record<string, unknown>} */
       const left = maybe || (all[hook] = {});
+      /** @type {Record<string, unknown> | undefined} */
       const right = extension[hook];
       /** @type {string} */
       let code;
 
-      for (code in right) {
-        if (!hasOwnProperty$1.call(left, code)) left[code] = [];
-        const value = right[code];
-        constructs(
-          // @ts-expect-error Looks like a list.
-          left[code],
-          Array.isArray(value) ? value : value ? [value] : []
-        );
+      if (right) {
+        for (code in right) {
+          if (!hasOwnProperty$1.call(left, code)) left[code] = [];
+          const value = right[code];
+          constructs(
+            // @ts-expect-error Looks like a list.
+            left[code],
+            Array.isArray(value) ? value : value ? [value] : []
+          );
+        }
       }
     }
   }
@@ -45880,13 +45897,13 @@ img.ProseMirror-separator {
    * Merge `list` into `existing` (both lists of constructs).
    * Mutates `existing`.
    *
-   * @param {unknown[]} existing
-   * @param {unknown[]} list
+   * @param {Array<unknown>} existing
+   * @param {Array<unknown>} list
    * @returns {void}
    */
   function constructs(existing, list) {
     let index = -1;
-    /** @type {unknown[]} */
+    /** @type {Array<unknown>} */
     const before = [];
 
     while (++index < list.length) {
@@ -46162,9 +46179,11 @@ img.ProseMirror-separator {
   }
 
   /**
+   * @typedef {import('micromark-util-types').Event} Event
    * @typedef {import('micromark-util-types').Extension} Extension
    * @typedef {import('micromark-util-types').Resolver} Resolver
    * @typedef {import('micromark-util-types').State} State
+   * @typedef {import('micromark-util-types').Token} Token
    * @typedef {import('micromark-util-types').TokenizeContext} TokenizeContext
    * @typedef {import('micromark-util-types').Tokenizer} Tokenizer
    *
@@ -46239,11 +46258,15 @@ img.ProseMirror-separator {
             ) {
               events[index][1].type = 'strikethroughSequence';
               events[open][1].type = 'strikethroughSequence';
+
+              /** @type {Token} */
               const strikethrough = {
                 type: 'strikethrough',
                 start: Object.assign({}, events[open][1].start),
                 end: Object.assign({}, events[index][1].end)
               };
+
+              /** @type {Token} */
               const text = {
                 type: 'strikethroughText',
                 start: Object.assign({}, events[open][1].end),
@@ -46251,6 +46274,7 @@ img.ProseMirror-separator {
               };
 
               // Opening.
+              /** @type {Array<Event>} */
               const nextEvents = [
                 ['enter', strikethrough, context],
                 ['enter', events[open][1], context],
@@ -46264,7 +46288,6 @@ img.ProseMirror-separator {
                   nextEvents,
                   nextEvents.length,
                   0,
-                  // @ts-expect-error: to do: update `mdast-util-types` to allow explicit `undefined`s.
                   resolveAll(insideSpan, events.slice(open + 1, index), context)
                 );
               }
@@ -51735,7 +51758,7 @@ img.ProseMirror-separator {
           'source',
       ], false),
       protocols: __assign(__assign({}, defaultSchema.protocols), { href: ['http', 'https', 'mailto', 'tel'] }),
-      attributes: __assign(__assign({}, defaultSchema.attributes), { a: ['href', 'ref', 'target', 'className', 'data*'], img: ['src', 'srcSet', 'data*'], audio: ['controls', 'data*', ['preload', 'metadata']], source: ['src', 'type', 'data*'], figure: [
+      attributes: __assign(__assign({}, defaultSchema.attributes), { a: ['href', 'ref', 'target', 'className', 'data*'], br: ['className'], img: ['src', 'srcSet', 'data*'], audio: ['controls', 'data*', ['preload', 'metadata']], source: ['src', 'type', 'data*'], figure: [
               ['className', 'image', 'audio', 'embed', 'embed-code', 'embed-video'],
           ], div: [
               [
