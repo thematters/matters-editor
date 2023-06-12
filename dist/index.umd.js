@@ -26233,7 +26233,7 @@ img.ProseMirror-separator {
    * but it is read-only for article revision.
    */
   var pluginName$2 = 'readyOnlyFigureImage';
-  Node.create({
+  var ReadOnlyFigureImage = Node.create({
       name: pluginName$2,
       group: 'block',
       content: 'text*',
@@ -26286,7 +26286,7 @@ img.ProseMirror-separator {
    * but it is read-only for article revision.
    */
   var pluginName$1 = 'readOnlyFigureAudio';
-  Node.create({
+  var ReadOnlyFigureAudio = Node.create({
       name: pluginName$1,
       group: 'block',
       content: 'text*',
@@ -26548,7 +26548,7 @@ img.ProseMirror-separator {
       return fallbackReturn;
   };
   var pluginName = 'readOnlyFigureEmbed';
-  Node.create({
+  var ReadOnlyFigureEmbed = Node.create({
       name: pluginName,
       group: 'block',
       content: 'text*',
@@ -26656,6 +26656,18 @@ img.ProseMirror-separator {
       }
       return extensions;
   };
+  var makeEditArticleEditorExtensions = function (_a) {
+      var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
+      var extensions = __spreadArray(__spreadArray([], baseArticleExtensions(placeholder), true), [
+          ReadOnlyFigureImage,
+          ReadOnlyFigureAudio,
+          ReadOnlyFigureEmbed,
+      ], false);
+      if (mentionSuggestion) {
+          extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
+      }
+      return extensions;
+  };
   var makeCommentEditorExtensions = function (_a) {
       var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
       var extensions = __spreadArray([], baseExtensions(placeholder), true);
@@ -26676,6 +26688,13 @@ img.ProseMirror-separator {
       var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
       var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
       var editor = useEditor(__assign({ extensions: __spreadArray(__spreadArray([], makeCommentEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions || []), true), content: content }, restProps));
+      return editor;
+  };
+
+  var useEditArticleEdtor = function (_a) {
+      var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
+      var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
+      var editor = useEditor(__assign({ extensions: __spreadArray(__spreadArray([], makeEditArticleEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions || []), true), content: content }, restProps));
       return editor;
   };
 
@@ -68932,6 +68951,7 @@ img.ProseMirror-separator {
   exports.textblockTypeInputRule = textblockTypeInputRule;
   exports.useArticleEdtor = useArticleEdtor;
   exports.useCommentEditor = useCommentEditor;
+  exports.useEditArticleEdtor = useEditArticleEdtor;
   exports.useEditor = useEditor;
   exports.wrappingInputRule = wrappingInputRule;
 
