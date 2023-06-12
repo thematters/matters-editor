@@ -21,15 +21,59 @@ import { Link } from './link'
 import { Mention, MentionSuggestion } from './mention'
 import { Bold } from './bold'
 import { HorizontalRule } from './horizontalRule'
+import { ReadOnlyFigureImage } from './readOnlyFigureImage'
+import { ReadOnlyFigureAudio } from './readOnlyFigureAudio'
+import { ReadOnlyFigureEmbed } from './readOnlyFigureEmbed'
 
 export * from './figureAudio'
 export * from './figureEmbed'
 export * from './figureImage'
+export * from './readOnlyFigureAudio'
+export * from './readOnlyFigureEmbed'
+export * from './readOnlyFigureImage'
 export * from './link'
 export * from './horizontalRule'
 export * from './mention'
 export * from './bold'
 
+const baseExtensions = (placeholder?: string) => [
+  Document,
+  History,
+  Placeholder.configure({
+    placeholder,
+  }),
+  // Basic Formats
+  Text,
+  Paragraph,
+  Bold,
+  Strike,
+  Code,
+  CodeBlock,
+  Blockquote,
+  HardBreak.configure({
+    HTMLAttributes: {
+      class: 'smart',
+    },
+  }),
+  HorizontalRule,
+  OrderedList,
+  ListItem,
+  BulletList,
+  // Custom Formats
+  Link,
+]
+
+const baseArticleExtensions = (placeholder?: string) => [
+  ...baseExtensions(placeholder),
+  Gapcursor,
+  Heading.configure({
+    levels: [2, 3],
+  }),
+]
+
+/**
+ * Article
+ */
 export type MakeArticleEditorExtensionsProps = {
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
@@ -40,34 +84,7 @@ export const makeArticleEditorExtensions = ({
   mentionSuggestion,
 }: MakeArticleEditorExtensionsProps) => {
   const extensions = [
-    Document,
-    History,
-    Gapcursor,
-    Placeholder.configure({
-      placeholder,
-    }),
-    // Basic Formats
-    Text,
-    Paragraph,
-    Heading.configure({
-      levels: [2, 3],
-    }),
-    Bold,
-    Strike,
-    Code,
-    CodeBlock,
-    Blockquote,
-    HardBreak.configure({
-      HTMLAttributes: {
-        class: 'smart',
-      },
-    }),
-    HorizontalRule,
-    OrderedList,
-    ListItem,
-    BulletList,
-    // Custom Formats
-    Link,
+    ...baseArticleExtensions(placeholder),
     FigureImage,
     FigureAudio,
     FigureEmbed,
@@ -80,6 +97,27 @@ export const makeArticleEditorExtensions = ({
   return extensions
 }
 
+export const makeEditArticleEditorExtensions = ({
+  placeholder,
+  mentionSuggestion,
+}: MakeArticleEditorExtensionsProps) => {
+  const extensions = [
+    ...baseArticleExtensions(placeholder),
+    ReadOnlyFigureImage,
+    ReadOnlyFigureAudio,
+    ReadOnlyFigureEmbed,
+  ]
+
+  if (mentionSuggestion) {
+    extensions.push(Mention.configure({ suggestion: mentionSuggestion }))
+  }
+
+  return extensions
+}
+
+/**
+ * Comment
+ */
 export type MakeCommentEditorExtensionsProps = {
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
@@ -89,32 +127,7 @@ export const makeCommentEditorExtensions = ({
   placeholder,
   mentionSuggestion,
 }: MakeCommentEditorExtensionsProps) => {
-  const extensions = [
-    Document,
-    History,
-    Placeholder.configure({
-      placeholder,
-    }),
-    // Basic Formats
-    Text,
-    Paragraph,
-    Bold,
-    Strike,
-    Code,
-    CodeBlock,
-    Blockquote,
-    HardBreak.configure({
-      HTMLAttributes: {
-        class: 'smart',
-      },
-    }),
-    HorizontalRule,
-    ListItem,
-    OrderedList,
-    BulletList,
-    // Custom Formats
-    Link,
-  ]
+  const extensions = [...baseExtensions(placeholder)]
 
   if (mentionSuggestion) {
     extensions.push(Mention.configure({ suggestion: mentionSuggestion }))

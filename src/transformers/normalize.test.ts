@@ -202,8 +202,9 @@ describe('Normalization', () => {
       'https://www.bilibili.com/BV1bW411n7fY?abc=123',
     ]
     const bilibiliTargetUrl =
-      'https://player.bilibili.com/player.html?bvid=BV1bW411n7fY'
-    // 'https://player.bilibili.com/player.html?bvid=BV1bW411n7fY&autoplay=0'
+      // 'https://player.bilibili.com/player.html?bvid=BV1bW411n7fY'
+      // 'https://player.bilibili.com/player.html?bvid=BV1bW411n7fY&autoplay=0'
+      'https://player.bilibili.com/player.html?bvid=BV1bW411n7fY&amp;autoplay=0'
 
     bilibiliUrls.forEach((url) => {
       expectNormalizeArticleHTML(
