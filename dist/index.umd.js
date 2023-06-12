@@ -23018,9 +23018,9 @@ img.ProseMirror-separator {
       group: 'inline',
   });
 
-  var pluginName$2 = 'figureAudio';
+  var pluginName$5 = 'figureAudio';
   var FigureAudio = Node.create({
-      name: pluginName$2,
+      name: pluginName$5,
       group: 'block',
       content: 'text*',
       draggable: true,
@@ -23131,7 +23131,7 @@ img.ProseMirror-separator {
                               return;
                           }
                           var anchorParent = view.state.selection.$anchor.parent;
-                          var isCurrentPlugin = anchorParent.type.name === pluginName$2;
+                          var isCurrentPlugin = anchorParent.type.name === pluginName$5;
                           var isEmptyFigcaption = anchorParent.content.size <= 0;
                           if (!isCurrentPlugin) {
                               return;
@@ -23142,7 +23142,7 @@ img.ProseMirror-separator {
                           if (isBackSpace && isEmptyFigcaption) {
                               // FIXME: setTimeOut to avoid repetitive deletion
                               setTimeout(function () {
-                                  editor.commands.deleteNode(pluginName$2);
+                                  editor.commands.deleteNode(pluginName$5);
                               });
                               return;
                           }
@@ -23177,7 +23177,7 @@ img.ProseMirror-separator {
       },
   });
 
-  var Provider;
+  var Provider$1;
   (function (Provider) {
       Provider["YouTube"] = "youtube";
       Provider["Vimeo"] = "vimeo";
@@ -23186,8 +23186,8 @@ img.ProseMirror-separator {
       Provider["Instagram"] = "instagram";
       Provider["JSFiddle"] = "jsfiddle";
       Provider["CodePen"] = "codepen";
-  })(Provider || (Provider = {}));
-  var normalizeEmbedURL = function (url) {
+  })(Provider$1 || (Provider$1 = {}));
+  var normalizeEmbedURL$1 = function (url) {
       var fallbackReturn = {
           url: '',
           allowfullscreen: false,
@@ -23238,7 +23238,7 @@ img.ProseMirror-separator {
           }
           return {
               url: "https://www.youtube.com/embed/".concat(id) + (qs ? "?".concat(qs) : ''),
-              provider: Provider.YouTube,
+              provider: Provider$1.YouTube,
               allowfullscreen: true,
               sandbox: [],
           };
@@ -23255,7 +23255,7 @@ img.ProseMirror-separator {
           var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
           return {
               url: "https://player.vimeo.com/video/".concat(id),
-              provider: Provider.Vimeo,
+              provider: Provider$1.Vimeo,
               allowfullscreen: true,
               sandbox: [],
           };
@@ -23286,9 +23286,9 @@ img.ProseMirror-separator {
               id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
           }
           return {
-              // url: `https://player.bilibili.com/player.html?bvid=${id}&autoplay=0`,
-              url: "https://player.bilibili.com/player.html?bvid=".concat(id),
-              provider: Provider.Bilibili,
+              url: "https://player.bilibili.com/player.html?bvid=".concat(id, "&autoplay=0"),
+              // url: `https://player.bilibili.com/player.html?bvid=${id}`,
+              provider: Provider$1.Bilibili,
               allowfullscreen: true,
               sandbox: [],
           };
@@ -23309,7 +23309,7 @@ img.ProseMirror-separator {
               .slice(-1)[0];
           return {
               url: "https://www.instagram.com/p/".concat(id, "/embed"),
-              provider: Provider.Instagram,
+              provider: Provider$1.Instagram,
               allowfullscreen: false,
               sandbox: [],
           };
@@ -23334,7 +23334,7 @@ img.ProseMirror-separator {
           var id = parts.length === 1 ? parts[0] : parts[1];
           return {
               url: "https://jsfiddle.net/".concat(id, "/embedded/"),
-              provider: Provider.JSFiddle,
+              provider: Provider$1.JSFiddle,
               allowfullscreen: false,
               sandbox: [],
           };
@@ -23353,16 +23353,16 @@ img.ProseMirror-separator {
           var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
           return {
               url: "https://codepen.io/".concat(author, "/embed/preview/").concat(id),
-              provider: Provider.CodePen,
+              provider: Provider$1.CodePen,
               allowfullscreen: false,
               sandbox: [],
           };
       }
       return fallbackReturn;
   };
-  var pluginName$1 = 'figureEmbed';
+  var pluginName$4 = 'figureEmbed';
   var FigureEmbed = Node.create({
-      name: pluginName$1,
+      name: pluginName$4,
       group: 'block',
       content: 'text*',
       draggable: true,
@@ -23392,18 +23392,19 @@ img.ProseMirror-separator {
       },
       renderHTML: function (_a) {
           var HTMLAttributes = _a.HTMLAttributes;
-          var _b = normalizeEmbedURL(HTMLAttributes.src), url = _b.url, provider = _b.provider, allowfullscreen = _b.allowfullscreen, sandbox = _b.sandbox;
+          var _b = normalizeEmbedURL$1(HTMLAttributes.src), url = _b.url, provider = _b.provider, allowfullscreen = _b.allowfullscreen, sandbox = _b.sandbox;
           // for backward compatibility
           // can be removed when fully switch to new editor
           var isVideo = [
-              Provider.YouTube,
-              Provider.Vimeo,
-              Provider.Bilibili,
+              Provider$1.YouTube,
+              Provider$1.Vimeo,
+              Provider$1.Bilibili,
           ].includes(provider);
-          var isCode = [Provider.JSFiddle, Provider.CodePen].includes(provider);
+          var isCode = [Provider$1.JSFiddle, Provider$1.CodePen].includes(provider);
           var className = __spreadArray(__spreadArray([
               'embed'
           ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
+          console.log({ url: url });
           return [
               'figure',
               __assign({ class: className }, (provider ? { 'data-provider': provider } : {})),
@@ -23458,7 +23459,7 @@ img.ProseMirror-separator {
                               return;
                           }
                           var anchorParent = view.state.selection.$anchor.parent;
-                          var isCurrentPlugin = anchorParent.type.name === pluginName$1;
+                          var isCurrentPlugin = anchorParent.type.name === pluginName$4;
                           var isEmptyFigcaption = anchorParent.content.size <= 0;
                           if (!isCurrentPlugin) {
                               return;
@@ -23469,7 +23470,7 @@ img.ProseMirror-separator {
                           if (isBackSpace && isEmptyFigcaption) {
                               // FIXME: setTimeOut to avoid repetitive deletion
                               setTimeout(function () {
-                                  editor.commands.deleteNode(pluginName$1);
+                                  editor.commands.deleteNode(pluginName$4);
                               });
                               return;
                           }
@@ -23504,9 +23505,9 @@ img.ProseMirror-separator {
       },
   });
 
-  var pluginName = 'figureImage';
+  var pluginName$3 = 'figureImage';
   var FigureImage = Node.create({
-      name: pluginName,
+      name: pluginName$3,
       group: 'block',
       content: 'text*',
       draggable: true,
@@ -23587,7 +23588,7 @@ img.ProseMirror-separator {
                               return;
                           }
                           var anchorParent = view.state.selection.$anchor.parent;
-                          var isCurrentPlugin = anchorParent.type.name === pluginName;
+                          var isCurrentPlugin = anchorParent.type.name === pluginName$3;
                           var isEmptyFigcaption = anchorParent.content.size <= 0;
                           if (!isCurrentPlugin) {
                               return;
@@ -23598,7 +23599,7 @@ img.ProseMirror-separator {
                           if (isBackSpace && isEmptyFigcaption) {
                               // FIXME: setTimeOut to avoid repetitive deletion
                               setTimeout(function () {
-                                  editor.commands.deleteNode(pluginName);
+                                  editor.commands.deleteNode(pluginName$3);
                               });
                               return;
                           }
@@ -26227,41 +26228,429 @@ img.ProseMirror-separator {
       },
   });
 
+  /**
+   * ReadyOnlyFigureImage extension is similar to FigureImage extension,
+   * but it is read-only for article revision.
+   */
+  var pluginName$2 = 'readyOnlyFigureImage';
+  Node.create({
+      name: pluginName$2,
+      group: 'block',
+      content: 'text*',
+      draggable: true,
+      isolating: true,
+      // read-only
+      atom: true,
+      // disallows all marks for figcaption
+      marks: '',
+      addAttributes: function () {
+          return {
+              class: {
+                  default: null,
+                  parseHTML: function (element) { return element.getAttribute('class'); },
+              },
+              src: {
+                  default: null,
+                  parseHTML: function (element) { var _a; return (_a = element.querySelector('img')) === null || _a === void 0 ? void 0 : _a.getAttribute('src'); },
+              },
+          };
+      },
+      parseHTML: function () {
+          return [
+              {
+                  tag: 'figure[class="image"]',
+                  contentElement: 'figcaption',
+              },
+          ];
+      },
+      renderHTML: function (_a) {
+          var HTMLAttributes = _a.HTMLAttributes;
+          return [
+              'figure',
+              { class: 'image' },
+              [
+                  'img',
+                  {
+                      src: HTMLAttributes.src,
+                      draggable: false,
+                      contenteditable: false,
+                  },
+              ],
+              ['figcaption', 0],
+          ];
+      },
+  });
+
+  /**
+   * ReadyOnlyFigureAudio extension is similar to FigureAudio extension,
+   * but it is read-only for article revision.
+   */
+  var pluginName$1 = 'readOnlyFigureAudio';
+  Node.create({
+      name: pluginName$1,
+      group: 'block',
+      content: 'text*',
+      draggable: true,
+      isolating: true,
+      // read-only
+      atom: true,
+      // disallows all marks for figcaption
+      marks: '',
+      addAttributes: function () {
+          return {
+              src: {
+                  default: null,
+                  parseHTML: function (element) { var _a; return (_a = element.querySelector('source')) === null || _a === void 0 ? void 0 : _a.getAttribute('src'); },
+              },
+              title: {
+                  default: '',
+                  parseHTML: function (element) { var _a; return (_a = element.querySelector('.title')) === null || _a === void 0 ? void 0 : _a.textContent; },
+              },
+          };
+      },
+      parseHTML: function () {
+          return [
+              {
+                  tag: 'figure[class="audio"]',
+                  contentElement: 'figcaption',
+              },
+          ];
+      },
+      renderHTML: function (_a) {
+          var HTMLAttributes = _a.HTMLAttributes;
+          return [
+              'figure',
+              { class: 'audio' },
+              [
+                  'audio',
+                  {
+                      controls: true,
+                      // for backward compatibility
+                      // can be removed when fully switch to new editor
+                      'data-file-name': HTMLAttributes.title,
+                  },
+                  [
+                      'source',
+                      {
+                          src: HTMLAttributes.src,
+                          type: 'audio/mp3',
+                          draggable: false,
+                          contenteditable: false,
+                      },
+                  ],
+              ],
+              [
+                  'div',
+                  { class: 'player' },
+                  [
+                      'header',
+                      [
+                          'div',
+                          { class: 'meta' },
+                          ['h4', { class: 'title' }, HTMLAttributes.title],
+                          [
+                              'div',
+                              { class: 'time' },
+                              ['span', { class: 'current', 'data-time': '00:00' }],
+                              ['span', { class: 'duration', 'data-time': '--:--' }],
+                          ],
+                      ],
+                      ['span', { class: 'play' }],
+                  ],
+                  ['footer', ['div', { class: 'progress-bar' }, ['span', {}]]],
+              ],
+              ['figcaption', 0],
+          ];
+      },
+  });
+
+  var Provider;
+  (function (Provider) {
+      Provider["YouTube"] = "youtube";
+      Provider["Vimeo"] = "vimeo";
+      Provider["Bilibili"] = "bilibili";
+      // Twitter = 'twitter',
+      Provider["Instagram"] = "instagram";
+      Provider["JSFiddle"] = "jsfiddle";
+      Provider["CodePen"] = "codepen";
+  })(Provider || (Provider = {}));
+  var normalizeEmbedURL = function (url) {
+      var fallbackReturn = {
+          url: '',
+          allowfullscreen: false,
+          sandbox: [],
+      };
+      var inputUrl;
+      try {
+          inputUrl = new URL(url);
+      }
+      catch (e) {
+          return fallbackReturn;
+      }
+      var hostname = inputUrl.hostname, pathname = inputUrl.pathname, searchParams = inputUrl.searchParams;
+      // if (!hostname) {
+      //   throw
+      // }
+      /**
+       * YouTube
+       *
+       * URL:
+       *   - https://www.youtube.com/watch?v=ARJ8cAGm6JE
+       *   - https://www.youtube.com/embed/ARJ8cAGm6JE
+       *   - https://youtu.be/ARJ8cAGm6JE
+       *
+       * Params:
+       *   - t=123 for start time
+       *   - v=ARJ8cAGm6JE for video id
+       */
+      var isYouTube = [
+          'youtube.com',
+          'youtu.be',
+          'www.youtu.be',
+          'www.youtube.com',
+      ].includes(hostname);
+      if (isYouTube) {
+          var v = searchParams.get('v');
+          var t = searchParams.get('t') || searchParams.get('start');
+          var qs = new URLSearchParams(__assign({ rel: '0' }, (t ? { start: t } : {}))).toString();
+          var id = '';
+          if (v) {
+              id = v;
+          }
+          else if (pathname.match('/embed/')) {
+              id = pathname.split('/embed/')[1];
+          }
+          else if (hostname.includes('youtu.be')) {
+              id = pathname.split('/')[1];
+          }
+          return {
+              url: "https://www.youtube.com/embed/".concat(id) + (qs ? "?".concat(qs) : ''),
+              provider: Provider.YouTube,
+              allowfullscreen: true,
+              sandbox: [],
+          };
+      }
+      /**
+       * Vimeo
+       *
+       * URL:
+       *   - https://vimeo.com/332732612
+       *   - https://player.vimeo.com/video/332732612
+       */
+      var isVimeo = ['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'].includes(hostname);
+      if (isVimeo) {
+          var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
+          return {
+              url: "https://player.vimeo.com/video/".concat(id),
+              provider: Provider.Vimeo,
+              allowfullscreen: true,
+              sandbox: [],
+          };
+      }
+      /**
+       * bilibili
+       *
+       * URL:
+       *   - https://www.bilibili.com/video/BV1bW411n7fY/
+       *   - https://www.bilibili.com/BV1bW411n7fY/
+       *   - https://player.bilibili.com/player.html?bvid=BV1bW411n7fY
+       *
+       * Params:
+       *   - bvid=BV1bW411n7fY for video id
+       */
+      var isBilibili = [
+          'bilibili.com',
+          'player.bilibili.com',
+          'www.bilibili.com',
+      ].includes(hostname);
+      if (isBilibili) {
+          var bvid = searchParams.get('bvid');
+          var id = '';
+          if (bvid) {
+              id = bvid;
+          }
+          else {
+              id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
+          }
+          return {
+              url: "https://player.bilibili.com/player.html?bvid=".concat(id, "&autoplay=0"),
+              // url: `https://player.bilibili.com/player.html?bvid=${id}`,
+              provider: Provider.Bilibili,
+              allowfullscreen: true,
+              sandbox: [],
+          };
+      }
+      // Twitter
+      /**
+       * Instagram
+       *
+       * URL:
+       *   - https://www.instagram.com/p/CkszmehL4hF/
+       */
+      var isInstagram = ['instagram.com', 'www.instagram.com'].includes(hostname);
+      if (isInstagram) {
+          var id = pathname
+              .replace('/embed', '')
+              .replace(/\/$/, '')
+              .split('/')
+              .slice(-1)[0];
+          return {
+              url: "https://www.instagram.com/p/".concat(id, "/embed"),
+              provider: Provider.Instagram,
+              allowfullscreen: false,
+              sandbox: [],
+          };
+      }
+      /**
+       * JSFiddle
+       *
+       * URL:
+       *   - https://jsfiddle.net/zfUyN/
+       *   - https://jsfiddle.net/kizu/zfUyN/
+       *   - https://jsfiddle.net/kizu/zfUyN/embedded/
+       *   - https://jsfiddle.net/kizu/zfUyN/embedded/result/
+       *   - https://jsfiddle.net/kizu/zfUyN/embed/js,result/
+       */
+      var isJSFiddle = ['jsfiddle.net', 'www.jsfiddle.net'].includes(hostname);
+      if (isJSFiddle) {
+          var parts = pathname
+              .replace('/embedded', '')
+              .replace(/\/$/, '')
+              .split('/')
+              .filter(Boolean);
+          var id = parts.length === 1 ? parts[0] : parts[1];
+          return {
+              url: "https://jsfiddle.net/".concat(id, "/embedded/"),
+              provider: Provider.JSFiddle,
+              allowfullscreen: false,
+              sandbox: [],
+          };
+      }
+      /**
+       * CodePen
+       *
+       * URL:
+       *   - https://codepen.io/ykadosh/pen/jOwjmJe
+       *   - https://codepen.io/ykadosh/embed/jOwjmJe
+       *   - https://codepen.io/ykadosh/embed/preview/jOwjmJe
+       */
+      var isCodePen = ['codepen.io', 'www.codepen.io'].includes(hostname);
+      if (isCodePen) {
+          var author = pathname.split('/')[1];
+          var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
+          return {
+              url: "https://codepen.io/".concat(author, "/embed/preview/").concat(id),
+              provider: Provider.CodePen,
+              allowfullscreen: false,
+              sandbox: [],
+          };
+      }
+      return fallbackReturn;
+  };
+  var pluginName = 'readOnlyFigureEmbed';
+  Node.create({
+      name: pluginName,
+      group: 'block',
+      content: 'text*',
+      draggable: true,
+      isolating: true,
+      // read-only
+      atom: true,
+      // disallows all marks for figcaption
+      marks: '',
+      addAttributes: function () {
+          return {
+              class: {
+                  default: null,
+                  parseHTML: function (element) { return element.getAttribute('class'); },
+              },
+              src: {
+                  default: null,
+                  parseHTML: function (element) { var _a; return (_a = element.querySelector('iframe')) === null || _a === void 0 ? void 0 : _a.getAttribute('src'); },
+              },
+          };
+      },
+      parseHTML: function () {
+          return [
+              {
+                  // match "embed", "embed-video", "embed-code" for backward compatibility
+                  tag: 'figure[class^="embed"]',
+                  contentElement: 'figcaption',
+              },
+          ];
+      },
+      renderHTML: function (_a) {
+          var HTMLAttributes = _a.HTMLAttributes;
+          var _b = normalizeEmbedURL(HTMLAttributes.src), url = _b.url, provider = _b.provider, allowfullscreen = _b.allowfullscreen, sandbox = _b.sandbox;
+          // for backward compatibility
+          // can be removed when fully switch to new editor
+          var isVideo = [
+              Provider.YouTube,
+              Provider.Vimeo,
+              Provider.Bilibili,
+          ].includes(provider);
+          var isCode = [Provider.JSFiddle, Provider.CodePen].includes(provider);
+          var className = __spreadArray(__spreadArray([
+              'embed'
+          ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
+          console.log({ url: url });
+          return [
+              'figure',
+              __assign({ class: className }, (provider ? { 'data-provider': provider } : {})),
+              [
+                  'div',
+                  { class: 'iframe-container' },
+                  [
+                      'iframe',
+                      __assign(__assign(__assign({ src: url, loading: 'lazy' }, (sandbox && sandbox.length > 0
+                          ? { sandbox: sandbox.join(' ') }
+                          : {})), (allowfullscreen ? { allowfullscreen: true } : {})), { frameborder: '0', draggable: false, contenteditable: false }),
+                  ],
+              ],
+              ['figcaption', 0],
+          ];
+      },
+  });
+
+  var baseExtensions = function (placeholder) { return [
+      Document,
+      History,
+      Placeholder.configure({
+          placeholder: placeholder,
+      }),
+      // Basic Formats
+      Text$1,
+      Paragraph,
+      Bold,
+      Strike,
+      Code,
+      CodeBlock,
+      Blockquote,
+      HardBreak.configure({
+          HTMLAttributes: {
+              class: 'smart',
+          },
+      }),
+      HorizontalRule,
+      OrderedList,
+      ListItem$1,
+      BulletList,
+      // Custom Formats
+      Link,
+  ]; };
+  var baseArticleExtensions = function (placeholder) { return __spreadArray(__spreadArray([], baseExtensions(placeholder), true), [
+      Gapcursor,
+      Heading.configure({
+          levels: [2, 3],
+      }),
+  ], false); };
   var makeArticleEditorExtensions = function (_a) {
       var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
-      var extensions = [
-          Document,
-          History,
-          Gapcursor,
-          Placeholder.configure({
-              placeholder: placeholder,
-          }),
-          // Basic Formats
-          Text$1,
-          Paragraph,
-          Heading.configure({
-              levels: [2, 3],
-          }),
-          Bold,
-          Strike,
-          Code,
-          CodeBlock,
-          Blockquote,
-          HardBreak.configure({
-              HTMLAttributes: {
-                  class: 'smart',
-              },
-          }),
-          HorizontalRule,
-          OrderedList,
-          ListItem$1,
-          BulletList,
-          // Custom Formats
-          Link,
+      var extensions = __spreadArray(__spreadArray([], baseArticleExtensions(placeholder), true), [
           FigureImage,
           FigureAudio,
           FigureEmbed,
-      ];
+      ], false);
       if (mentionSuggestion) {
           extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
       }
@@ -26269,32 +26658,7 @@ img.ProseMirror-separator {
   };
   var makeCommentEditorExtensions = function (_a) {
       var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
-      var extensions = [
-          Document,
-          History,
-          Placeholder.configure({
-              placeholder: placeholder,
-          }),
-          // Basic Formats
-          Text$1,
-          Paragraph,
-          Bold,
-          Strike,
-          Code,
-          CodeBlock,
-          Blockquote,
-          HardBreak.configure({
-              HTMLAttributes: {
-                  class: 'smart',
-              },
-          }),
-          HorizontalRule,
-          ListItem$1,
-          OrderedList,
-          BulletList,
-          // Custom Formats
-          Link,
-      ];
+      var extensions = __spreadArray([], baseExtensions(placeholder), true);
       if (mentionSuggestion) {
           extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
       }

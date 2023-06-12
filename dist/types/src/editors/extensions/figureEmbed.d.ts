@@ -30,12 +30,4 @@ declare module '@tiptap/core' {
         };
     }
 }
-type NormalizeEmbedURLReturn = {
-    url: string;
-    provider?: 'youtube' | 'vimeo' | 'bilibili' | 'twitter' | 'instagram' | 'jsfiddle' | 'codepen';
-    allowfullscreen: boolean;
-    sandbox: Array<'allow-scripts' | 'allow-same-origin' | 'allow-popups'>;
-};
-export declare const normalizeEmbedURL: (url: string) => NormalizeEmbedURLReturn;
 export declare const FigureEmbed: Node<any, any>;
-export {};
