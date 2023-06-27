@@ -7,8 +7,8 @@ const packageJson = require('../package.json')
 const sourcemap = false
 
 const plugins = [
-  resolve({ browser: true }),
   commonjs(),
+  resolve({ browser: true }),
   typescript({ tsconfig: './tsconfig.json' }),
   // terser(),
   replace({

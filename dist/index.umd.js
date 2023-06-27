@@ -15075,6 +15075,30 @@
       return marks;
   }
 
+  /**
+   * Finds the first node of a given type or name in the current selection.
+   * @param state The editor state.
+   * @param typeOrName The node type or name.
+   * @param pos The position to start searching from.
+   * @param maxDepth The maximum depth to search.
+   * @returns The node and the depth as an array.
+   */
+  const getNodeAtPosition = (state, typeOrName, pos, maxDepth = 20) => {
+      const $pos = state.doc.resolve(pos);
+      let currentDepth = maxDepth;
+      let node = null;
+      while (currentDepth > 0 && node === null) {
+          const currentNode = $pos.node(currentDepth);
+          if ((currentNode === null || currentNode === void 0 ? void 0 : currentNode.type.name) === typeOrName) {
+              node = currentNode;
+          }
+          else {
+              currentDepth -= 1;
+          }
+      }
+      return [node, currentDepth];
+  };
+
   function getSplittedAttributes(extensionAttributes, typeName, attributes) {
       return Object.fromEntries(Object
           .entries(attributes)
@@ -15164,6 +15188,22 @@
       }
       return false;
   }
+
+  const istAtEndOfNode = (state) => {
+      const { $from, $to } = state.selection;
+      if ($to.parentOffset < $to.parent.nodeSize - 2 || $from.pos !== $to.pos) {
+          return false;
+      }
+      return true;
+  };
+
+  const isAtStartOfNode = (state) => {
+      const { $from, $to } = state.selection;
+      if ($from.parentOffset > 0 || $from.pos !== $to.pos) {
+          return false;
+      }
+      return true;
+  };
 
   function isList(name, extensions) {
       const { nodeExtensions } = splitExtensions(extensions);
@@ -15887,7 +15927,12 @@
                   const { selection, doc } = tr;
                   const { empty, $anchor } = selection;
                   const { pos, parent } = $anchor;
-                  const isAtStart = Selection.atStart(doc).from === pos;
+                  const $parentPos = $anchor.parent.isTextblock ? tr.doc.resolve(pos - 1) : $anchor;
+                  const parentIsIsolating = $parentPos.parent.type.spec.isolating;
+                  const parentPos = $anchor.pos - $anchor.parentOffset;
+                  const isAtStart = (parentIsIsolating && $parentPos.parent.childCount === 1)
+                      ? parentPos === $anchor.pos
+                      : Selection.atStart(doc).from === pos;
                   if (!empty || !isAtStart || !parent.type.isTextblock || parent.textContent.length) {
                       return false;
                   }
@@ -16300,6 +16345,7 @@ img.ProseMirror-separator {
           });
           this.view.updateState(newState);
           this.createNodeViews();
+          this.prependClass();
           // Let’s store the editor instance in the DOM element.
           // So we’ll have access to it for tests.
           const dom = this.view.dom;
@@ -16312,6 +16358,12 @@ img.ProseMirror-separator {
           this.view.setProps({
               nodeViews: this.extensionManager.nodeViews,
           });
+      }
+      /**
+       * Prepend class name to element.
+       */
+      prependClass() {
+          this.view.dom.className = `tiptap ${this.view.dom.className}`;
       }
       captureTransaction(fn) {
           this.isCapturingTransaction = true;
@@ -21184,7 +21236,7 @@ img.ProseMirror-separator {
   OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
   PERFORMANCE OF THIS SOFTWARE.
   ***************************************************************************** */
-  /* global Reflect, Promise */
+  /* global Reflect, Promise, SuppressedError, Symbol */
 
 
   var __assign = function() {
@@ -21219,6 +21271,11 @@ img.ProseMirror-separator {
       }
       return to.concat(ar || Array.prototype.slice.call(from));
   }
+
+  typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+      var e = new Error(message);
+      return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+  };
 
   const inputRegex$4 = /^\s*>\s$/;
   const Blockquote = Node.create({
@@ -21267,6 +21324,120 @@ img.ProseMirror-separator {
       },
   });
 
+  const joinListItemBackward$2 = () => ({ tr, state, dispatch, }) => {
+      try {
+          const point = joinPoint(state.doc, state.selection.$from.pos, -1);
+          if (point === null || point === undefined) {
+              return false;
+          }
+          tr.join(point, 2);
+          if (dispatch) {
+              dispatch(tr);
+          }
+          return true;
+      }
+      catch {
+          return false;
+      }
+  };
+
+  const joinListItemForward$2 = () => ({ state, dispatch, tr, }) => {
+      try {
+          const point = joinPoint(state.doc, state.selection.$from.pos, +1);
+          if (point === null || point === undefined) {
+              return false;
+          }
+          tr.join(point, 2);
+          if (dispatch) {
+              dispatch(tr);
+          }
+          return true;
+      }
+      catch (e) {
+          return false;
+      }
+  };
+
+  const hasListItemBefore$2 = (typeOrName, state) => {
+      var _a;
+      const { $anchor } = state.selection;
+      const $targetPos = state.doc.resolve($anchor.pos - 2);
+      if ($targetPos.index() === 0) {
+          return false;
+      }
+      if (((_a = $targetPos.nodeBefore) === null || _a === void 0 ? void 0 : _a.type.name) !== typeOrName) {
+          return false;
+      }
+      return true;
+  };
+
+  const listItemHasSubList$2 = (typeOrName, state, node) => {
+      if (!node) {
+          return false;
+      }
+      const nodeType = getNodeType(typeOrName, state.schema);
+      let hasSubList = false;
+      node.descendants(child => {
+          if (child.type === nodeType) {
+              hasSubList = true;
+          }
+      });
+      return hasSubList;
+  };
+
+  const findListItemPos$2 = (typeOrName, state) => {
+      const { $from } = state.selection;
+      const nodeType = getNodeType(typeOrName, state.schema);
+      let currentNode = null;
+      let currentDepth = $from.depth;
+      let currentPos = $from.pos;
+      let targetDepth = null;
+      while (currentDepth > 0 && targetDepth === null) {
+          currentNode = $from.node(currentDepth);
+          if (currentNode.type === nodeType) {
+              targetDepth = currentDepth;
+          }
+          else {
+              currentDepth -= 1;
+              currentPos -= 1;
+          }
+      }
+      if (targetDepth === null) {
+          return null;
+      }
+      return { $pos: state.doc.resolve(currentPos), depth: targetDepth };
+  };
+  const getNextListDepth$2 = (typeOrName, state) => {
+      const listItemPos = findListItemPos$2(typeOrName, state);
+      if (!listItemPos) {
+          return false;
+      }
+      const [, depth] = getNodeAtPosition(state, typeOrName, listItemPos.$pos.pos + 4);
+      return depth;
+  };
+  const nextListIsDeeper$2 = (typeOrName, state) => {
+      const listDepth = getNextListDepth$2(typeOrName, state);
+      const listItemPos = findListItemPos$2(typeOrName, state);
+      if (!listItemPos || !listDepth) {
+          return false;
+      }
+      if (listDepth > listItemPos.depth) {
+          return true;
+      }
+      return false;
+  };
+  const nextListIsHigher$2 = (typeOrName, state) => {
+      const listDepth = getNextListDepth$2(typeOrName, state);
+      const listItemPos = findListItemPos$2(typeOrName, state);
+      if (!listItemPos || !listDepth) {
+          return false;
+      }
+      if (listDepth < listItemPos.depth) {
+          return true;
+      }
+      return false;
+  };
+
   const ListItem$2 = Node.create({
       name: 'listItem',
       addOptions() {
@@ -21286,11 +21457,77 @@ img.ProseMirror-separator {
       renderHTML({ HTMLAttributes }) {
           return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
       },
+      addCommands() {
+          return {
+              joinListItemForward: joinListItemForward$2,
+              joinListItemBackward: joinListItemBackward$2,
+          };
+      },
       addKeyboardShortcuts() {
           return {
               Enter: () => this.editor.commands.splitListItem(this.name),
               Tab: () => this.editor.commands.sinkListItem(this.name),
               'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
+              Delete: ({ editor }) => {
+                  // if the cursor is not inside the current node type
+                  // do nothing and proceed
+                  if (!isNodeActive(editor.state, this.name)) {
+                      return false;
+                  }
+                  // if the cursor is not at the end of a node
+                  // do nothing and proceed
+                  if (!istAtEndOfNode(editor.state)) {
+                      return false;
+                  }
+                  // check if the next node is a list with a deeper depth
+                  if (nextListIsDeeper$2(this.name, editor.state)) {
+                      return editor
+                          .chain()
+                          .focus(editor.state.selection.from + 4)
+                          .lift(this.name)
+                          .joinBackward()
+                          .run();
+                  }
+                  if (nextListIsHigher$2(this.name, editor.state)) {
+                      return editor.chain()
+                          .joinForward()
+                          .joinBackward()
+                          .run();
+                  }
+                  // check if the next node is also a listItem
+                  return editor.commands.joinListItemForward(this.name);
+              },
+              Backspace: ({ editor }) => {
+                  // this is required to still handle the undo handling
+                  if (this.editor.commands.undoInputRule()) {
+                      return true;
+                  }
+                  // if the cursor is not inside the current node type
+                  // do nothing and proceed
+                  if (!isNodeActive(editor.state, this.name)) {
+                      return false;
+                  }
+                  // if the cursor is not at the start of a node
+                  // do nothing and proceed
+                  if (!isAtStartOfNode(editor.state)) {
+                      return false;
+                  }
+                  const listItemPos = findListItemPos$2(this.name, editor.state);
+                  if (!listItemPos) {
+                      return false;
+                  }
+                  const $prev = editor.state.doc.resolve(listItemPos.$pos.pos - 2);
+                  const prevNode = $prev.node(listItemPos.depth);
+                  const previousListItemHasSubList = listItemHasSubList$2(this.name, editor.state, prevNode);
+                  // if the previous item is a list item and doesn't have a sublist, join the list items
+                  if (hasListItemBefore$2(this.name, editor.state) && !previousListItemHasSubList) {
+                      return editor.commands.joinListItemBackward(this.name);
+                  }
+                  // otherwise in the end, a backspace should
+                  // always just lift the list item if
+                  // joining / merging is not possible
+                  return editor.chain().liftListItem(this.name).run();
+              },
           };
       },
   });
@@ -22683,6 +22920,120 @@ img.ProseMirror-separator {
       },
   });
 
+  const joinListItemBackward$1 = () => ({ tr, state, dispatch, }) => {
+      try {
+          const point = joinPoint(state.doc, state.selection.$from.pos, -1);
+          if (point === null || point === undefined) {
+              return false;
+          }
+          tr.join(point, 2);
+          if (dispatch) {
+              dispatch(tr);
+          }
+          return true;
+      }
+      catch {
+          return false;
+      }
+  };
+
+  const joinListItemForward$1 = () => ({ state, dispatch, tr, }) => {
+      try {
+          const point = joinPoint(state.doc, state.selection.$from.pos, +1);
+          if (point === null || point === undefined) {
+              return false;
+          }
+          tr.join(point, 2);
+          if (dispatch) {
+              dispatch(tr);
+          }
+          return true;
+      }
+      catch (e) {
+          return false;
+      }
+  };
+
+  const hasListItemBefore$1 = (typeOrName, state) => {
+      var _a;
+      const { $anchor } = state.selection;
+      const $targetPos = state.doc.resolve($anchor.pos - 2);
+      if ($targetPos.index() === 0) {
+          return false;
+      }
+      if (((_a = $targetPos.nodeBefore) === null || _a === void 0 ? void 0 : _a.type.name) !== typeOrName) {
+          return false;
+      }
+      return true;
+  };
+
+  const listItemHasSubList$1 = (typeOrName, state, node) => {
+      if (!node) {
+          return false;
+      }
+      const nodeType = getNodeType(typeOrName, state.schema);
+      let hasSubList = false;
+      node.descendants(child => {
+          if (child.type === nodeType) {
+              hasSubList = true;
+          }
+      });
+      return hasSubList;
+  };
+
+  const findListItemPos$1 = (typeOrName, state) => {
+      const { $from } = state.selection;
+      const nodeType = getNodeType(typeOrName, state.schema);
+      let currentNode = null;
+      let currentDepth = $from.depth;
+      let currentPos = $from.pos;
+      let targetDepth = null;
+      while (currentDepth > 0 && targetDepth === null) {
+          currentNode = $from.node(currentDepth);
+          if (currentNode.type === nodeType) {
+              targetDepth = currentDepth;
+          }
+          else {
+              currentDepth -= 1;
+              currentPos -= 1;
+          }
+      }
+      if (targetDepth === null) {
+          return null;
+      }
+      return { $pos: state.doc.resolve(currentPos), depth: targetDepth };
+  };
+  const getNextListDepth$1 = (typeOrName, state) => {
+      const listItemPos = findListItemPos$1(typeOrName, state);
+      if (!listItemPos) {
+          return false;
+      }
+      const [, depth] = getNodeAtPosition(state, typeOrName, listItemPos.$pos.pos + 4);
+      return depth;
+  };
+  const nextListIsDeeper$1 = (typeOrName, state) => {
+      const listDepth = getNextListDepth$1(typeOrName, state);
+      const listItemPos = findListItemPos$1(typeOrName, state);
+      if (!listItemPos || !listDepth) {
+          return false;
+      }
+      if (listDepth > listItemPos.depth) {
+          return true;
+      }
+      return false;
+  };
+  const nextListIsHigher$1 = (typeOrName, state) => {
+      const listDepth = getNextListDepth$1(typeOrName, state);
+      const listItemPos = findListItemPos$1(typeOrName, state);
+      if (!listItemPos || !listDepth) {
+          return false;
+      }
+      if (listDepth < listItemPos.depth) {
+          return true;
+      }
+      return false;
+  };
+
   const ListItem$1 = Node.create({
       name: 'listItem',
       addOptions() {
@@ -22702,14 +23053,194 @@ img.ProseMirror-separator {
       renderHTML({ HTMLAttributes }) {
           return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
       },
+      addCommands() {
+          return {
+              joinListItemForward: joinListItemForward$1,
+              joinListItemBackward: joinListItemBackward$1,
+          };
+      },
       addKeyboardShortcuts() {
           return {
               Enter: () => this.editor.commands.splitListItem(this.name),
               Tab: () => this.editor.commands.sinkListItem(this.name),
               'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
+              Delete: ({ editor }) => {
+                  // if the cursor is not inside the current node type
+                  // do nothing and proceed
+                  if (!isNodeActive(editor.state, this.name)) {
+                      return false;
+                  }
+                  // if the cursor is not at the end of a node
+                  // do nothing and proceed
+                  if (!istAtEndOfNode(editor.state)) {
+                      return false;
+                  }
+                  // check if the next node is a list with a deeper depth
+                  if (nextListIsDeeper$1(this.name, editor.state)) {
+                      return editor
+                          .chain()
+                          .focus(editor.state.selection.from + 4)
+                          .lift(this.name)
+                          .joinBackward()
+                          .run();
+                  }
+                  if (nextListIsHigher$1(this.name, editor.state)) {
+                      return editor.chain()
+                          .joinForward()
+                          .joinBackward()
+                          .run();
+                  }
+                  // check if the next node is also a listItem
+                  return editor.commands.joinListItemForward(this.name);
+              },
+              Backspace: ({ editor }) => {
+                  // this is required to still handle the undo handling
+                  if (this.editor.commands.undoInputRule()) {
+                      return true;
+                  }
+                  // if the cursor is not inside the current node type
+                  // do nothing and proceed
+                  if (!isNodeActive(editor.state, this.name)) {
+                      return false;
+                  }
+                  // if the cursor is not at the start of a node
+                  // do nothing and proceed
+                  if (!isAtStartOfNode(editor.state)) {
+                      return false;
+                  }
+                  const listItemPos = findListItemPos$1(this.name, editor.state);
+                  if (!listItemPos) {
+                      return false;
+                  }
+                  const $prev = editor.state.doc.resolve(listItemPos.$pos.pos - 2);
+                  const prevNode = $prev.node(listItemPos.depth);
+                  const previousListItemHasSubList = listItemHasSubList$1(this.name, editor.state, prevNode);
+                  // if the previous item is a list item and doesn't have a sublist, join the list items
+                  if (hasListItemBefore$1(this.name, editor.state) && !previousListItemHasSubList) {
+                      return editor.commands.joinListItemBackward(this.name);
+                  }
+                  // otherwise in the end, a backspace should
+                  // always just lift the list item if
+                  // joining / merging is not possible
+                  return editor.chain().liftListItem(this.name).run();
+              },
           };
       },
   });
+
+  const joinListItemBackward = () => ({ tr, state, dispatch, }) => {
+      try {
+          const point = joinPoint(state.doc, state.selection.$from.pos, -1);
+          if (point === null || point === undefined) {
+              return false;
+          }
+          tr.join(point, 2);
+          if (dispatch) {
+              dispatch(tr);
+          }
+          return true;
+      }
+      catch {
+          return false;
+      }
+  };
+
+  const joinListItemForward = () => ({ state, dispatch, tr, }) => {
+      try {
+          const point = joinPoint(state.doc, state.selection.$from.pos, +1);
+          if (point === null || point === undefined) {
+              return false;
+          }
+          tr.join(point, 2);
+          if (dispatch) {
+              dispatch(tr);
+          }
+          return true;
+      }
+      catch (e) {
+          return false;
+      }
+  };
+
+  const hasListItemBefore = (typeOrName, state) => {
+      var _a;
+      const { $anchor } = state.selection;
+      const $targetPos = state.doc.resolve($anchor.pos - 2);
+      if ($targetPos.index() === 0) {
+          return false;
+      }
+      if (((_a = $targetPos.nodeBefore) === null || _a === void 0 ? void 0 : _a.type.name) !== typeOrName) {
+          return false;
+      }
+      return true;
+  };
+
+  const listItemHasSubList = (typeOrName, state, node) => {
+      if (!node) {
+          return false;
+      }
+      const nodeType = getNodeType(typeOrName, state.schema);
+      let hasSubList = false;
+      node.descendants(child => {
+          if (child.type === nodeType) {
+              hasSubList = true;
+          }
+      });
+      return hasSubList;
+  };
+
+  const findListItemPos = (typeOrName, state) => {
+      const { $from } = state.selection;
+      const nodeType = getNodeType(typeOrName, state.schema);
+      let currentNode = null;
+      let currentDepth = $from.depth;
+      let currentPos = $from.pos;
+      let targetDepth = null;
+      while (currentDepth > 0 && targetDepth === null) {
+          currentNode = $from.node(currentDepth);
+          if (currentNode.type === nodeType) {
+              targetDepth = currentDepth;
+          }
+          else {
+              currentDepth -= 1;
+              currentPos -= 1;
+          }
+      }
+      if (targetDepth === null) {
+          return null;
+      }
+      return { $pos: state.doc.resolve(currentPos), depth: targetDepth };
+  };
+  const getNextListDepth = (typeOrName, state) => {
+      const listItemPos = findListItemPos(typeOrName, state);
+      if (!listItemPos) {
+          return false;
+      }
+      const [, depth] = getNodeAtPosition(state, typeOrName, listItemPos.$pos.pos + 4);
+      return depth;
+  };
+  const nextListIsDeeper = (typeOrName, state) => {
+      const listDepth = getNextListDepth(typeOrName, state);
+      const listItemPos = findListItemPos(typeOrName, state);
+      if (!listItemPos || !listDepth) {
+          return false;
+      }
+      if (listDepth > listItemPos.depth) {
+          return true;
+      }
+      return false;
+  };
+  const nextListIsHigher = (typeOrName, state) => {
+      const listDepth = getNextListDepth(typeOrName, state);
+      const listItemPos = findListItemPos(typeOrName, state);
+      if (!listItemPos || !listDepth) {
+          return false;
+      }
+      if (listDepth < listItemPos.depth) {
+          return true;
+      }
+      return false;
+  };
 
   const ListItem = Node.create({
       name: 'listItem',
@@ -22730,11 +23261,77 @@ img.ProseMirror-separator {
       renderHTML({ HTMLAttributes }) {
           return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
       },
+      addCommands() {
+          return {
+              joinListItemForward,
+              joinListItemBackward,
+          };
+      },
       addKeyboardShortcuts() {
           return {
               Enter: () => this.editor.commands.splitListItem(this.name),
               Tab: () => this.editor.commands.sinkListItem(this.name),
               'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
+              Delete: ({ editor }) => {
+                  // if the cursor is not inside the current node type
+                  // do nothing and proceed
+                  if (!isNodeActive(editor.state, this.name)) {
+                      return false;
+                  }
+                  // if the cursor is not at the end of a node
+                  // do nothing and proceed
+                  if (!istAtEndOfNode(editor.state)) {
+                      return false;
+                  }
+                  // check if the next node is a list with a deeper depth
+                  if (nextListIsDeeper(this.name, editor.state)) {
+                      return editor
+                          .chain()
+                          .focus(editor.state.selection.from + 4)
+                          .lift(this.name)
+                          .joinBackward()
+                          .run();
+                  }
+                  if (nextListIsHigher(this.name, editor.state)) {
+                      return editor.chain()
+                          .joinForward()
+                          .joinBackward()
+                          .run();
+                  }
+                  // check if the next node is also a listItem
+                  return editor.commands.joinListItemForward(this.name);
+              },
+              Backspace: ({ editor }) => {
+                  // this is required to still handle the undo handling
+                  if (this.editor.commands.undoInputRule()) {
+                      return true;
+                  }
+                  // if the cursor is not inside the current node type
+                  // do nothing and proceed
+                  if (!isNodeActive(editor.state, this.name)) {
+                      return false;
+                  }
+                  // if the cursor is not at the start of a node
+                  // do nothing and proceed
+                  if (!isAtStartOfNode(editor.state)) {
+                      return false;
+                  }
+                  const listItemPos = findListItemPos(this.name, editor.state);
+                  if (!listItemPos) {
+                      return false;
+                  }
+                  const $prev = editor.state.doc.resolve(listItemPos.$pos.pos - 2);
+                  const prevNode = $prev.node(listItemPos.depth);
+                  const previousListItemHasSubList = listItemHasSubList(this.name, editor.state, prevNode);
+                  // if the previous item is a list item and doesn't have a sublist, join the list items
+                  if (hasListItemBefore(this.name, editor.state) && !previousListItemHasSubList) {
+                      return editor.commands.joinListItemBackward(this.name);
+                  }
+                  // otherwise in the end, a backspace should
+                  // always just lift the list item if
+                  // joining / merging is not possible
+                  return editor.chain().liftListItem(this.name).run();
+              },
           };
       },
   });
@@ -46150,64 +46747,52 @@ img.ProseMirror-separator {
    * array instead of rest parameters.
    *
    * @template {unknown} T
-   * @param {T[]} list
+   *   Item type.
+   * @param {Array<T>} list
+   *   List to operate on.
    * @param {number} start
+   *   Index to remove/insert at (can be negative).
    * @param {number} remove
-   * @param {T[]} items
-   * @returns {void}
+   *   Number of items to remove.
+   * @param {Array<T>} items
+   *   Items to inject into `list`.
+   * @returns {undefined}
+   *   Nothing.
    */
-  function splice(list, start, remove, items) {
+  function splice$2(list, start, remove, items) {
     const end = list.length;
     let chunkStart = 0;
-    /** @type {unknown[]} */
+    /** @type {Array<unknown>} */
+    let parameters;
 
-    let parameters; // Make start between zero and `end` (included).
-
+    // Make start between zero and `end` (included).
     if (start < 0) {
       start = -start > end ? 0 : end + start;
     } else {
       start = start > end ? end : start;
     }
+    remove = remove > 0 ? remove : 0;
 
-    remove = remove > 0 ? remove : 0; // No need to chunk the items if there’s only a couple (10k) items.
-
+    // No need to chunk the items if there’s only a couple (10k) items.
     if (items.length < 10000) {
       parameters = Array.from(items);
-      parameters.unshift(start, remove) // @ts-expect-error Hush, it’s fine.
-      ;[].splice.apply(list, parameters);
+      parameters.unshift(start, remove);
+      // @ts-expect-error Hush, it’s fine.
+      list.splice(...parameters);
     } else {
       // Delete `remove` items starting from `start`
-      if (remove) [].splice.apply(list, [start, remove]); // Insert the items in chunks to not cause stack overflows.
+      if (remove) list.splice(start, remove);
 
+      // Insert the items in chunks to not cause stack overflows.
       while (chunkStart < items.length) {
         parameters = items.slice(chunkStart, chunkStart + 10000);
-        parameters.unshift(start, 0) // @ts-expect-error Hush, it’s fine.
-        ;[].splice.apply(list, parameters);
+        parameters.unshift(start, 0);
+        // @ts-expect-error Hush, it’s fine.
+        list.splice(...parameters);
         chunkStart += 10000;
         start += 10000;
       }
     }
-  }
-  /**
-   * Append `items` (an array) at the end of `list` (another array).
-   * When `list` was empty, returns `items` instead.
-   *
-   * This prevents a potentially expensive operation when `list` is empty,
-   * and adds items in batches to prevent V8 from hanging.
-   *
-   * @template {unknown} T
-   * @param {T[]} list
-   * @param {T[]} items
-   * @returns {T[]}
-   */
-
-  function push(list, items) {
-    if (list.length > 0) {
-      splice(list, list.length, 0, items);
-      return list
-    }
-
-    return items
   }
 
   /**
@@ -46218,7 +46803,7 @@ img.ProseMirror-separator {
    */
 
 
-  const hasOwnProperty$1 = {}.hasOwnProperty;
+  const hasOwnProperty$2 = {}.hasOwnProperty;
 
   /**
    * Combine multiple syntax extensions into one.
@@ -46228,13 +46813,13 @@ img.ProseMirror-separator {
    * @returns {NormalizedExtension}
    *   A single combined extension.
    */
-  function combineExtensions(extensions) {
+  function combineExtensions$1(extensions) {
     /** @type {NormalizedExtension} */
     const all = {};
     let index = -1;
 
     while (++index < extensions.length) {
-      syntaxExtension(all, extensions[index]);
+      syntaxExtension$1(all, extensions[index]);
     }
 
     return all
@@ -46247,14 +46832,14 @@ img.ProseMirror-separator {
    *   Extension to merge into.
    * @param {Extension} extension
    *   Extension to merge.
-   * @returns {void}
+   * @returns {undefined}
    */
-  function syntaxExtension(all, extension) {
+  function syntaxExtension$1(all, extension) {
     /** @type {keyof Extension} */
     let hook;
 
     for (hook in extension) {
-      const maybe = hasOwnProperty$1.call(all, hook) ? all[hook] : undefined;
+      const maybe = hasOwnProperty$2.call(all, hook) ? all[hook] : undefined;
       /** @type {Record<string, unknown>} */
       const left = maybe || (all[hook] = {});
       /** @type {Record<string, unknown> | undefined} */
@@ -46264,9 +46849,9 @@ img.ProseMirror-separator {
 
       if (right) {
         for (code in right) {
-          if (!hasOwnProperty$1.call(left, code)) left[code] = [];
+          if (!hasOwnProperty$2.call(left, code)) left[code] = [];
           const value = right[code];
-          constructs(
+          constructs$1(
             // @ts-expect-error Looks like a list.
             left[code],
             Array.isArray(value) ? value : value ? [value] : []
@@ -46282,9 +46867,9 @@ img.ProseMirror-separator {
    *
    * @param {Array<unknown>} existing
    * @param {Array<unknown>} list
-   * @returns {void}
+   * @returns {undefined}
    */
-  function constructs(existing, list) {
+  function constructs$1(existing, list) {
     let index = -1;
     /** @type {Array<unknown>} */
     const before = [];
@@ -46293,67 +46878,73 @@ img.ProseMirror-separator {
   (list[index].add === 'after' ? existing : before).push(list[index]);
     }
 
-    splice(existing, 0, 0, before);
+    splice$2(existing, 0, 0, before);
   }
 
-  // This module is generated by `script/`.
-  //
-  // CommonMark handles attention (emphasis, strong) markers based on what comes
-  // before or after them.
-  // One such difference is if those characters are Unicode punctuation.
-  // This script is generated from the Unicode data.
-  const unicodePunctuationRegex =
-    /[!-/:-@[-`{-~\u00A1\u00A7\u00AB\u00B6\u00B7\u00BB\u00BF\u037E\u0387\u055A-\u055F\u0589\u058A\u05BE\u05C0\u05C3\u05C6\u05F3\u05F4\u0609\u060A\u060C\u060D\u061B\u061E\u061F\u066A-\u066D\u06D4\u0700-\u070D\u07F7-\u07F9\u0830-\u083E\u085E\u0964\u0965\u0970\u09FD\u0A76\u0AF0\u0C77\u0C84\u0DF4\u0E4F\u0E5A\u0E5B\u0F04-\u0F12\u0F14\u0F3A-\u0F3D\u0F85\u0FD0-\u0FD4\u0FD9\u0FDA\u104A-\u104F\u10FB\u1360-\u1368\u1400\u166E\u169B\u169C\u16EB-\u16ED\u1735\u1736\u17D4-\u17D6\u17D8-\u17DA\u1800-\u180A\u1944\u1945\u1A1E\u1A1F\u1AA0-\u1AA6\u1AA8-\u1AAD\u1B5A-\u1B60\u1BFC-\u1BFF\u1C3B-\u1C3F\u1C7E\u1C7F\u1CC0-\u1CC7\u1CD3\u2010-\u2027\u2030-\u2043\u2045-\u2051\u2053-\u205E\u207D\u207E\u208D\u208E\u2308-\u230B\u2329\u232A\u2768-\u2775\u27C5\u27C6\u27E6-\u27EF\u2983-\u2998\u29D8-\u29DB\u29FC\u29FD\u2CF9-\u2CFC\u2CFE\u2CFF\u2D70\u2E00-\u2E2E\u2E30-\u2E4F\u2E52\u3001-\u3003\u3008-\u3011\u3014-\u301F\u3030\u303D\u30A0\u30FB\uA4FE\uA4FF\uA60D-\uA60F\uA673\uA67E\uA6F2-\uA6F7\uA874-\uA877\uA8CE\uA8CF\uA8F8-\uA8FA\uA8FC\uA92E\uA92F\uA95F\uA9C1-\uA9CD\uA9DE\uA9DF\uAA5C-\uAA5F\uAADE\uAADF\uAAF0\uAAF1\uABEB\uFD3E\uFD3F\uFE10-\uFE19\uFE30-\uFE52\uFE54-\uFE61\uFE63\uFE68\uFE6A\uFE6B\uFF01-\uFF03\uFF05-\uFF0A\uFF0C-\uFF0F\uFF1A\uFF1B\uFF1F\uFF20\uFF3B-\uFF3D\uFF3F\uFF5B\uFF5D\uFF5F-\uFF65]/;
+  /**
+   * Like `Array#splice`, but smarter for giant arrays.
+   *
+   * `Array#splice` takes all items to be inserted as individual argument which
+   * causes a stack overflow in V8 when trying to insert 100k items for instance.
+   *
+   * Otherwise, this does not return the removed items, and takes `items` as an
+   * array instead of rest parameters.
+   *
+   * @template {unknown} T
+   *   Item type.
+   * @param {Array<T>} list
+   *   List to operate on.
+   * @param {number} start
+   *   Index to remove/insert at (can be negative).
+   * @param {number} remove
+   *   Number of items to remove.
+   * @param {Array<T>} items
+   *   Items to inject into `list`.
+   * @returns {undefined}
+   *   Nothing.
+   */
+  function splice$1(list, start, remove, items) {
+    const end = list.length;
+    let chunkStart = 0;
+    /** @type {Array<unknown>} */
+    let parameters;
+
+    // Make start between zero and `end` (included).
+    if (start < 0) {
+      start = -start > end ? 0 : end + start;
+    } else {
+      start = start > end ? end : start;
+    }
+    remove = remove > 0 ? remove : 0;
+
+    // No need to chunk the items if there’s only a couple (10k) items.
+    if (items.length < 10000) {
+      parameters = Array.from(items);
+      parameters.unshift(start, remove);
+      // @ts-expect-error Hush, it’s fine.
+      list.splice(...parameters);
+    } else {
+      // Delete `remove` items starting from `start`
+      if (remove) list.splice(start, remove);
+
+      // Insert the items in chunks to not cause stack overflows.
+      while (chunkStart < items.length) {
+        parameters = items.slice(chunkStart, chunkStart + 10000);
+        parameters.unshift(start, 0);
+        // @ts-expect-error Hush, it’s fine.
+        list.splice(...parameters);
+        chunkStart += 10000;
+        start += 10000;
+      }
+    }
+  }
 
   /**
    * @typedef {import('micromark-util-types').Code} Code
    */
-  /**
-   * Check whether the character code represents an ASCII alpha (`a` through `z`,
-   * case insensitive).
-   *
-   * An **ASCII alpha** is an ASCII upper alpha or ASCII lower alpha.
-   *
-   * An **ASCII upper alpha** is a character in the inclusive range U+0041 (`A`)
-   * to U+005A (`Z`).
-   *
-   * An **ASCII lower alpha** is a character in the inclusive range U+0061 (`a`)
-   * to U+007A (`z`).
-   */
 
-  const asciiAlpha = regexCheck(/[A-Za-z]/);
-  /**
-   * Check whether the character code represents an ASCII digit (`0` through `9`).
-   *
-   * An **ASCII digit** is a character in the inclusive range U+0030 (`0`) to
-   * U+0039 (`9`).
-   */
+  const unicodePunctuationInternal = regexCheck$1(/\p{P}/u);
 
-  const asciiDigit = regexCheck(/\d/);
-  /**
-   * Check whether the character code represents an ASCII hex digit (`a` through
-   * `f`, case insensitive, or `0` through `9`).
-   *
-   * An **ASCII hex digit** is an ASCII digit (see `asciiDigit`), ASCII upper hex
-   * digit, or an ASCII lower hex digit.
-   *
-   * An **ASCII upper hex digit** is a character in the inclusive range U+0041
-   * (`A`) to U+0046 (`F`).
-   *
-   * An **ASCII lower hex digit** is a character in the inclusive range U+0061
-   * (`a`) to U+0066 (`f`).
-   */
-
-  const asciiHexDigit = regexCheck(/[\dA-Fa-f]/);
-  /**
-   * Check whether the character code represents an ASCII alphanumeric (`a`
-   * through `z`, case insensitive, or `0` through `9`).
-   *
-   * An **ASCII alphanumeric** is an ASCII digit (see `asciiDigit`) or ASCII alpha
-   * (see `asciiAlpha`).
-   */
-
-  const asciiAlphanumeric = regexCheck(/[\dA-Za-z]/);
   /**
    * Check whether the character code represents ASCII punctuation.
    *
@@ -46361,89 +46952,52 @@ img.ProseMirror-separator {
    * EXCLAMATION MARK (`!`) to U+002F SLASH (`/`), U+003A COLON (`:`) to U+0040 AT
    * SIGN (`@`), U+005B LEFT SQUARE BRACKET (`[`) to U+0060 GRAVE ACCENT
    * (`` ` ``), or U+007B LEFT CURLY BRACE (`{`) to U+007E TILDE (`~`).
+   *
+   * @param code
+   *   Code.
+   * @returns {boolean}
+   *   Whether it matches.
    */
+  const asciiPunctuation$1 = regexCheck$1(/[!-/:-@[-`{-~]/);
 
-  const asciiPunctuation = regexCheck(/[!-/:-@[-`{-~]/);
-  /**
-   * Check whether the character code represents an ASCII atext.
-   *
-   * atext is an ASCII alphanumeric (see `asciiAlphanumeric`), or a character in
-   * the inclusive ranges U+0023 NUMBER SIGN (`#`) to U+0027 APOSTROPHE (`'`),
-   * U+002A ASTERISK (`*`), U+002B PLUS SIGN (`+`), U+002D DASH (`-`), U+002F
-   * SLASH (`/`), U+003D EQUALS TO (`=`), U+003F QUESTION MARK (`?`), U+005E
-   * CARET (`^`) to U+0060 GRAVE ACCENT (`` ` ``), or U+007B LEFT CURLY BRACE
-   * (`{`) to U+007E TILDE (`~`).
-   *
-   * See:
-   * **\[RFC5322]**:
-   * [Internet Message Format](https://tools.ietf.org/html/rfc5322).
-   * P. Resnick.
-   * IETF.
-   */
-
-  const asciiAtext = regexCheck(/[#-'*+\--9=?A-Z^-~]/);
-  /**
-   * Check whether a character code is an ASCII control character.
-   *
-   * An **ASCII control** is a character in the inclusive range U+0000 NULL (NUL)
-   * to U+001F (US), or U+007F (DEL).
-   *
-   * @param {Code} code
-   * @returns {code is number}
-   */
-
-  function asciiControl(code) {
-    return (
-      // Special whitespace codes (which have negative values), C0 and Control
-      // character DEL
-      code !== null && (code < 32 || code === 127)
-    )
-  }
   /**
    * Check whether a character code is a markdown line ending (see
    * `markdownLineEnding`) or markdown space (see `markdownSpace`).
    *
    * @param {Code} code
-   * @returns {code is number}
+   *   Code.
+   * @returns {boolean}
+   *   Whether it matches.
    */
-
-  function markdownLineEndingOrSpace(code) {
+  function markdownLineEndingOrSpace$1(code) {
     return code !== null && (code < 0 || code === 32)
   }
+
+  // Size note: removing ASCII from the regex and using `asciiPunctuation` here
+  // In fact adds to the bundle size.
   /**
-   * Check whether a character code is a markdown line ending.
+   * Check whether the character code represents Unicode punctuation.
    *
-   * A **markdown line ending** is the virtual characters M-0003 CARRIAGE RETURN
-   * LINE FEED (CRLF), M-0004 LINE FEED (LF) and M-0005 CARRIAGE RETURN (CR).
+   * A **Unicode punctuation** is a character in the Unicode `Pc` (Punctuation,
+   * Connector), `Pd` (Punctuation, Dash), `Pe` (Punctuation, Close), `Pf`
+   * (Punctuation, Final quote), `Pi` (Punctuation, Initial quote), `Po`
+   * (Punctuation, Other), or `Ps` (Punctuation, Open) categories, or an ASCII
+   * punctuation (see `asciiPunctuation`).
    *
-   * In micromark, the actual character U+000A LINE FEED (LF) and U+000D CARRIAGE
-   * RETURN (CR) are replaced by these virtual characters depending on whether
-   * they occurred together.
+   * See:
+   * **\[UNICODE]**:
+   * [The Unicode Standard](https://www.unicode.org/versions/).
+   * Unicode Consortium.
    *
    * @param {Code} code
-   * @returns {code is number}
+   *   Code.
+   * @returns {boolean}
+   *   Whether it matches.
    */
-
-  function markdownLineEnding(code) {
-    return code !== null && code < -2
+  function unicodePunctuation$1(code) {
+    return asciiPunctuation$1(code) || unicodePunctuationInternal(code)
   }
-  /**
-   * Check whether a character code is a markdown space.
-   *
-   * A **markdown space** is the concrete character U+0020 SPACE (SP) and the
-   * virtual characters M-0001 VIRTUAL SPACE (VS) and M-0002 HORIZONTAL TAB (HT).
-   *
-   * In micromark, the actual character U+0009 CHARACTER TABULATION (HT) is
-   * replaced by one M-0002 HORIZONTAL TAB (HT) and between 0 and 3 M-0001 VIRTUAL
-   * SPACE (VS) characters, depending on the column at which the tab occurred.
-   *
-   * @param {Code} code
-   * @returns {code is number}
-   */
 
-  function markdownSpace(code) {
-    return code === -2 || code === -1 || code === 32
-  }
   /**
    * Check whether the character code represents Unicode whitespace.
    *
@@ -46458,45 +47012,33 @@ img.ProseMirror-separator {
    * **\[UNICODE]**:
    * [The Unicode Standard](https://www.unicode.org/versions/).
    * Unicode Consortium.
-   */
-
-  const unicodeWhitespace = regexCheck(/\s/);
-  /**
-   * Check whether the character code represents Unicode punctuation.
    *
-   * A **Unicode punctuation** is a character in the Unicode `Pc` (Punctuation,
-   * Connector), `Pd` (Punctuation, Dash), `Pe` (Punctuation, Close), `Pf`
-   * (Punctuation, Final quote), `Pi` (Punctuation, Initial quote), `Po`
-   * (Punctuation, Other), or `Ps` (Punctuation, Open) categories, or an ASCII
-   * punctuation (see `asciiPunctuation`).
-   *
-   * See:
-   * **\[UNICODE]**:
-   * [The Unicode Standard](https://www.unicode.org/versions/).
-   * Unicode Consortium.
+   * @param code
+   *   Code.
+   * @returns {boolean}
+   *   Whether it matches.
    */
-  // Size note: removing ASCII from the regex and using `asciiPunctuation` here
-  // In fact adds to the bundle size.
+  const unicodeWhitespace$1 = regexCheck$1(/\s/);
 
-  const unicodePunctuation = regexCheck(unicodePunctuationRegex);
   /**
    * Create a code check from a regex.
    *
    * @param {RegExp} regex
-   * @returns {(code: Code) => code is number}
+   * @returns {(code: Code) => boolean}
    */
-
-  function regexCheck(regex) {
+  function regexCheck$1(regex) {
     return check
+
     /**
      * Check whether a code matches the bound regex.
      *
-     * @param {Code} code Character code
-     * @returns {code is number} Whether the character code matches the bound regex
+     * @param {Code} code
+     *   Character code.
+     * @returns {boolean}
+     *   Whether the character code matches the bound regex.
      */
-
     function check(code) {
-      return code !== null && regex.test(String.fromCharCode(code))
+      return code !== null && code > -1 && regex.test(String.fromCharCode(code))
     }
   }
 
@@ -46505,47 +47047,52 @@ img.ProseMirror-separator {
    */
 
   /**
-   * Classify whether a character code represents whitespace, punctuation, or
-   * something else.
+   * Classify whether a code represents whitespace, punctuation, or something
+   * else.
    *
    * Used for attention (emphasis, strong), whose sequences can open or close
    * based on the class of surrounding characters.
    *
-   * Note that eof (`null`) is seen as whitespace.
+   * > 👉 **Note**: eof (`null`) is seen as whitespace.
    *
    * @param {Code} code
-   * @returns {number|undefined}
+   *   Code.
+   * @returns {typeof constants.characterGroupWhitespace | typeof constants.characterGroupPunctuation | undefined}
+   *   Group.
    */
-  function classifyCharacter(code) {
+  function classifyCharacter$1(code) {
     if (
       code === null ||
-      markdownLineEndingOrSpace(code) ||
-      unicodeWhitespace(code)
+      markdownLineEndingOrSpace$1(code) ||
+      unicodeWhitespace$1(code)
     ) {
       return 1
     }
-
-    if (unicodePunctuation(code)) {
+    if (unicodePunctuation$1(code)) {
       return 2
     }
   }
 
   /**
-   * @typedef {import('micromark-util-types').TokenizeContext} TokenizeContext
    * @typedef {import('micromark-util-types').Event} Event
    * @typedef {import('micromark-util-types').Resolver} Resolver
+   * @typedef {import('micromark-util-types').TokenizeContext} TokenizeContext
    */
 
   /**
    * Call all `resolveAll`s.
    *
-   * @param {{resolveAll?: Resolver}[]} constructs
-   * @param {Event[]} events
+   * @param {Array<{resolveAll?: Resolver | undefined}>} constructs
+   *   List of constructs, optionally with `resolveAll`s.
+   * @param {Array<Event>} events
+   *   List of events.
    * @param {TokenizeContext} context
-   * @returns {Event[]}
+   *   Context used by `tokenize`.
+   * @returns {Array<Event>}
+   *   Changed events.
    */
-  function resolveAll(constructs, events, context) {
-    /** @type {Resolver[]} */
+  function resolveAll$1(constructs, events, context) {
+    /** @type {Array<Resolver>} */
     const called = [];
     let index = -1;
 
@@ -46572,8 +47119,8 @@ img.ProseMirror-separator {
    *
    * @typedef Options
    *   Configuration (optional).
-   * @property {boolean} [singleTilde=true]
-   *   Whether to support strikethrough with a single tilde.
+   * @property {boolean | null | undefined} [singleTilde=true]
+   *   Whether to support strikethrough with a single tilde (default: `true`).
    *
    *   Single tildes work on github.com, but are technically prohibited by the
    *   GFM spec.
@@ -46582,7 +47129,7 @@ img.ProseMirror-separator {
   /**
    * Create an extension for `micromark` to enable GFM strikethrough syntax.
    *
-   * @param {Options | null | undefined} [options]
+   * @param {Options | null | undefined} [options={}]
    *   Configuration.
    * @returns {Extension}
    *   Extension for `micromark` that can be passed in `extensions`, to
@@ -46667,22 +47214,22 @@ img.ProseMirror-separator {
               const insideSpan = context.parser.constructs.insideSpan.null;
               if (insideSpan) {
                 // Between.
-                splice(
+                splice$1(
                   nextEvents,
                   nextEvents.length,
                   0,
-                  resolveAll(insideSpan, events.slice(open + 1, index), context)
+                  resolveAll$1(insideSpan, events.slice(open + 1, index), context)
                 );
               }
 
               // Closing.
-              splice(nextEvents, nextEvents.length, 0, [
+              splice$1(nextEvents, nextEvents.length, 0, [
                 ['exit', text, context],
                 ['enter', events[index][1], context],
                 ['exit', events[index][1], context],
                 ['exit', strikethrough, context]
               ]);
-              splice(events, open - 1, index - open + 3, nextEvents);
+              splice$1(events, open - 1, index - open + 3, nextEvents);
               index = open + nextEvents.length - 2;
               break
             }
@@ -46722,7 +47269,7 @@ img.ProseMirror-separator {
 
       /** @type {State} */
       function more(code) {
-        const before = classifyCharacter(previous);
+        const before = classifyCharacter$1(previous);
         if (code === 126) {
           // If this is the third marker, exit.
           if (size > 1) return nok(code)
@@ -46732,7 +47279,7 @@ img.ProseMirror-separator {
         }
         if (size < 2 && !single) return nok(code)
         const token = effects.exit('strikethroughSequenceTemporary');
-        const after = classifyCharacter(code);
+        const after = classifyCharacter$1(code);
         token._open = !after || (after === 2 && Boolean(before));
         token._close = !before || (before === 2 && Boolean(after));
         return ok(code)
@@ -46844,7 +47391,7 @@ img.ProseMirror-separator {
   }
 
   function gfm(options) {
-      return combineExtensions([gfmStrikethrough(options)]);
+      return combineExtensions$1([gfmStrikethrough(options)]);
   }
   // function gfmHtml() {
   //   return combineHtmlExtensions([gfmStrikethroughHtml])
@@ -52174,6 +52721,366 @@ img.ProseMirror-separator {
   };
 
   /**
+   * Like `Array#splice`, but smarter for giant arrays.
+   *
+   * `Array#splice` takes all items to be inserted as individual argument which
+   * causes a stack overflow in V8 when trying to insert 100k items for instance.
+   *
+   * Otherwise, this does not return the removed items, and takes `items` as an
+   * array instead of rest parameters.
+   *
+   * @template {unknown} T
+   * @param {T[]} list
+   * @param {number} start
+   * @param {number} remove
+   * @param {T[]} items
+   * @returns {void}
+   */
+  function splice(list, start, remove, items) {
+    const end = list.length;
+    let chunkStart = 0;
+    /** @type {unknown[]} */
+
+    let parameters; // Make start between zero and `end` (included).
+
+    if (start < 0) {
+      start = -start > end ? 0 : end + start;
+    } else {
+      start = start > end ? end : start;
+    }
+
+    remove = remove > 0 ? remove : 0; // No need to chunk the items if there’s only a couple (10k) items.
+
+    if (items.length < 10000) {
+      parameters = Array.from(items);
+      parameters.unshift(start, remove) // @ts-expect-error Hush, it’s fine.
+      ;[].splice.apply(list, parameters);
+    } else {
+      // Delete `remove` items starting from `start`
+      if (remove) [].splice.apply(list, [start, remove]); // Insert the items in chunks to not cause stack overflows.
+
+      while (chunkStart < items.length) {
+        parameters = items.slice(chunkStart, chunkStart + 10000);
+        parameters.unshift(start, 0) // @ts-expect-error Hush, it’s fine.
+        ;[].splice.apply(list, parameters);
+        chunkStart += 10000;
+        start += 10000;
+      }
+    }
+  }
+  /**
+   * Append `items` (an array) at the end of `list` (another array).
+   * When `list` was empty, returns `items` instead.
+   *
+   * This prevents a potentially expensive operation when `list` is empty,
+   * and adds items in batches to prevent V8 from hanging.
+   *
+   * @template {unknown} T
+   * @param {T[]} list
+   * @param {T[]} items
+   * @returns {T[]}
+   */
+
+  function push(list, items) {
+    if (list.length > 0) {
+      splice(list, list.length, 0, items);
+      return list
+    }
+
+    return items
+  }
+
+  /**
+   * @typedef {import('micromark-util-types').Extension} Extension
+   * @typedef {import('micromark-util-types').Handles} Handles
+   * @typedef {import('micromark-util-types').HtmlExtension} HtmlExtension
+   * @typedef {import('micromark-util-types').NormalizedExtension} NormalizedExtension
+   */
+
+
+  const hasOwnProperty$1 = {}.hasOwnProperty;
+
+  /**
+   * Combine multiple syntax extensions into one.
+   *
+   * @param {Array<Extension>} extensions
+   *   List of syntax extensions.
+   * @returns {NormalizedExtension}
+   *   A single combined extension.
+   */
+  function combineExtensions(extensions) {
+    /** @type {NormalizedExtension} */
+    const all = {};
+    let index = -1;
+
+    while (++index < extensions.length) {
+      syntaxExtension(all, extensions[index]);
+    }
+
+    return all
+  }
+
+  /**
+   * Merge `extension` into `all`.
+   *
+   * @param {NormalizedExtension} all
+   *   Extension to merge into.
+   * @param {Extension} extension
+   *   Extension to merge.
+   * @returns {void}
+   */
+  function syntaxExtension(all, extension) {
+    /** @type {keyof Extension} */
+    let hook;
+
+    for (hook in extension) {
+      const maybe = hasOwnProperty$1.call(all, hook) ? all[hook] : undefined;
+      /** @type {Record<string, unknown>} */
+      const left = maybe || (all[hook] = {});
+      /** @type {Record<string, unknown> | undefined} */
+      const right = extension[hook];
+      /** @type {string} */
+      let code;
+
+      if (right) {
+        for (code in right) {
+          if (!hasOwnProperty$1.call(left, code)) left[code] = [];
+          const value = right[code];
+          constructs(
+            // @ts-expect-error Looks like a list.
+            left[code],
+            Array.isArray(value) ? value : value ? [value] : []
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Merge `list` into `existing` (both lists of constructs).
+   * Mutates `existing`.
+   *
+   * @param {Array<unknown>} existing
+   * @param {Array<unknown>} list
+   * @returns {void}
+   */
+  function constructs(existing, list) {
+    let index = -1;
+    /** @type {Array<unknown>} */
+    const before = [];
+
+    while (++index < list.length) {
+  (list[index].add === 'after' ? existing : before).push(list[index]);
+    }
+
+    splice(existing, 0, 0, before);
+  }
+
+  // This module is generated by `script/`.
+  //
+  // CommonMark handles attention (emphasis, strong) markers based on what comes
+  // before or after them.
+  // One such difference is if those characters are Unicode punctuation.
+  // This script is generated from the Unicode data.
+  const unicodePunctuationRegex =
+    /[!-/:-@[-`{-~\u00A1\u00A7\u00AB\u00B6\u00B7\u00BB\u00BF\u037E\u0387\u055A-\u055F\u0589\u058A\u05BE\u05C0\u05C3\u05C6\u05F3\u05F4\u0609\u060A\u060C\u060D\u061B\u061E\u061F\u066A-\u066D\u06D4\u0700-\u070D\u07F7-\u07F9\u0830-\u083E\u085E\u0964\u0965\u0970\u09FD\u0A76\u0AF0\u0C77\u0C84\u0DF4\u0E4F\u0E5A\u0E5B\u0F04-\u0F12\u0F14\u0F3A-\u0F3D\u0F85\u0FD0-\u0FD4\u0FD9\u0FDA\u104A-\u104F\u10FB\u1360-\u1368\u1400\u166E\u169B\u169C\u16EB-\u16ED\u1735\u1736\u17D4-\u17D6\u17D8-\u17DA\u1800-\u180A\u1944\u1945\u1A1E\u1A1F\u1AA0-\u1AA6\u1AA8-\u1AAD\u1B5A-\u1B60\u1BFC-\u1BFF\u1C3B-\u1C3F\u1C7E\u1C7F\u1CC0-\u1CC7\u1CD3\u2010-\u2027\u2030-\u2043\u2045-\u2051\u2053-\u205E\u207D\u207E\u208D\u208E\u2308-\u230B\u2329\u232A\u2768-\u2775\u27C5\u27C6\u27E6-\u27EF\u2983-\u2998\u29D8-\u29DB\u29FC\u29FD\u2CF9-\u2CFC\u2CFE\u2CFF\u2D70\u2E00-\u2E2E\u2E30-\u2E4F\u2E52\u3001-\u3003\u3008-\u3011\u3014-\u301F\u3030\u303D\u30A0\u30FB\uA4FE\uA4FF\uA60D-\uA60F\uA673\uA67E\uA6F2-\uA6F7\uA874-\uA877\uA8CE\uA8CF\uA8F8-\uA8FA\uA8FC\uA92E\uA92F\uA95F\uA9C1-\uA9CD\uA9DE\uA9DF\uAA5C-\uAA5F\uAADE\uAADF\uAAF0\uAAF1\uABEB\uFD3E\uFD3F\uFE10-\uFE19\uFE30-\uFE52\uFE54-\uFE61\uFE63\uFE68\uFE6A\uFE6B\uFF01-\uFF03\uFF05-\uFF0A\uFF0C-\uFF0F\uFF1A\uFF1B\uFF1F\uFF20\uFF3B-\uFF3D\uFF3F\uFF5B\uFF5D\uFF5F-\uFF65]/;
+
+  /**
+   * @typedef {import('micromark-util-types').Code} Code
+   */
+  /**
+   * Check whether the character code represents an ASCII alpha (`a` through `z`,
+   * case insensitive).
+   *
+   * An **ASCII alpha** is an ASCII upper alpha or ASCII lower alpha.
+   *
+   * An **ASCII upper alpha** is a character in the inclusive range U+0041 (`A`)
+   * to U+005A (`Z`).
+   *
+   * An **ASCII lower alpha** is a character in the inclusive range U+0061 (`a`)
+   * to U+007A (`z`).
+   */
+
+  const asciiAlpha = regexCheck(/[A-Za-z]/);
+  /**
+   * Check whether the character code represents an ASCII digit (`0` through `9`).
+   *
+   * An **ASCII digit** is a character in the inclusive range U+0030 (`0`) to
+   * U+0039 (`9`).
+   */
+
+  const asciiDigit = regexCheck(/\d/);
+  /**
+   * Check whether the character code represents an ASCII hex digit (`a` through
+   * `f`, case insensitive, or `0` through `9`).
+   *
+   * An **ASCII hex digit** is an ASCII digit (see `asciiDigit`), ASCII upper hex
+   * digit, or an ASCII lower hex digit.
+   *
+   * An **ASCII upper hex digit** is a character in the inclusive range U+0041
+   * (`A`) to U+0046 (`F`).
+   *
+   * An **ASCII lower hex digit** is a character in the inclusive range U+0061
+   * (`a`) to U+0066 (`f`).
+   */
+
+  const asciiHexDigit = regexCheck(/[\dA-Fa-f]/);
+  /**
+   * Check whether the character code represents an ASCII alphanumeric (`a`
+   * through `z`, case insensitive, or `0` through `9`).
+   *
+   * An **ASCII alphanumeric** is an ASCII digit (see `asciiDigit`) or ASCII alpha
+   * (see `asciiAlpha`).
+   */
+
+  const asciiAlphanumeric = regexCheck(/[\dA-Za-z]/);
+  /**
+   * Check whether the character code represents ASCII punctuation.
+   *
+   * An **ASCII punctuation** is a character in the inclusive ranges U+0021
+   * EXCLAMATION MARK (`!`) to U+002F SLASH (`/`), U+003A COLON (`:`) to U+0040 AT
+   * SIGN (`@`), U+005B LEFT SQUARE BRACKET (`[`) to U+0060 GRAVE ACCENT
+   * (`` ` ``), or U+007B LEFT CURLY BRACE (`{`) to U+007E TILDE (`~`).
+   */
+
+  const asciiPunctuation = regexCheck(/[!-/:-@[-`{-~]/);
+  /**
+   * Check whether the character code represents an ASCII atext.
+   *
+   * atext is an ASCII alphanumeric (see `asciiAlphanumeric`), or a character in
+   * the inclusive ranges U+0023 NUMBER SIGN (`#`) to U+0027 APOSTROPHE (`'`),
+   * U+002A ASTERISK (`*`), U+002B PLUS SIGN (`+`), U+002D DASH (`-`), U+002F
+   * SLASH (`/`), U+003D EQUALS TO (`=`), U+003F QUESTION MARK (`?`), U+005E
+   * CARET (`^`) to U+0060 GRAVE ACCENT (`` ` ``), or U+007B LEFT CURLY BRACE
+   * (`{`) to U+007E TILDE (`~`).
+   *
+   * See:
+   * **\[RFC5322]**:
+   * [Internet Message Format](https://tools.ietf.org/html/rfc5322).
+   * P. Resnick.
+   * IETF.
+   */
+
+  const asciiAtext = regexCheck(/[#-'*+\--9=?A-Z^-~]/);
+  /**
+   * Check whether a character code is an ASCII control character.
+   *
+   * An **ASCII control** is a character in the inclusive range U+0000 NULL (NUL)
+   * to U+001F (US), or U+007F (DEL).
+   *
+   * @param {Code} code
+   * @returns {code is number}
+   */
+
+  function asciiControl(code) {
+    return (
+      // Special whitespace codes (which have negative values), C0 and Control
+      // character DEL
+      code !== null && (code < 32 || code === 127)
+    )
+  }
+  /**
+   * Check whether a character code is a markdown line ending (see
+   * `markdownLineEnding`) or markdown space (see `markdownSpace`).
+   *
+   * @param {Code} code
+   * @returns {code is number}
+   */
+
+  function markdownLineEndingOrSpace(code) {
+    return code !== null && (code < 0 || code === 32)
+  }
+  /**
+   * Check whether a character code is a markdown line ending.
+   *
+   * A **markdown line ending** is the virtual characters M-0003 CARRIAGE RETURN
+   * LINE FEED (CRLF), M-0004 LINE FEED (LF) and M-0005 CARRIAGE RETURN (CR).
+   *
+   * In micromark, the actual character U+000A LINE FEED (LF) and U+000D CARRIAGE
+   * RETURN (CR) are replaced by these virtual characters depending on whether
+   * they occurred together.
+   *
+   * @param {Code} code
+   * @returns {code is number}
+   */
+
+  function markdownLineEnding(code) {
+    return code !== null && code < -2
+  }
+  /**
+   * Check whether a character code is a markdown space.
+   *
+   * A **markdown space** is the concrete character U+0020 SPACE (SP) and the
+   * virtual characters M-0001 VIRTUAL SPACE (VS) and M-0002 HORIZONTAL TAB (HT).
+   *
+   * In micromark, the actual character U+0009 CHARACTER TABULATION (HT) is
+   * replaced by one M-0002 HORIZONTAL TAB (HT) and between 0 and 3 M-0001 VIRTUAL
+   * SPACE (VS) characters, depending on the column at which the tab occurred.
+   *
+   * @param {Code} code
+   * @returns {code is number}
+   */
+
+  function markdownSpace(code) {
+    return code === -2 || code === -1 || code === 32
+  }
+  /**
+   * Check whether the character code represents Unicode whitespace.
+   *
+   * Note that this does handle micromark specific markdown whitespace characters.
+   * See `markdownLineEndingOrSpace` to check that.
+   *
+   * A **Unicode whitespace** is a character in the Unicode `Zs` (Separator,
+   * Space) category, or U+0009 CHARACTER TABULATION (HT), U+000A LINE FEED (LF),
+   * U+000C (FF), or U+000D CARRIAGE RETURN (CR) (**\[UNICODE]**).
+   *
+   * See:
+   * **\[UNICODE]**:
+   * [The Unicode Standard](https://www.unicode.org/versions/).
+   * Unicode Consortium.
+   */
+
+  const unicodeWhitespace = regexCheck(/\s/);
+  /**
+   * Check whether the character code represents Unicode punctuation.
+   *
+   * A **Unicode punctuation** is a character in the Unicode `Pc` (Punctuation,
+   * Connector), `Pd` (Punctuation, Dash), `Pe` (Punctuation, Close), `Pf`
+   * (Punctuation, Final quote), `Pi` (Punctuation, Initial quote), `Po`
+   * (Punctuation, Other), or `Ps` (Punctuation, Open) categories, or an ASCII
+   * punctuation (see `asciiPunctuation`).
+   *
+   * See:
+   * **\[UNICODE]**:
+   * [The Unicode Standard](https://www.unicode.org/versions/).
+   * Unicode Consortium.
+   */
+  // Size note: removing ASCII from the regex and using `asciiPunctuation` here
+  // In fact adds to the bundle size.
+
+  const unicodePunctuation = regexCheck(unicodePunctuationRegex);
+  /**
+   * Create a code check from a regex.
+   *
+   * @param {RegExp} regex
+   * @returns {(code: Code) => code is number}
+   */
+
+  function regexCheck(regex) {
+    return check
+    /**
+     * Check whether a code matches the bound regex.
+     *
+     * @param {Code} code Character code
+     * @returns {code is number} Whether the character code matches the bound regex
+     */
+
+    function check(code) {
+      return code !== null && regex.test(String.fromCharCode(code))
+    }
+  }
+
+  /**
    * @typedef {import('micromark-util-types').Effects} Effects
    * @typedef {import('micromark-util-types').State} State
    */
@@ -52655,6 +53562,67 @@ img.ProseMirror-separator {
       'linePrefix',
       this.parser.constructs.disable.null.includes('codeIndented') ? undefined : 4
     )
+  }
+
+  /**
+   * @typedef {import('micromark-util-types').Code} Code
+   */
+
+  /**
+   * Classify whether a character code represents whitespace, punctuation, or
+   * something else.
+   *
+   * Used for attention (emphasis, strong), whose sequences can open or close
+   * based on the class of surrounding characters.
+   *
+   * Note that eof (`null`) is seen as whitespace.
+   *
+   * @param {Code} code
+   * @returns {number|undefined}
+   */
+  function classifyCharacter(code) {
+    if (
+      code === null ||
+      markdownLineEndingOrSpace(code) ||
+      unicodeWhitespace(code)
+    ) {
+      return 1
+    }
+
+    if (unicodePunctuation(code)) {
+      return 2
+    }
+  }
+
+  /**
+   * @typedef {import('micromark-util-types').TokenizeContext} TokenizeContext
+   * @typedef {import('micromark-util-types').Event} Event
+   * @typedef {import('micromark-util-types').Resolver} Resolver
+   */
+
+  /**
+   * Call all `resolveAll`s.
+   *
+   * @param {{resolveAll?: Resolver}[]} constructs
+   * @param {Event[]} events
+   * @param {TokenizeContext} context
+   * @returns {Event[]}
+   */
+  function resolveAll(constructs, events, context) {
+    /** @type {Resolver[]} */
+    const called = [];
+    let index = -1;
+
+    while (++index < constructs.length) {
+      const resolve = constructs[index].resolveAll;
+
+      if (resolve && !called.includes(resolve)) {
+        events = resolve(events, context);
+        called.push(resolve);
+      }
+    }
+
+    return events
   }
 
   /**
@@ -68088,7 +69056,7 @@ img.ProseMirror-separator {
   function matchSelector(selector, element, { debug = false } = {}) {
     for (const rules of parseSelector(selector)) {
       const handleRules = (element2, rules2) => {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         let success = false;
         for (const part of rules2) {
           const { type, name, action, value, _ignoreCase = true, data } = part;
@@ -68107,6 +69075,8 @@ img.ProseMirror-separator {
               }
             } else if (action === "exists") {
               success = element2.hasAttribute(name);
+            } else if (action === "any") {
+              success = !!((_d = element2.getAttribute(name)) == null ? void 0 : _d.includes(value));
             } else {
               console.warn("Unknown CSS selector action", action);
             }
@@ -68160,7 +69130,7 @@ img.ProseMirror-separator {
     // 'tt': C
   };
   var toCamelCase = (s) => s.toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, (m, chr) => chr.toUpperCase());
-  var _VNode = class {
+  var _VNode = class _VNode {
     constructor() {
       this.append = this.appendChild;
       this._parentNode = null;
@@ -68338,15 +69308,15 @@ img.ProseMirror-separator {
       return `${this.constructor.name} "${this.render()}"`;
     }
   };
+  _VNode.ELEMENT_NODE = 1;
+  _VNode.TEXT_NODE = 3;
+  _VNode.CDATA_SECTION_NODE = 4;
+  _VNode.PROCESSING_INSTRUCTION_NODE = 7;
+  _VNode.COMMENT_NODE = 8;
+  _VNode.DOCUMENT_NODE = 9;
+  _VNode.DOCUMENT_TYPE_NODE = 10;
+  _VNode.DOCUMENT_FRAGMENT_NODE = 11;
   var VNode = _VNode;
-  VNode.ELEMENT_NODE = 1;
-  VNode.TEXT_NODE = 3;
-  VNode.CDATA_SECTION_NODE = 4;
-  VNode.PROCESSING_INSTRUCTION_NODE = 7;
-  VNode.COMMENT_NODE = 8;
-  VNode.DOCUMENT_NODE = 9;
-  VNode.DOCUMENT_TYPE_NODE = 10;
-  VNode.DOCUMENT_FRAGMENT_NODE = 11;
   var VTextNode = class extends VNode {
     constructor(text = "") {
       super();
@@ -68559,7 +69529,7 @@ img.ProseMirror-separator {
       );
     }
   };
-  var VDocType = class extends VNode {
+  var VDocType = class _VDocType extends VNode {
     get nodeName() {
       return super.nodeName;
     }
@@ -68567,13 +69537,13 @@ img.ProseMirror-separator {
       return super.nodeValue;
     }
     get nodeType() {
-      return VDocType.DOCUMENT_TYPE_NODE;
+      return _VDocType.DOCUMENT_TYPE_NODE;
     }
     render() {
       return "<!DOCTYPE html>";
     }
   };
-  var VDocumentFragment = class extends VNodeQuery {
+  var VDocumentFragment = class _VDocumentFragment extends VNodeQuery {
     get nodeType() {
       return VNode.DOCUMENT_FRAGMENT_NODE;
     }
@@ -68590,7 +69560,7 @@ img.ProseMirror-separator {
       return new VElement(name, attrs);
     }
     createDocumentFragment() {
-      return new VDocumentFragment();
+      return new _VDocumentFragment();
     }
     createTextNode(text) {
       return new VTextNode(text);
@@ -68896,6 +69866,7 @@ img.ProseMirror-separator {
   exports.getMarkRange = getMarkRange;
   exports.getMarkType = getMarkType;
   exports.getMarksBetween = getMarksBetween;
+  exports.getNodeAtPosition = getNodeAtPosition;
   exports.getNodeAttributes = getNodeAttributes;
   exports.getNodeType = getNodeType;
   exports.getRenderedAttributes = getRenderedAttributes;
@@ -68912,6 +69883,7 @@ img.ProseMirror-separator {
   exports.injectExtensionAttributesToParseRule = injectExtensionAttributesToParseRule;
   exports.inputRulesPlugin = inputRulesPlugin;
   exports.isActive = isActive;
+  exports.isAtStartOfNode = isAtStartOfNode;
   exports.isEmptyObject = isEmptyObject;
   exports.isExtensionRulesEnabled = isExtensionRulesEnabled;
   exports.isFunction = isFunction;
@@ -68927,6 +69899,7 @@ img.ProseMirror-separator {
   exports.isString = isString;
   exports.isTextSelection = isTextSelection;
   exports.isiOS = isiOS;
+  exports.istAtEndOfNode = istAtEndOfNode;
   exports.makeNormalizer = makeNormalizer;
   exports.markInputRule = markInputRule;
   exports.markPasteRule = markPasteRule;
