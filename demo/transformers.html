@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transformers / @matters/matters-editor</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>@matters/matters-editor</h1>
+
+        <section class="links">
+          <a
+            href="https://github.com/thematters/matters-editor"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img
+              src="https://img.shields.io/badge/GitHub-%40matters%2Fmatters--editor-blue"
+              alt="GitHub Link"
+            />
+          </a>
+        </section>
+      </header>
+
+      <section class="container">
+        <h2>HTML <=> Markdown Converters</h2>
+
+        <section class="panels">
+          <section class="panel">
+            <h3>HTML</h3>
+            <textarea id="html"></textarea>
+          </section>
+          <section class="panel">
+            <h3>Markdown</h3>
+            <textarea id="markdown"></textarea>
+          </section>
+        </section>
+      </section>
+
+      <section class="container">
+        <h2>Sanitizer</h2>
+
+        <section class="panels">
+          <section class="panel">
+            <h3>Input</h3>
+            <textarea id="sanitizer_input"></textarea>
+          </section>
+          <section class="panel">
+            <h3>Output</h3>
+            <textarea id="sanitizer_output"></textarea>
+          </section>
+        </section>
+      </section>
+
+      <section class="container">
+        <h2>Normalizer</h2>
+
+        <section class="panels">
+          <section class="panel">
+            <h3>Input</h3>
+            <textarea id="normalizer_input"></textarea>
+          </section>
+          <section class="panel">
+            <h3>Output</h3>
+            <textarea id="normalizer_output"></textarea>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="./dist/index.umd.js"></script>
+
+    <!-- HTML <=> Markdown -->
+    <script type="module">
+      const { html2md, md2html } = window['@matters/matters-editor']
+      const $html = document.querySelector('#html')
+      const $markdown = document.querySelector('#markdown')
+
+      $html.addEventListener('input', async (event) => {
+        let md = ''
+        try {
+          md = html2md($html.value)
+          console.log('[HTML -> MD] ', md)
+        } catch (error) {
+          md = String(error)
+          console.error(error)
+        }
+        $markdown.value = md
+      })
+      $markdown.addEventListener('input', async (event) => {
+        let html = ''
+        try {
+          html = md2html($markdown.value)
+          console.log('[MD -> HTML] ', html)
+        } catch (error) {
+          html = String(error)
+          console.error(error)
+        }
+        $html.value = html
+      })
+    </script>
+
+    <!-- Sanitizer -->
+    <script type="module">
+      const { sanitizeHTML } = window['@matters/matters-editor']
+      const $sanitizerInput = document.querySelector('#sanitizer_input')
+      const $sanitizerOutput = document.querySelector('#sanitizer_output')
+
+      $sanitizerInput.addEventListener('input', async (event) => {
+        let output = ''
+        try {
+          output = sanitizeHTML($sanitizerInput.value)
+          console.log('[sanitizeHTML] ', output)
+        } catch (error) {
+          output = String(error)
+          console.error(error)
+        }
+        $sanitizerOutput.value = output
+      })
+    </script>
+
+    <!-- Normalizer -->
+    <script type="module">
+      const { normalizeArticleHTML } = window['@matters/matters-editor']
+      const $normalizeInput = document.querySelector('#normalizer_input')
+      const $normalizeOutput = document.querySelector('#normalizer_output')
+
+      $normalizeInput.addEventListener('input', async (event) => {
+        let output = ''
+        try {
+          output = normalizeArticleHTML($normalizeInput.value)
+          console.log('[normalizeHTML] ', output)
+        } catch (error) {
+          output = String(error)
+          console.error(error)
+        }
+        $normalizeOutput.value = output
+      })
+    </script>
+  </body>
+</html>
