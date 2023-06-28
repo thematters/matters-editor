@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - feat/new-editor
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -3,7 +3,7 @@ name: Deploy Demo
 on:
   push:
     branches:
-      - feat/new-editor
+      - master
 
 jobs:
   build:
@@ -33,7 +33,7 @@ jobs:
     name: Deploy
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/feat/new-editor'
+    if: github.ref == 'refs/heads/master'
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v3
