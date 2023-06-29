@@ -15,9 +15,10 @@ export * from './bold';
 export type MakeArticleEditorExtensionsProps = {
     placeholder?: string;
     mentionSuggestion?: MentionSuggestion;
+    maxCaptionLength?: number;
 };
-export declare const makeArticleEditorExtensions: ({ placeholder, mentionSuggestion, }: MakeArticleEditorExtensionsProps) => (import("@tiptap/core").Mark<import("./bold").BoldOptions, any> | import("@tiptap/core").Node<any, any> | import("@tiptap/core").Extension<any, any>)[];
-export declare const makeEditArticleEditorExtensions: ({ placeholder, mentionSuggestion, }: MakeArticleEditorExtensionsProps) => (import("@tiptap/core").Mark<import("./bold").BoldOptions, any> | import("@tiptap/core").Node<any, any> | import("@tiptap/core").Extension<any, any>)[];
+export declare const makeArticleEditorExtensions: ({ placeholder, mentionSuggestion, maxCaptionLength, }: MakeArticleEditorExtensionsProps) => (import("@tiptap/core").Mark<import("./bold").BoldOptions, any> | import("@tiptap/core").Node<any, any> | import("@tiptap/core").Extension<any, any>)[];
+export declare const makeEditArticleEditorExtensions: ({ placeholder, mentionSuggestion, maxCaptionLength, }: MakeArticleEditorExtensionsProps) => (import("@tiptap/core").Mark<import("./bold").BoldOptions, any> | import("@tiptap/core").Node<any, any> | import("@tiptap/core").Extension<any, any>)[];
 /**
  * Comment
  */

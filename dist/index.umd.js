@@ -27309,11 +27309,11 @@ img.ProseMirror-separator {
       }),
   ], false); };
   var makeArticleEditorExtensions = function (_a) {
-      var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
+      var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, maxCaptionLength = _a.maxCaptionLength;
       var extensions = __spreadArray(__spreadArray([], baseArticleExtensions(placeholder), true), [
-          FigureImage,
-          FigureAudio,
-          FigureEmbed,
+          FigureImage.configure({ maxCaptionLength: maxCaptionLength }),
+          FigureAudio.configure({ maxCaptionLength: maxCaptionLength }),
+          FigureEmbed.configure({ maxCaptionLength: maxCaptionLength }),
       ], false);
       if (mentionSuggestion) {
           extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
@@ -27321,11 +27321,11 @@ img.ProseMirror-separator {
       return extensions;
   };
   var makeEditArticleEditorExtensions = function (_a) {
-      var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
+      var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, maxCaptionLength = _a.maxCaptionLength;
       var extensions = __spreadArray(__spreadArray([], baseArticleExtensions(placeholder), true), [
-          ReadOnlyFigureImage,
-          ReadOnlyFigureAudio,
-          ReadOnlyFigureEmbed,
+          ReadOnlyFigureImage.configure({ maxCaptionLength: maxCaptionLength }),
+          ReadOnlyFigureAudio.configure({ maxCaptionLength: maxCaptionLength }),
+          ReadOnlyFigureEmbed.configure({ maxCaptionLength: maxCaptionLength }),
       ], false);
       if (mentionSuggestion) {
           extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
@@ -27342,9 +27342,13 @@ img.ProseMirror-separator {
   };
 
   var useArticleEdtor = function (_a) {
-      var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
+      var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, maxCaptionLength = _a.maxCaptionLength, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion", "maxCaptionLength"]);
       var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
-      var editor = useEditor(__assign({ extensions: __spreadArray(__spreadArray([], makeArticleEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions || []), true), content: content }, restProps));
+      var editor = useEditor(__assign({ extensions: __spreadArray(__spreadArray([], makeArticleEditorExtensions({
+              placeholder: placeholder,
+              mentionSuggestion: mentionSuggestion,
+              maxCaptionLength: maxCaptionLength,
+          }), true), (extensions || []), true), content: content }, restProps));
       return editor;
   };
 
