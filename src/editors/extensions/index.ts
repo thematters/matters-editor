@@ -77,17 +77,19 @@ const baseArticleExtensions = (placeholder?: string) => [
 export type MakeArticleEditorExtensionsProps = {
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
+  maxCaptionLength?: number
 }
 
 export const makeArticleEditorExtensions = ({
   placeholder,
   mentionSuggestion,
+  maxCaptionLength,
 }: MakeArticleEditorExtensionsProps) => {
   const extensions = [
     ...baseArticleExtensions(placeholder),
-    FigureImage,
-    FigureAudio,
-    FigureEmbed,
+    FigureImage.configure({ maxCaptionLength }),
+    FigureAudio.configure({ maxCaptionLength }),
+    FigureEmbed.configure({ maxCaptionLength }),
   ]
 
   if (mentionSuggestion) {
@@ -100,12 +102,13 @@ export const makeArticleEditorExtensions = ({
 export const makeEditArticleEditorExtensions = ({
   placeholder,
   mentionSuggestion,
+  maxCaptionLength,
 }: MakeArticleEditorExtensionsProps) => {
   const extensions = [
     ...baseArticleExtensions(placeholder),
-    ReadOnlyFigureImage,
-    ReadOnlyFigureAudio,
-    ReadOnlyFigureEmbed,
+    ReadOnlyFigureImage.configure({ maxCaptionLength }),
+    ReadOnlyFigureAudio.configure({ maxCaptionLength }),
+    ReadOnlyFigureEmbed.configure({ maxCaptionLength }),
   ]
 
   if (mentionSuggestion) {
