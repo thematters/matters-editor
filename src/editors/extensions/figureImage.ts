@@ -26,9 +26,13 @@ declare module '@tiptap/core' {
   }
 }
 
+type FigureImageOptions = {
+  maxCaptionLength?: number
+}
+
 const pluginName = 'figureImage'
 
-export const FigureImage = Node.create({
+export const FigureImage = Node.create<FigureImageOptions>({
   name: pluginName,
   group: 'block',
   content: 'text*',
@@ -37,6 +41,12 @@ export const FigureImage = Node.create({
 
   // disallows all marks for figcaption
   marks: '',
+
+  addOptions() {
+    return {
+      maxCaptionLength: undefined,
+    }
+  },
 
   addAttributes() {
     return {
@@ -164,6 +174,24 @@ export const FigureImage = Node.create({
               .replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '')
             return html
           },
+        },
+        filterTransaction: (transaction, state) => {
+          // Nothing has changed, ignore it.
+          if (!transaction.docChanged || !this.options.maxCaptionLength) {
+            return true
+          }
+
+          try {
+            const anchorParent = transaction.selection.$anchor.parent
+            const figcaptionText = anchorParent.content.child(0).text || ''
+            if (figcaptionText.length > this.options.maxCaptionLength) {
+              return false
+            }
+          } catch (e) {
+            console.error(e)
+          }
+
+          return true
         },
       }),
     ]

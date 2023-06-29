@@ -44,9 +44,13 @@ declare module '@tiptap/core' {
   }
 }
 
+type FigureAudioOptions = {
+  maxCaptionLength?: number
+}
+
 const pluginName = 'figureAudio'
 
-export const FigureAudio = Node.create({
+export const FigureAudio = Node.create<FigureAudioOptions>({
   name: pluginName,
   group: 'block',
   content: 'text*',
@@ -55,6 +59,12 @@ export const FigureAudio = Node.create({
 
   // disallows all marks for figcaption
   marks: '',
+
+  addOptions() {
+    return {
+      maxCaptionLength: undefined,
+    }
+  },
 
   addAttributes() {
     return {
@@ -212,6 +222,24 @@ export const FigureAudio = Node.create({
               .replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '')
             return html
           },
+        },
+        filterTransaction: (transaction, state) => {
+          // Nothing has changed, ignore it.
+          if (!transaction.docChanged || !this.options.maxCaptionLength) {
+            return true
+          }
+
+          try {
+            const anchorParent = transaction.selection.$anchor.parent
+            const figcaptionText = anchorParent.content.child(0).text || ''
+            if (figcaptionText.length > this.options.maxCaptionLength) {
+              return false
+            }
+          } catch (e) {
+            console.error(e)
+          }
+
+          return true
         },
       }),
     ]
