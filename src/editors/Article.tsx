@@ -14,12 +14,17 @@ export const useArticleEdtor = ({
   content,
   placeholder,
   mentionSuggestion,
+  maxCaptionLength,
   ...editorProps
 }: UseArticleEditorProps) => {
   const { extensions, ...restProps } = editorProps
   const editor = useEditor({
     extensions: [
-      ...makeArticleEditorExtensions({ placeholder, mentionSuggestion }),
+      ...makeArticleEditorExtensions({
+        placeholder,
+        mentionSuggestion,
+        maxCaptionLength,
+      }),
       ...(extensions || []),
     ],
     content,
