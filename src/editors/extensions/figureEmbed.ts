@@ -34,6 +34,10 @@ declare module '@tiptap/core' {
   }
 }
 
+type FigureEmbedOptions = {
+  maxCaptionLength?: number
+}
+
 type NormalizeEmbedURLReturn = {
   url: string
   provider?:
@@ -249,7 +253,7 @@ const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
 
 const pluginName = 'figureEmbed'
 
-export const FigureEmbed = Node.create({
+export const FigureEmbed = Node.create<FigureEmbedOptions>({
   name: pluginName,
   group: 'block',
   content: 'text*',
@@ -258,6 +262,12 @@ export const FigureEmbed = Node.create({
 
   // disallows all marks for figcaption
   marks: '',
+
+  addOptions() {
+    return {
+      maxCaptionLength: undefined,
+    }
+  },
 
   addAttributes() {
     return {
@@ -303,8 +313,6 @@ export const FigureEmbed = Node.create({
       ...(isVideo ? [`embed-video`] : []),
       ...(isCode ? [`embed-code`] : []),
     ].join(' ')
-
-    console.log({ url })
 
     return [
       'figure',
@@ -418,6 +426,24 @@ export const FigureEmbed = Node.create({
               .replace(/<figure.*class=.embed.*[\n]*.*?<\/figure>/g, '')
             return html
           },
+        },
+        filterTransaction: (transaction, state) => {
+          // Nothing has changed, ignore it.
+          if (!transaction.docChanged || !this.options.maxCaptionLength) {
+            return true
+          }
+
+          try {
+            const anchorParent = transaction.selection.$anchor.parent
+            const figcaptionText = anchorParent.content.child(0).text || ''
+            if (figcaptionText.length > this.options.maxCaptionLength) {
+              return false
+            }
+          } catch (e) {
+            console.error(e)
+          }
+
+          return true
         },
       }),
     ]
