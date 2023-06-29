@@ -22,4 +22,8 @@ declare module '@tiptap/core' {
         };
     }
 }
-export declare const FigureImage: Node<any, any>;
+type FigureImageOptions = {
+    maxCaptionLength?: number;
+};
+export declare const FigureImage: Node<FigureImageOptions, any>;
+export {};

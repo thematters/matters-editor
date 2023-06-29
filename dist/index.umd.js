@@ -23624,6 +23624,11 @@ img.ProseMirror-separator {
       isolating: true,
       // disallows all marks for figcaption
       marks: '',
+      addOptions: function () {
+          return {
+              maxCaptionLength: undefined,
+          };
+      },
       addAttributes: function () {
           return {
               src: {
@@ -23716,6 +23721,7 @@ img.ProseMirror-separator {
           };
       },
       addProseMirrorPlugins: function () {
+          var _this = this;
           return [
               new Plugin({
                   key: new PluginKey('removePastedFigureAudio'),
@@ -23768,6 +23774,23 @@ img.ProseMirror-separator {
                               .replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '');
                           return html;
                       },
+                  },
+                  filterTransaction: function (transaction, state) {
+                      // Nothing has changed, ignore it.
+                      if (!transaction.docChanged || !_this.options.maxCaptionLength) {
+                          return true;
+                      }
+                      try {
+                          var anchorParent = transaction.selection.$anchor.parent;
+                          var figcaptionText = anchorParent.content.child(0).text || '';
+                          if (figcaptionText.length > _this.options.maxCaptionLength) {
+                              return false;
+                          }
+                      }
+                      catch (e) {
+                          console.error(e);
+                      }
+                      return true;
                   },
               }),
           ];
@@ -23966,6 +23989,11 @@ img.ProseMirror-separator {
       isolating: true,
       // disallows all marks for figcaption
       marks: '',
+      addOptions: function () {
+          return {
+              maxCaptionLength: undefined,
+          };
+      },
       addAttributes: function () {
           return {
               class: {
@@ -24001,7 +24029,6 @@ img.ProseMirror-separator {
           var className = __spreadArray(__spreadArray([
               'embed'
           ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
-          console.log({ url: url });
           return [
               'figure',
               __assign({ class: className }, (provider ? { 'data-provider': provider } : {})),
@@ -24044,6 +24071,7 @@ img.ProseMirror-separator {
           };
       },
       addProseMirrorPlugins: function () {
+          var _this = this;
           return [
               new Plugin({
                   key: new PluginKey('removePastedFigureEmbed'),
@@ -24097,6 +24125,23 @@ img.ProseMirror-separator {
                           return html;
                       },
                   },
+                  filterTransaction: function (transaction, state) {
+                      // Nothing has changed, ignore it.
+                      if (!transaction.docChanged || !_this.options.maxCaptionLength) {
+                          return true;
+                      }
+                      try {
+                          var anchorParent = transaction.selection.$anchor.parent;
+                          var figcaptionText = anchorParent.content.child(0).text || '';
+                          if (figcaptionText.length > _this.options.maxCaptionLength) {
+                              return false;
+                          }
+                      }
+                      catch (e) {
+                          console.error(e);
+                      }
+                      return true;
+                  },
               }),
           ];
       },
@@ -24111,6 +24156,11 @@ img.ProseMirror-separator {
       isolating: true,
       // disallows all marks for figcaption
       marks: '',
+      addOptions: function () {
+          return {
+              maxCaptionLength: undefined,
+          };
+      },
       addAttributes: function () {
           return {
               class: {
@@ -24173,6 +24223,7 @@ img.ProseMirror-separator {
           };
       },
       addProseMirrorPlugins: function () {
+          var _this = this;
           return [
               new Plugin({
                   key: new PluginKey('removePastedFigureImage'),
@@ -24225,6 +24276,23 @@ img.ProseMirror-separator {
                               .replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '');
                           return html;
                       },
+                  },
+                  filterTransaction: function (transaction, state) {
+                      // Nothing has changed, ignore it.
+                      if (!transaction.docChanged || !_this.options.maxCaptionLength) {
+                          return true;
+                      }
+                      try {
+                          var anchorParent = transaction.selection.$anchor.parent;
+                          var figcaptionText = anchorParent.content.child(0).text || '';
+                          if (figcaptionText.length > _this.options.maxCaptionLength) {
+                              return false;
+                          }
+                      }
+                      catch (e) {
+                          console.error(e);
+                      }
+                      return true;
                   },
               }),
           ];
@@ -27190,7 +27258,6 @@ img.ProseMirror-separator {
           var className = __spreadArray(__spreadArray([
               'embed'
           ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
-          console.log({ url: url });
           return [
               'figure',
               __assign({ class: className }, (provider ? { 'data-provider': provider } : {})),

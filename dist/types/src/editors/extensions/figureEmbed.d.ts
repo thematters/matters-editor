@@ -30,4 +30,8 @@ declare module '@tiptap/core' {
         };
     }
 }
-export declare const FigureEmbed: Node<any, any>;
+type FigureEmbedOptions = {
+    maxCaptionLength?: number;
+};
+export declare const FigureEmbed: Node<FigureEmbedOptions, any>;
+export {};
