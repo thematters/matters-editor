@@ -40,8 +40,4 @@ declare module '@tiptap/core' {
         };
     }
 }
-type FigureAudioOptions = {
-    maxCaptionLength?: number;
-};
-export declare const FigureAudio: Node<FigureAudioOptions, any>;
-export {};
+export declare const FigureAudio: Node<any, any>;

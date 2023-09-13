@@ -23624,11 +23624,6 @@ img.ProseMirror-separator {
       isolating: true,
       // disallows all marks for figcaption
       marks: '',
-      addOptions: function () {
-          return {
-              maxCaptionLength: undefined,
-          };
-      },
       addAttributes: function () {
           return {
               src: {
@@ -23721,7 +23716,6 @@ img.ProseMirror-separator {
           };
       },
       addProseMirrorPlugins: function () {
-          var _this = this;
           return [
               new Plugin({
                   key: new PluginKey('removePastedFigureAudio'),
@@ -23774,23 +23768,6 @@ img.ProseMirror-separator {
                               .replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '');
                           return html;
                       },
-                  },
-                  filterTransaction: function (transaction, state) {
-                      // Nothing has changed, ignore it.
-                      if (!transaction.docChanged || !_this.options.maxCaptionLength) {
-                          return true;
-                      }
-                      try {
-                          var anchorParent = transaction.selection.$anchor.parent;
-                          var figcaptionText = anchorParent.content.child(0).text || '';
-                          if (figcaptionText.length > _this.options.maxCaptionLength) {
-                              return false;
-                          }
-                      }
-                      catch (e) {
-                          console.error(e);
-                      }
-                      return true;
                   },
               }),
           ];
@@ -23989,11 +23966,6 @@ img.ProseMirror-separator {
       isolating: true,
       // disallows all marks for figcaption
       marks: '',
-      addOptions: function () {
-          return {
-              maxCaptionLength: undefined,
-          };
-      },
       addAttributes: function () {
           return {
               class: {
@@ -24029,6 +24001,7 @@ img.ProseMirror-separator {
           var className = __spreadArray(__spreadArray([
               'embed'
           ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
+          console.log({ url: url });
           return [
               'figure',
               __assign({ class: className }, (provider ? { 'data-provider': provider } : {})),
@@ -24071,7 +24044,6 @@ img.ProseMirror-separator {
           };
       },
       addProseMirrorPlugins: function () {
-          var _this = this;
           return [
               new Plugin({
                   key: new PluginKey('removePastedFigureEmbed'),
@@ -24125,23 +24097,6 @@ img.ProseMirror-separator {
                           return html;
                       },
                   },
-                  filterTransaction: function (transaction, state) {
-                      // Nothing has changed, ignore it.
-                      if (!transaction.docChanged || !_this.options.maxCaptionLength) {
-                          return true;
-                      }
-                      try {
-                          var anchorParent = transaction.selection.$anchor.parent;
-                          var figcaptionText = anchorParent.content.child(0).text || '';
-                          if (figcaptionText.length > _this.options.maxCaptionLength) {
-                              return false;
-                          }
-                      }
-                      catch (e) {
-                          console.error(e);
-                      }
-                      return true;
-                  },
               }),
           ];
       },
@@ -24156,11 +24111,6 @@ img.ProseMirror-separator {
       isolating: true,
       // disallows all marks for figcaption
       marks: '',
-      addOptions: function () {
-          return {
-              maxCaptionLength: undefined,
-          };
-      },
       addAttributes: function () {
           return {
               class: {
@@ -24223,7 +24173,6 @@ img.ProseMirror-separator {
           };
       },
       addProseMirrorPlugins: function () {
-          var _this = this;
           return [
               new Plugin({
                   key: new PluginKey('removePastedFigureImage'),
@@ -24276,23 +24225,6 @@ img.ProseMirror-separator {
                               .replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '');
                           return html;
                       },
-                  },
-                  filterTransaction: function (transaction, state) {
-                      // Nothing has changed, ignore it.
-                      if (!transaction.docChanged || !_this.options.maxCaptionLength) {
-                          return true;
-                      }
-                      try {
-                          var anchorParent = transaction.selection.$anchor.parent;
-                          var figcaptionText = anchorParent.content.child(0).text || '';
-                          if (figcaptionText.length > _this.options.maxCaptionLength) {
-                              return false;
-                          }
-                      }
-                      catch (e) {
-                          console.error(e);
-                      }
-                      return true;
                   },
               }),
           ];
@@ -27258,6 +27190,7 @@ img.ProseMirror-separator {
           var className = __spreadArray(__spreadArray([
               'embed'
           ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
+          console.log({ url: url });
           return [
               'figure',
               __assign({ class: className }, (provider ? { 'data-provider': provider } : {})),
@@ -27309,11 +27242,11 @@ img.ProseMirror-separator {
       }),
   ], false); };
   var makeArticleEditorExtensions = function (_a) {
-      var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, maxCaptionLength = _a.maxCaptionLength;
+      var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
       var extensions = __spreadArray(__spreadArray([], baseArticleExtensions(placeholder), true), [
-          FigureImage.configure({ maxCaptionLength: maxCaptionLength }),
-          FigureAudio.configure({ maxCaptionLength: maxCaptionLength }),
-          FigureEmbed.configure({ maxCaptionLength: maxCaptionLength }),
+          FigureImage,
+          FigureAudio,
+          FigureEmbed,
       ], false);
       if (mentionSuggestion) {
           extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
@@ -27321,11 +27254,11 @@ img.ProseMirror-separator {
       return extensions;
   };
   var makeEditArticleEditorExtensions = function (_a) {
-      var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, maxCaptionLength = _a.maxCaptionLength;
+      var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
       var extensions = __spreadArray(__spreadArray([], baseArticleExtensions(placeholder), true), [
-          ReadOnlyFigureImage.configure({ maxCaptionLength: maxCaptionLength }),
-          ReadOnlyFigureAudio.configure({ maxCaptionLength: maxCaptionLength }),
-          ReadOnlyFigureEmbed.configure({ maxCaptionLength: maxCaptionLength }),
+          ReadOnlyFigureImage,
+          ReadOnlyFigureAudio,
+          ReadOnlyFigureEmbed,
       ], false);
       if (mentionSuggestion) {
           extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
@@ -27342,13 +27275,9 @@ img.ProseMirror-separator {
   };
 
   var useArticleEdtor = function (_a) {
-      var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, maxCaptionLength = _a.maxCaptionLength, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion", "maxCaptionLength"]);
+      var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
       var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
-      var editor = useEditor(__assign({ extensions: __spreadArray(__spreadArray([], makeArticleEditorExtensions({
-              placeholder: placeholder,
-              mentionSuggestion: mentionSuggestion,
-              maxCaptionLength: maxCaptionLength,
-          }), true), (extensions || []), true), content: content }, restProps));
+      var editor = useEditor(__assign({ extensions: __spreadArray(__spreadArray([], makeArticleEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions || []), true), content: content }, restProps));
       return editor;
   };
 
