@@ -278,6 +278,7 @@ export const ReadOnlyFigureEmbed = Node.create({
       ...(isCode ? [`embed-code`] : []),
     ].join(' ')
 
+    console.log({ url })
 
     return [
       'figure',
