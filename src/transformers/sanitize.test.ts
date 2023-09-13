@@ -9,6 +9,16 @@ const expectSanitizeHTML = (input: string, output: string) => {
 /**
  * Tests
  */
+describe('Sanitization: custom', () => {
+  test('whitelist classes', () => {
+    expectSanitizeHTML('<a class="mention">pp</a>', '<a class="mention">pp</a>')
+    expectSanitizeHTML(
+      '<a class="styles_link__dKYrM">pp</a>',
+      '<a class="">pp</a>'
+    )
+  })
+})
+
 // via https://github.com/leizongmin/js-xss/blob/master/test/test_xss.js
 describe('Sanitization: basic', () => {
   test('unknown attributes', () => {
