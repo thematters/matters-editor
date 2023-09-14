@@ -95,15 +95,27 @@ export const rehypeSanitizeOptions:
   },
   attributes: {
     ...defaultSchema.attributes,
-    a: ['href', 'ref', 'target', 'className', 'data*'],
-    br: ['className'],
+    a: [
+      // classes
+      ['className', 'mention'],
+      'href',
+      'ref',
+      'target',
+      'data*',
+    ],
+    br: [
+      // classes
+      ['className', 'smart'],
+    ],
     img: ['src', 'srcSet', 'data*'],
     audio: ['controls', 'data*', ['preload', 'metadata']],
     source: ['src', 'type', 'data*'],
     figure: [
+      // classes
       ['className', 'image', 'audio', 'embed', 'embed-code', 'embed-video'],
     ],
     div: [
+      // classes
       [
         'className',
         'player',
@@ -114,8 +126,15 @@ export const rehypeSanitizeOptions:
       ],
       'data*',
     ],
-    h4: [['className', 'title']],
-    span: [['className', 'play', 'current', 'duration'], 'data*'],
+    h4: [
+      // classes
+      ['className', 'title'],
+    ],
+    span: [
+      // classes
+      ['className', 'play', 'current', 'duration'],
+      'data*',
+    ],
     iframe: [
       'src',
       'allowFullScreen',
