@@ -27190,7 +27190,6 @@ img.ProseMirror-separator {
           var className = __spreadArray(__spreadArray([
               'embed'
           ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
-          console.log({ url: url });
           return [
               'figure',
               __assign({ class: className }, (provider ? { 'data-provider': provider } : {})),
@@ -52688,9 +52687,21 @@ img.ProseMirror-separator {
           'source',
       ], false),
       protocols: __assign(__assign({}, defaultSchema.protocols), { href: ['http', 'https', 'mailto', 'tel'] }),
-      attributes: __assign(__assign({}, defaultSchema.attributes), { a: ['href', 'ref', 'target', 'className', 'data*'], br: ['className'], img: ['src', 'srcSet', 'data*'], audio: ['controls', 'data*', ['preload', 'metadata']], source: ['src', 'type', 'data*'], figure: [
+      attributes: __assign(__assign({}, defaultSchema.attributes), { a: [
+              // classes
+              ['className', 'mention'],
+              'href',
+              'ref',
+              'target',
+              'data*',
+          ], br: [
+              // classes
+              ['className', 'smart'],
+          ], img: ['src', 'srcSet', 'data*'], audio: ['controls', 'data*', ['preload', 'metadata']], source: ['src', 'type', 'data*'], figure: [
+              // classes
               ['className', 'image', 'audio', 'embed', 'embed-code', 'embed-video'],
           ], div: [
+              // classes
               [
                   'className',
                   'player',
@@ -52700,7 +52711,14 @@ img.ProseMirror-separator {
                   'iframe-container',
               ],
               'data*',
-          ], h4: [['className', 'title']], span: [['className', 'play', 'current', 'duration'], 'data*'], iframe: [
+          ], h4: [
+              // classes
+              ['className', 'title'],
+          ], span: [
+              // classes
+              ['className', 'play', 'current', 'duration'],
+              'data*',
+          ], iframe: [
               'src',
               'allowFullScreen',
               ['loading', 'lazy'],
