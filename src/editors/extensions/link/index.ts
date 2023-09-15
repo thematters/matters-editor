@@ -107,7 +107,6 @@ export const Link = Mark.create<LinkOptions>({
       HTMLAttributes: {
         target: '_blank',
         rel: 'noopener noreferrer nofollow',
-        class: null,
       },
       validate: undefined,
     }
@@ -120,9 +119,6 @@ export const Link = Mark.create<LinkOptions>({
       },
       target: {
         default: this.options.HTMLAttributes.target,
-      },
-      class: {
-        default: this.options.HTMLAttributes.class,
       },
     }
   },
