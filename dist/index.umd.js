@@ -26166,7 +26166,6 @@ img.ProseMirror-separator {
               HTMLAttributes: {
                   target: '_blank',
                   rel: 'noopener noreferrer nofollow',
-                  class: null,
               },
               validate: undefined,
           };
@@ -26178,9 +26177,6 @@ img.ProseMirror-separator {
               },
               target: {
                   default: this.options.HTMLAttributes.target,
-              },
-              class: {
-                  default: this.options.HTMLAttributes.class,
               },
           };
       },
