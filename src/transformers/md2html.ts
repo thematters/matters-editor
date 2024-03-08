@@ -1,3 +1,4 @@
+import rehypeExternalLinks from 'rehype-external-links'
 import rehypeFormat from 'rehype-format'
 import rehypeRaw from 'rehype-raw'
 import rehypeRewrite from 'rehype-rewrite'
@@ -9,7 +10,6 @@ import remarkDirectiveRehype from 'remark-directive-rehype'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
-import rehypeExternalLinks from 'rehype-external-links'
 
 import {
   rehypeRewriteOptions,

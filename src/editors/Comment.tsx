@@ -20,7 +20,7 @@ export const useCommentEditor = ({
   const editor = useEditor({
     extensions: [
       ...makeCommentEditorExtensions({ placeholder, mentionSuggestion }),
-      ...(extensions || []),
+      ...(extensions ?? []),
     ],
     content,
     ...restProps,

@@ -21,7 +21,7 @@ export const useArticleEdtor = ({
   const editor = useEditor({
     extensions: [
       ...makeArticleEditorExtensions({ placeholder, mentionSuggestion }),
-      ...(extensions || []),
+      ...(extensions ?? []),
     ],
     content,
     ...restProps,
