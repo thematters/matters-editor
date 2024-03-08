@@ -1,7 +1,8 @@
-import { EditorOptions, useEditor } from '@tiptap/react'
+import { type EditorOptions, useEditor } from '@tiptap/react'
+
 import {
   makeCommentEditorExtensions,
-  MakeCommentEditorExtensionsProps,
+  type MakeCommentEditorExtensionsProps,
 } from './extensions'
 
 type UseCommentEditorProps = {

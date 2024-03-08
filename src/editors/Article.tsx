@@ -1,8 +1,9 @@
-import { useEditor } from '@tiptap/react'
 import type { EditorOptions } from '@tiptap/react'
+import { useEditor } from '@tiptap/react'
+
 import {
   makeArticleEditorExtensions,
-  MakeArticleEditorExtensionsProps,
+  type MakeArticleEditorExtensionsProps,
 } from './extensions'
 
 type UseArticleEditorProps = {

@@ -1,8 +1,10 @@
-import { RehypeRewriteOptions } from 'rehype-rewrite'
-import { defaultSchema } from 'rehype-sanitize'
+import { type Schema } from 'hast-util-sanitize'
 import { toHtml } from 'hast-util-to-html'
-import { Options as RemarkStringifyOptions } from 'remark-stringify'
-import { defaultHandlers, H } from 'hast-util-to-mdast'
+import { defaultHandlers, type Handle, type Options } from 'hast-util-to-mdast'
+import { type Html } from 'mdast'
+import { type RehypeRewriteOptions } from 'rehype-rewrite'
+import { defaultSchema } from 'rehype-sanitize'
+import { type Options as RemarkStringifyOptions } from 'remark-stringify'
 
 export const remarkStringifyOptions: RemarkStringifyOptions = {
   bullet: '*',
@@ -23,40 +25,43 @@ export const rehypeParseOptions = { fragment: true }
  * <p>abcabc</p> -> abcabc
  */
 const makeBrHandler =
-  (defaultHandler: typeof defaultHandlers.p) => (h: H, node: any) => {
+  (defaultHandler: Handle): Handle =>
+  (state, node, parent) => {
     const isBrOnly =
       node.children.length > 0 &&
       node.children.every((child: any) => child.tagName === 'br')
     if (isBrOnly) {
-      return h(node, 'html', toHtml(node))
+      const result: Html = { type: 'html', value: toHtml(node) }
+      state.patch(node, result)
+      return result
     }
 
-    return defaultHandler(h, node)
+    return defaultHandler(state, node, parent)
   }
 
-export const rehypeRemarkOptions: import('hast-util-to-mdast/lib/types').Options =
-  {
-    newlines: true,
-    handlers: {
-      p: makeBrHandler(defaultHandlers.p),
-      h1: makeBrHandler(defaultHandlers.h1),
-      h2: makeBrHandler(defaultHandlers.h2),
-      h3: makeBrHandler(defaultHandlers.h3),
-      h4: makeBrHandler(defaultHandlers.h4),
-      h5: makeBrHandler(defaultHandlers.h5),
-      h6: makeBrHandler(defaultHandlers.h6),
-      figure(h, node) {
-        return h(
-          node,
-          'html',
-          toHtml(node, {
-            closeSelfClosing: false,
-            closeEmptyElements: true,
-          })
-        )
-      },
+export const rehypeRemarkOptions: Options = {
+  newlines: true,
+  handlers: {
+    p: makeBrHandler(defaultHandlers.p),
+    h1: makeBrHandler(defaultHandlers.h1),
+    h2: makeBrHandler(defaultHandlers.h2),
+    h3: makeBrHandler(defaultHandlers.h3),
+    h4: makeBrHandler(defaultHandlers.h4),
+    h5: makeBrHandler(defaultHandlers.h5),
+    h6: makeBrHandler(defaultHandlers.h6),
+    figure(state, node) {
+      const result: Html = {
+        type: 'html',
+        value: toHtml(node, {
+          closeSelfClosing: false,
+          closeEmptyElements: true,
+        }),
+      }
+      state.patch(node, result)
+      return result
     },
-  }
+  },
+}
 
 export const rehypeStringifyOptions = {
   closeSelfClosing: false,
@@ -65,29 +70,33 @@ export const rehypeStringifyOptions = {
 
 export const rehypeRewriteOptions: RehypeRewriteOptions = {
   rewrite: (node, index, parent) => {
-    if (node.type == 'element' && node.tagName == 'a' && node.properties) {
+    if (
+      node.type === 'element' &&
+      node.tagName === 'a' &&
+      node.properties !== undefined
+    ) {
       node.properties.target = '_blank'
       node.properties.rel = 'noopener noreferrer nofollow'
     }
-    if (node.type == 'element' && node.tagName == 'del') {
+    if (node.type === 'element' && node.tagName === 'del') {
       node.tagName = 's'
     }
-    if (node.type == 'element' && node.tagName == 'u') {
+    if (node.type === 'element' && node.tagName === 'u') {
       node.tagName = 'strong'
     }
   },
 }
 
-export const rehypeSanitizeOptions:
-  | void
-  | import('hast-util-sanitize/lib').Schema = {
+export const rehypeSanitizeOptions: Schema = {
   tagNames: [
-    ...defaultSchema.tagNames!,
+    ...(defaultSchema.tagNames ?? []),
     'iframe',
     'footer',
     'header',
     'audio',
     'source',
+    'figure',
+    'figcaption',
   ],
   protocols: {
     ...defaultSchema.protocols,

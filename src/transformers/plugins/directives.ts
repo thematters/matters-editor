@@ -1,9 +1,9 @@
-import { Root } from 'mdast'
-import { Plugin } from 'unified'
+import { type Root } from 'mdast'
+import { type Plugin } from 'unified'
 
 export const directives: Plugin<[], Root> = () => {
   return (tree) => {
-    // @ts-ignore
+    // @ts-expect-error
     visit(tree, (node) => {
       if (
         node.type === 'textDirective' ||
@@ -11,7 +11,7 @@ export const directives: Plugin<[], Root> = () => {
         node.type === 'containerDirective'
       ) {
         const data = node.data || (node.data = {})
-        // @ts-ignore
+        // @ts-expect-error
         const hast = h(node.name, node.attributes)
 
         data.hName = hast.tagName

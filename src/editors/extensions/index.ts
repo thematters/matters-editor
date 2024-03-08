@@ -14,21 +14,21 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Strike from '@tiptap/extension-strike'
 import Text from '@tiptap/extension-text'
 
+import { Bold } from './bold'
 import { FigureAudio } from './figureAudio'
 import { FigureEmbed } from './figureEmbed'
 import { FigureImage } from './figureImage'
-import { Link } from './link'
-import { Mention, MentionSuggestion } from './mention'
-import { Bold } from './bold'
 import { HorizontalRule } from './horizontalRule'
+import { Link } from './link'
+import { Mention, type MentionSuggestion } from './mention'
 
+export * from './bold'
 export * from './figureAudio'
 export * from './figureEmbed'
 export * from './figureImage'
-export * from './link'
 export * from './horizontalRule'
+export * from './link'
 export * from './mention'
-export * from './bold'
 
 const baseExtensions = (placeholder?: string) => [
   Document,
@@ -68,7 +68,7 @@ const baseArticleExtensions = (placeholder?: string) => [
 /**
  * Article
  */
-export type MakeArticleEditorExtensionsProps = {
+export interface MakeArticleEditorExtensionsProps {
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
 }
@@ -94,7 +94,7 @@ export const makeArticleEditorExtensions = ({
 /**
  * Comment
  */
-export type MakeCommentEditorExtensionsProps = {
+export interface MakeCommentEditorExtensionsProps {
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
 }
