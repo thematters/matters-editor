@@ -21,16 +21,10 @@ import { Link } from './link'
 import { Mention, MentionSuggestion } from './mention'
 import { Bold } from './bold'
 import { HorizontalRule } from './horizontalRule'
-import { ReadOnlyFigureImage } from './readOnlyFigureImage'
-import { ReadOnlyFigureAudio } from './readOnlyFigureAudio'
-import { ReadOnlyFigureEmbed } from './readOnlyFigureEmbed'
 
 export * from './figureAudio'
 export * from './figureEmbed'
 export * from './figureImage'
-export * from './readOnlyFigureAudio'
-export * from './readOnlyFigureEmbed'
-export * from './readOnlyFigureImage'
 export * from './link'
 export * from './horizontalRule'
 export * from './mention'
@@ -88,24 +82,6 @@ export const makeArticleEditorExtensions = ({
     FigureImage,
     FigureAudio,
     FigureEmbed,
-  ]
-
-  if (mentionSuggestion) {
-    extensions.push(Mention.configure({ suggestion: mentionSuggestion }))
-  }
-
-  return extensions
-}
-
-export const makeEditArticleEditorExtensions = ({
-  placeholder,
-  mentionSuggestion,
-}: MakeArticleEditorExtensionsProps) => {
-  const extensions = [
-    ...baseArticleExtensions(placeholder),
-    ReadOnlyFigureImage,
-    ReadOnlyFigureAudio,
-    ReadOnlyFigureEmbed,
   ]
 
   if (mentionSuggestion) {

@@ -1,6 +1,6 @@
 {
   "name": "@matters/matters-editor",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Editor for matters.news",
   "author": "https://github.com/thematters",
   "homepage": "https://github.com/thematters/matters-editor",
@@ -9,7 +9,7 @@
     "url": "git@github.com:thematters/matters-editor.git"
   },
   "engines": {
-    "node": ">=16.14 <17.0"
+    "node": ">=16.14 <19.0"
   },
   "license": "MIT",
   "type": "module",
