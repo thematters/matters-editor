@@ -9,6 +9,7 @@ import remarkDirectiveRehype from 'remark-directive-rehype'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
+import rehypeExternalLinks from 'rehype-external-links'
 
 import {
   rehypeRewriteOptions,
@@ -28,6 +29,7 @@ const formatter = unified()
   .use(rehypeRewrite, rehypeRewriteOptions)
   .use(rehypeRaw)
   .use(rehypeSanitize, rehypeSanitizeOptions)
+  .use(rehypeExternalLinks, { rel: ['noopener', 'nofollow', 'noreferrer'] })
   .use(rehypeFormat)
   .use(rehypeStringify, rehypeStringifyOptions)
 
