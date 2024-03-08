@@ -39,20 +39,12 @@ const baseExtensions = (placeholder?: string) => [
   // Basic Formats
   Text,
   Paragraph,
-  Bold,
-  Strike,
-  Code,
-  CodeBlock,
   Blockquote,
   HardBreak.configure({
     HTMLAttributes: {
       class: 'smart',
     },
   }),
-  HorizontalRule,
-  OrderedList,
-  ListItem,
-  BulletList,
   // Custom Formats
   Link,
 ]
@@ -60,6 +52,14 @@ const baseExtensions = (placeholder?: string) => [
 const baseArticleExtensions = (placeholder?: string) => [
   ...baseExtensions(placeholder),
   Gapcursor,
+  Bold,
+  Strike,
+  Code,
+  CodeBlock,
+  HorizontalRule,
+  OrderedList,
+  ListItem,
+  BulletList,
   Heading.configure({
     levels: [2, 3],
   }),
