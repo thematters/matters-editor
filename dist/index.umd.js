@@ -75087,14 +75087,75 @@ img.ProseMirror-separator {
         return normalizer(html);
     };
 
+    /**
+     * Squeeze empty paragraphs to a maximum of N
+     *
+     * e.g.
+     * <p></p><p></p><p></p><p></p><p></p><p></p>
+     * =>
+     * <p></p><p></p>
+     *
+     * @param {number} maxCount
+     */
+    var rehypeSqueezeParagraphs = function (_a) {
+        var maxCount = _a.maxCount;
+        return function (tree) {
+            if (tree.type !== 'root') {
+                return;
+            }
+            var children = [];
+            var count = 0;
+            var touched = false;
+            tree.children.forEach(function (node) {
+                // skip empty text nodes
+                if (node.type === 'text' && node.value.replace(/\s/g, '') === '') {
+                    children.push(node);
+                    return;
+                }
+                // skip non-paragraph nodes
+                if (node.type !== 'element' || node.tagName !== 'p') {
+                    count = 0;
+                    children.push(node);
+                    return;
+                }
+                // skip non-empty paragraphs:
+                // - <p></p>
+                // - <p><br/></p>
+                var isEmptyParagraph = node.children.length === 0 ||
+                    node.children.every(function (n) { return n.type === 'element' && n.tagName === 'br'; });
+                if (!isEmptyParagraph) {
+                    count = 0;
+                    children.push(node);
+                    return;
+                }
+                // cap empty paragraphs
+                count++;
+                if (count <= maxCount) {
+                    children.push({
+                        type: 'element',
+                        tagName: 'p',
+                        properties: {},
+                        children: [],
+                    });
+                }
+                else {
+                    touched = true;
+                }
+            });
+            if (touched) {
+                tree.children = children;
+            }
+        };
+    };
     var formatter = unified()
         .use(rehypeParse, rehypeParseOptions)
         .use(rehypeRaw)
         .use(rehypeSanitize, rehypeSanitizeOptions)
+        .use(rehypeSqueezeParagraphs, { maxCount: 2 })
         .use(rehypeFormat)
         .use(rehypeStringify, rehypeStringifyOptions);
-    var sanitizeHTML = function (md) {
-        var result = formatter.processSync(md);
+    var sanitizeHTML = function (html) {
+        var result = formatter.processSync(html);
         return String(result);
     };
 

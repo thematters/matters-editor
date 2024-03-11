@@ -1,1 +1,1 @@
-export declare const sanitizeHTML: (md: string) => string;
+export declare const sanitizeHTML: (html: string) => string;
