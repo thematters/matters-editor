@@ -1,3 +1,4 @@
+import { stripIndent } from 'common-tags'
 import { describe, expect, test } from 'vitest'
 
 import { sanitizeHTML } from './sanitize'
@@ -16,6 +17,25 @@ describe('Sanitization: custom', () => {
     expectSanitizeHTML(
       '<a class="styles_link__dKYrM">pp</a>',
       '<a class="">pp</a>',
+    )
+  })
+
+  test('allow max two empty paragraphys', () => {
+    expectSanitizeHTML(
+      '<p>abc</p><p></p><p></p><p></p><p>abc</p><p></p><p></p><p></p><p></p><p></p><p></p>',
+      stripIndent`
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        <p></p>
+        <p></p>
+        <p></p>
+        <p></p>
+      `,
     )
   })
 })
