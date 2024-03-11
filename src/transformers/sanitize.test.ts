@@ -22,17 +22,33 @@ describe('Sanitization: custom', () => {
 
   test('allow max two empty paragraphys', () => {
     expectSanitizeHTML(
-      '<p>abc</p><p></p><p></p><p></p><p>abc</p><p></p><p></p><p></p><p></p><p></p><p></p>',
       stripIndent`
         <p>abc</p>
         <p></p>
         <p></p>
+        abc
         <p></p>
         <p>abc</p>
         <p></p>
         <p></p>
         <p></p>
+        <p>abc</p>
         <p></p>
+        <p><br></p>
+        <p><br/></p>
+        <p><br></br></p>
+        <p><br/><br/><br/></p>
+        <p></p>
+      `,
+      stripIndent`
+        <p>abc</p>
+        <p></p>
+        <p></p>abc
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        <p>abc</p>
         <p></p>
         <p></p>
       `,
