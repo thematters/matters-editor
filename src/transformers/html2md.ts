@@ -1,15 +1,16 @@
-import { unified } from 'unified'
 import rehypeParse from 'rehype-parse'
 import rehypeRemark from 'rehype-remark'
-import remarkStringify from 'remark-stringify'
-import { remarkStrikethrough } from './plugins'
 import rehypeRewrite from 'rehype-rewrite'
+import remarkStringify from 'remark-stringify'
+import { unified } from 'unified'
+
 import {
   rehypeParseOptions,
   rehypeRemarkOptions,
   rehypeRewriteOptions,
   remarkStringifyOptions,
 } from './options'
+import { remarkStrikethrough } from './plugins'
 
 const formatter = unified()
   .use(rehypeParse, rehypeParseOptions)

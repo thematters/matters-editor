@@ -1,9 +1,9 @@
-import { Editor } from '@tiptap/core'
-import { MarkType } from '@tiptap/pm/model'
+import { type Editor } from '@tiptap/core'
+import { type MarkType } from '@tiptap/pm/model'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { find } from 'linkifyjs'
 
-type PasteHandlerOptions = {
+interface PasteHandlerOptions {
   editor: Editor
   type: MarkType
 }
@@ -28,7 +28,7 @@ export function pasteHandler(options: PasteHandlerOptions): Plugin {
         })
 
         const link = find(textContent).find(
-          (item) => item.isLink && item.value === textContent
+          (item) => item.isLink && item.value === textContent,
         )
 
         if (!textContent || !link) {

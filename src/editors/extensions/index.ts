@@ -14,27 +14,21 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Strike from '@tiptap/extension-strike'
 import Text from '@tiptap/extension-text'
 
+import { Bold } from './bold'
 import { FigureAudio } from './figureAudio'
 import { FigureEmbed } from './figureEmbed'
 import { FigureImage } from './figureImage'
-import { Link } from './link'
-import { Mention, MentionSuggestion } from './mention'
-import { Bold } from './bold'
 import { HorizontalRule } from './horizontalRule'
-import { ReadOnlyFigureImage } from './readOnlyFigureImage'
-import { ReadOnlyFigureAudio } from './readOnlyFigureAudio'
-import { ReadOnlyFigureEmbed } from './readOnlyFigureEmbed'
+import { Link } from './link'
+import { Mention, type MentionSuggestion } from './mention'
 
+export * from './bold'
 export * from './figureAudio'
 export * from './figureEmbed'
 export * from './figureImage'
-export * from './readOnlyFigureAudio'
-export * from './readOnlyFigureEmbed'
-export * from './readOnlyFigureImage'
-export * from './link'
 export * from './horizontalRule'
+export * from './link'
 export * from './mention'
-export * from './bold'
 
 const baseExtensions = (placeholder?: string) => [
   Document,
@@ -45,20 +39,12 @@ const baseExtensions = (placeholder?: string) => [
   // Basic Formats
   Text,
   Paragraph,
-  Bold,
-  Strike,
-  Code,
-  CodeBlock,
   Blockquote,
   HardBreak.configure({
     HTMLAttributes: {
       class: 'smart',
     },
   }),
-  HorizontalRule,
-  OrderedList,
-  ListItem,
-  BulletList,
   // Custom Formats
   Link,
 ]
@@ -66,6 +52,14 @@ const baseExtensions = (placeholder?: string) => [
 const baseArticleExtensions = (placeholder?: string) => [
   ...baseExtensions(placeholder),
   Gapcursor,
+  Bold,
+  Strike,
+  Code,
+  CodeBlock,
+  HorizontalRule,
+  OrderedList,
+  ListItem,
+  BulletList,
   Heading.configure({
     levels: [2, 3],
   }),
@@ -74,7 +68,7 @@ const baseArticleExtensions = (placeholder?: string) => [
 /**
  * Article
  */
-export type MakeArticleEditorExtensionsProps = {
+export interface MakeArticleEditorExtensionsProps {
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
 }
@@ -97,28 +91,10 @@ export const makeArticleEditorExtensions = ({
   return extensions
 }
 
-export const makeEditArticleEditorExtensions = ({
-  placeholder,
-  mentionSuggestion,
-}: MakeArticleEditorExtensionsProps) => {
-  const extensions = [
-    ...baseArticleExtensions(placeholder),
-    ReadOnlyFigureImage,
-    ReadOnlyFigureAudio,
-    ReadOnlyFigureEmbed,
-  ]
-
-  if (mentionSuggestion) {
-    extensions.push(Mention.configure({ suggestion: mentionSuggestion }))
-  }
-
-  return extensions
-}
-
 /**
  * Comment
  */
-export type MakeCommentEditorExtensionsProps = {
+export interface MakeCommentEditorExtensionsProps {
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
 }

@@ -1,5 +1,4 @@
 import { mergeAttributes, Node, nodeInputRule } from '@tiptap/core'
-import { TextSelection } from '@tiptap/pm/state'
 
 export interface HorizontalRuleOptions {
   HTMLAttributes: Record<string, any>

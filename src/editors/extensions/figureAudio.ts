@@ -1,4 +1,4 @@
-import { Editor, Node } from '@tiptap/core'
+import { type Editor, Node } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 
 /**
@@ -171,7 +171,7 @@ export const FigureAudio = Node.create({
               return
             }
 
-            // @ts-ignore
+            // @ts-expect-error
             const editor = view.dom.editor as Editor
 
             // backSpace to remove if the figcaption is empty
@@ -200,8 +200,6 @@ export const FigureAudio = Node.create({
                   type: 'paragraph',
                 })
               })
-
-              return
             }
           },
 

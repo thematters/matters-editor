@@ -3,13 +3,13 @@ import {
   findChildrenInRange,
   getChangedRanges,
   getMarksBetween,
-  NodeWithPos,
+  type NodeWithPos,
 } from '@tiptap/core'
-import { MarkType } from '@tiptap/pm/model'
+import { type MarkType } from '@tiptap/pm/model'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { find, test } from 'linkifyjs'
 
-type AutolinkOptions = {
+interface AutolinkOptions {
   type: MarkType
   validate?: (url: string) => boolean
 }
@@ -22,7 +22,7 @@ export function autolink(options: AutolinkOptions): Plugin {
         transactions.some((transaction) => transaction.docChanged) &&
         !oldState.doc.eq(newState.doc)
       const preventAutolink = transactions.some((transaction) =>
-        transaction.getMeta('preventAutolink')
+        transaction.getMeta('preventAutolink'),
       )
 
       if (!docChanges || preventAutolink) {
@@ -44,10 +44,10 @@ export function autolink(options: AutolinkOptions): Plugin {
             const newMarks = getMarksBetween(
               newFrom,
               newTo,
-              newState.doc
+              newState.doc,
             ).filter((item) => item.mark.type === options.type)
 
-            if (!newMarks.length) {
+            if (newMarks.length === 0) {
               return
             }
 
@@ -56,13 +56,13 @@ export function autolink(options: AutolinkOptions): Plugin {
               oldMark.from,
               oldMark.to,
               undefined,
-              ' '
+              ' ',
             )
             const newLinkText = newState.doc.textBetween(
               newMark.from,
               newMark.to,
               undefined,
-              ' '
+              ' ',
             )
             const wasLink = test(oldLinkText)
             const isLink = test(newLinkText)
@@ -78,7 +78,7 @@ export function autolink(options: AutolinkOptions): Plugin {
         const nodesInChangedRanges = findChildrenInRange(
           newState.doc,
           newRange,
-          (node) => node.isTextblock
+          (node) => node.isTextblock,
         )
 
         let textBlock: NodeWithPos | undefined
@@ -91,10 +91,10 @@ export function autolink(options: AutolinkOptions): Plugin {
             textBlock.pos,
             textBlock.pos + textBlock.node.nodeSize,
             undefined,
-            ' '
+            ' ',
           )
         } else if (
-          nodesInChangedRanges.length &&
+          nodesInChangedRanges.length > 0 &&
           // We want to make sure to include the block seperator argument to treat hard breaks like spaces
           newState.doc
             .textBetween(newRange.from, newRange.to, ' ', ' ')
@@ -105,7 +105,7 @@ export function autolink(options: AutolinkOptions): Plugin {
             textBlock.pos,
             newRange.to,
             undefined,
-            ' '
+            ' ',
           )
         }
 
@@ -149,13 +149,13 @@ export function autolink(options: AutolinkOptions): Plugin {
                 link.to,
                 options.type.create({
                   href: link.href,
-                })
+                }),
               )
             })
         }
       })
 
-      if (!tr.steps.length) {
+      if (tr.steps.length === 0) {
         return
       }
 

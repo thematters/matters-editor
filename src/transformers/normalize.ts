@@ -1,11 +1,12 @@
 import type { Extensions } from '@tiptap/core'
 import { getSchema } from '@tiptap/core'
 import { DOMParser, DOMSerializer, Node } from '@tiptap/pm/model'
-import { createHTMLDocument, parseHTML, VHTMLDocument } from 'zeed-dom'
+import { createHTMLDocument, parseHTML, type VHTMLDocument } from 'zeed-dom'
+
 import {
-  Mention,
   makeArticleEditorExtensions,
   makeCommentEditorExtensions,
+  Mention,
 } from '../editors/extensions'
 
 export const makeNormalizer = (extensions: Extensions) => {
@@ -13,7 +14,7 @@ export const makeNormalizer = (extensions: Extensions) => {
 
   return (html: string): string => {
     const dom = parseHTML(html) as unknown as Node
-    // @ts-ignore
+    // @ts-expect-error
     const doc = DOMParser.fromSchema(schema).parse(dom).toJSON()
     const contentNode = Node.fromJSON(schema, doc)
 
@@ -21,7 +22,7 @@ export const makeNormalizer = (extensions: Extensions) => {
       contentNode.content,
       {
         document: createHTMLDocument() as unknown as Document,
-      }
+      },
     ) as unknown as VHTMLDocument
 
     return document.render()
