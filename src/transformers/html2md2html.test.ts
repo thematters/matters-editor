@@ -1,11 +1,12 @@
-import { test, expect, describe } from 'vitest'
-import { html2md } from './html2md'
-import { md2html } from './md2html'
-import { unified } from 'unified'
-import rehypeStringify from 'rehype-stringify'
+import { stripIndent } from 'common-tags'
 import rehypeFormat from 'rehype-format'
 import rehypeParse from 'rehype-parse'
-import { stripIndent } from 'common-tags'
+import rehypeStringify from 'rehype-stringify'
+import { unified } from 'unified'
+import { describe, expect, test } from 'vitest'
+
+import { html2md } from './html2md'
+import { md2html } from './md2html'
 
 /**
  * Utils
@@ -20,7 +21,7 @@ const formatHTML = (html: string): string => {
   return String(result)
 }
 
-const html2md2html = (html: string, md: string) => {
+const html2md2html = (html: string, md: string): void => {
   html = formatHTML(html)
 
   const mdResult = html2md(html)
@@ -66,25 +67,25 @@ describe('HTML to Markdown: Basic Formats', () => {
     // <em><strong>
     html2md2html(
       '<p>This text is <em><strong>really <s>important</s></strong></em>.</p>',
-      'This text is _**really ~~important~~**_.'
+      'This text is _**really ~~important~~**_.',
     )
 
     // <strong><em>
     html2md2html(
       '<p>This text is <strong><em>really important</em></strong>.</p>',
-      'This text is **_really important_**.'
+      'This text is **_really important_**.',
     )
   })
 
   test('code', () => {
     html2md2html(
       '<p>At the command prompt, type <code>nano</code>.</p>',
-      'At the command prompt, type `nano`.'
+      'At the command prompt, type `nano`.',
     )
 
     html2md2html(
       '<p><code>Use `code` in your Markdown file.</code></p>',
-      '``Use `code` in your Markdown file.``'
+      '``Use `code` in your Markdown file.``',
     )
   })
 
@@ -119,7 +120,7 @@ describe('HTML to Markdown: Basic Formats', () => {
       stripIndent`
         line\\
         breaks
-      `
+      `,
     )
     html2md2html('<p><br></p>', '<p><br></p>')
     html2md2html('<p><br/></p>', '<p><br></p>')
@@ -130,7 +131,7 @@ describe('HTML to Markdown: Basic Formats', () => {
         a\\
         b\\
         c
-      `
+      `,
     )
     html2md2html('<h1><br></h1>', '<h1><br></h1>')
     html2md2html('<h2><br></h2>', '<h2><br></h2>')
@@ -151,7 +152,7 @@ describe('HTML to Markdown: Basic Formats', () => {
         <p>Dorothy followed her through many of the beautiful rooms in her castle.</p>
       </blockquote>
       `,
-      '> Dorothy followed her through many of the beautiful rooms in her castle.'
+      '> Dorothy followed her through many of the beautiful rooms in her castle.',
     )
   })
 
@@ -170,7 +171,7 @@ describe('HTML to Markdown: Basic Formats', () => {
         2. Second item
         3. Third item
         4. Fourth item
-      `
+      `,
     )
   })
 
@@ -207,7 +208,7 @@ describe('HTML to Markdown: Basic Formats', () => {
            2. Indented item
 
         4. Fourth item
-      `
+      `,
     )
   })
 
@@ -226,7 +227,7 @@ describe('HTML to Markdown: Basic Formats', () => {
         * Second item
         * Third item
         * Fourth item
-      `
+      `,
     )
   })
 
@@ -263,16 +264,16 @@ describe('HTML to Markdown: Basic Formats', () => {
           * Indented item
 
         * Fourth item
-      `
+      `,
     )
   })
 
   test('link', () => {
     html2md2html(
       `
-      <p>My favorite search engine is <a href="https://duckduckgo.com" target="_blank" rel="noopener noreferrer nofollow">Duck Duck Go</a>.</p>
+      <p>My favorite search engine is <a href="https://duckduckgo.com" target="_blank" rel="noopener nofollow noreferrer">Duck Duck Go</a>.</p>
       `,
-      'My favorite search engine is [Duck Duck Go](https://duckduckgo.com).'
+      'My favorite search engine is [Duck Duck Go](https://duckduckgo.com).',
     )
   })
 
@@ -283,19 +284,19 @@ describe('HTML to Markdown: Basic Formats', () => {
         <img src="https://mdg.imgix.net/assets/images/san-juan-mountains.jpg" alt="The San Juan Mountains are beautiful!" title="San Juan Mountains" />
       </p>
       `,
-      '![The San Juan Mountains are beautiful!](https://mdg.imgix.net/assets/images/san-juan-mountains.jpg "San Juan Mountains")'
+      '![The San Juan Mountains are beautiful!](https://mdg.imgix.net/assets/images/san-juan-mountains.jpg "San Juan Mountains")',
     )
 
     // linking image
     html2md2html(
       `
       <p>
-        <a href="https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png" target="_blank" rel="noopener noreferrer nofollow">
+        <a href="https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png" target="_blank" rel="noopener nofollow noreferrer">
           <img src="https://mdg.imgix.net/assets/images/shiprock.jpg" alt="An old rock in the desert" title="Shiprock, New Mexico by Beau Rogers" />
         </a>
       </p>
       `,
-      '[![An old rock in the desert](https://mdg.imgix.net/assets/images/shiprock.jpg "Shiprock, New Mexico by Beau Rogers")](https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png)'
+      '[![An old rock in the desert](https://mdg.imgix.net/assets/images/shiprock.jpg "Shiprock, New Mexico by Beau Rogers")](https://www.flickr.com/photos/beaurogers/31833779864/in/abc.png)',
     )
   })
 })
@@ -311,7 +312,7 @@ describe('HTML to Markdown: Figures', () => {
   </figcaption>
 </figure>
   `,
-      '<figure class="image"><img src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"><figcaption><span>caption</span></figcaption></figure>'
+      '<figure class="image"><img src="https://assets.matters.news/embed/02403a12-040c-4e4b-bed9-e932658abb44.png" srcset="https://assets.matters.news/processed/540w/embed/02403a12-040c-4e4b-bed9-e932658abb44.png"><figcaption><span>caption</span></figcaption></figure>',
     )
   })
 
@@ -340,7 +341,7 @@ describe('HTML to Markdown: Figures', () => {
         <figcaption><span>區塊勢 Podcast</span></figcaption>
       </figure>
       `,
-      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>區塊勢 Podcast</span></figcaption></figure>'
+      '<figure class="audio"><audio controls data-file-name="點數經濟：讓過路客成為回頭客"><source src="https://assets.matters.news/embedaudio/0a45d56a-d19a-4300-bfa4-305639fd5a82/點數經濟-讓過路客成為回頭客.mp3" type="audio/mp3" data-asset-id="0a45d56a-d19a-4300-bfa4-305639fd5a82"></audio><div class="player"><header><div class="meta"><h4 class="title">點數經濟：讓過路客成為回頭客</h4><div class="time"><span class="current" data-time="00:00"></span><span class="duration" data-time="--:--"></span></div></div><span class="play"></span></header><footer><div class="progress-bar"><span></span></div></footer></div><figcaption><span>區塊勢 Podcast</span></figcaption></figure>',
     )
   })
 
@@ -354,7 +355,7 @@ describe('HTML to Markdown: Figures', () => {
         <figcaption><span>完整的JSFiddle代碼</span></figcaption>
       </figure>
   `,
-      '<figure class="embed-code"><div class="iframe-container"><iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>完整的JSFiddle代碼</span></figcaption></figure>'
+      '<figure class="embed-code"><div class="iframe-container"><iframe loading="lazy" src="https://jsfiddle.net/Sokiraon/t0gycfvb/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>完整的JSFiddle代碼</span></figcaption></figure>',
     )
   })
 })
@@ -375,7 +376,7 @@ describe('HTML to Markdown: Full Content', () => {
       <p>Dolore labore laboris <strong>consequat nostrud</strong> Lorem irure excepteur incididunt adipisicing id.</p>
       <p>Ullamco cillum <strong><em>esse anim dolore</em></strong> duis adipisicing.</p>
       <p>Cillum incididunt <strong><em>nostrud sunt occaecat</em></strong> fugiat commodo quis in pariatur exercitation.</p>
-      <p>Veniam pariatur labore <a href="https://google.com" target="_blank" rel="noopener noreferrer nofollow">consectetur</a> laborum.</p>
+      <p>Veniam pariatur labore <a href="https://google.com" target="_blank"  rel="noopener nofollow noreferrer">consectetur</a> laborum.</p>
       <blockquote>
         <p>Fugiat consectetur culpa anim enim sit nisi culpa consequat Lorem ipsum.<br><br>Qui proident non pariatur veniam est irure.</p>
       </blockquote>
@@ -486,7 +487,7 @@ describe('HTML to Markdown: Full Content', () => {
         <figure class="embed-video"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/VQKMoT-6XSg?rel=0" frameborder="0" allowfullscreen sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span>Sit cillum minim minim excepteur nostrud Lorem aliquip sint elit reprehenderit aute ipsum minim.</span></figcaption></figure>
 
         <figure class="embed-code"><div class="iframe-container"><iframe src="https://jsfiddle.net/scarabresearch/2bzfrg59/embedded/" frameborder="0" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div><figcaption><span></span></figcaption></figure>
-`
+`,
     )
   })
 })

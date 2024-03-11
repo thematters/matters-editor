@@ -1,5 +1,5 @@
 import { Mark, markPasteRule, mergeAttributes } from '@tiptap/core'
-import { Plugin } from '@tiptap/pm/state'
+import { type Plugin } from '@tiptap/pm/state'
 import { find, registerCustomProtocol, reset } from 'linkifyjs'
 
 import { autolink } from './helpers/autolink'
@@ -204,7 +204,7 @@ export const Link = Mark.create<LinkOptions>({
         autolink({
           type: this.type,
           validate: this.options.validate,
-        })
+        }),
       )
     }
 
@@ -212,7 +212,7 @@ export const Link = Mark.create<LinkOptions>({
       plugins.push(
         clickHandler({
           type: this.type,
-        })
+        }),
       )
     }
 
@@ -221,7 +221,7 @@ export const Link = Mark.create<LinkOptions>({
         pasteHandler({
           editor: this.editor,
           type: this.type,
-        })
+        }),
       )
     }
 

@@ -1,6 +1,6 @@
 import { Node } from '@tiptap/core'
 import { PluginKey } from '@tiptap/pm/state'
-import Suggestion, { SuggestionOptions } from '@tiptap/suggestion'
+import Suggestion, { type SuggestionOptions } from '@tiptap/suggestion'
 
 /**
  * Mention extension
@@ -22,7 +22,7 @@ import Suggestion, { SuggestionOptions } from '@tiptap/suggestion'
  */
 export type MentionSuggestion = Omit<SuggestionOptions, 'editor'>
 
-export type MentionOptions = {
+export interface MentionOptions {
   suggestion: MentionSuggestion
 }
 
@@ -138,9 +138,9 @@ export const Mention = Node.create<MentionOptions>({
             if (node.type.name === this.name) {
               isMention = true
               tr.insertText(
-                this.options.suggestion.char || '',
+                this.options.suggestion.char ?? '',
                 pos,
-                pos + node.nodeSize
+                pos + node.nodeSize,
               )
 
               return false

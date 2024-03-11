@@ -1,4 +1,4 @@
-import { Editor, Node } from '@tiptap/core'
+import { type Editor, Node } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 
 /**
@@ -34,7 +34,7 @@ declare module '@tiptap/core' {
   }
 }
 
-type NormalizeEmbedURLReturn = {
+interface NormalizeEmbedURLReturn {
   url: string
   provider?:
     | 'youtube'
@@ -97,7 +97,7 @@ const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
   ].includes(hostname)
   if (isYouTube) {
     const v = searchParams.get('v')
-    const t = searchParams.get('t') || searchParams.get('start')
+    const t = searchParams.get('t') ?? searchParams.get('start')
     const qs = new URLSearchParams({
       rel: '0',
       ...(t ? { start: t } : {}),
@@ -128,7 +128,7 @@ const normalizeEmbedURL = (url: string): NormalizeEmbedURLReturn => {
    *   - https://player.vimeo.com/video/332732612
    */
   const isVimeo = ['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'].includes(
-    hostname
+    hostname,
   )
   if (isVimeo) {
     const id = pathname.replace(/\/$/, '').split('/').slice(-1)[0]
@@ -285,7 +285,7 @@ export const FigureEmbed = Node.create({
 
   renderHTML({ HTMLAttributes }) {
     const { url, provider, allowfullscreen, sandbox } = normalizeEmbedURL(
-      HTMLAttributes.src
+      HTMLAttributes.src as string,
     )
 
     // for backward compatibility
@@ -296,15 +296,13 @@ export const FigureEmbed = Node.create({
       Provider.Bilibili,
     ].includes(provider as Provider)
     const isCode = [Provider.JSFiddle, Provider.CodePen].includes(
-      provider as Provider
+      provider as Provider,
     )
     const className = [
       'embed',
       ...(isVideo ? [`embed-video`] : []),
       ...(isCode ? [`embed-code`] : []),
     ].join(' ')
-
-    console.log({ url })
 
     return [
       'figure',
@@ -377,7 +375,7 @@ export const FigureEmbed = Node.create({
               return
             }
 
-            // @ts-ignore
+            // @ts-expect-error
             const editor = view.dom.editor as Editor
 
             // backSpace to remove if the figcaption is empty
@@ -406,8 +404,6 @@ export const FigureEmbed = Node.create({
                   type: 'paragraph',
                 })
               })
-
-              return
             }
           },
 

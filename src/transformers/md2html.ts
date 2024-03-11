@@ -1,22 +1,23 @@
-import { unified } from 'unified'
-import remarkParse from 'remark-parse'
-import remarkRehype from 'remark-rehype'
-import rehypeStringify from 'rehype-stringify'
-import rehypeRaw from 'rehype-raw'
-import rehypeSanitize from 'rehype-sanitize'
+import rehypeExternalLinks from 'rehype-external-links'
 import rehypeFormat from 'rehype-format'
+import rehypeRaw from 'rehype-raw'
 import rehypeRewrite from 'rehype-rewrite'
+import rehypeSanitize from 'rehype-sanitize'
+import rehypeStringify from 'rehype-stringify'
 import remarkBreaks from 'remark-breaks'
 import remarkDirective from 'remark-directive'
 import remarkDirectiveRehype from 'remark-directive-rehype'
+import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
+import { unified } from 'unified'
 
-import { remarkStrikethrough } from './plugins'
 import {
   rehypeRewriteOptions,
   rehypeSanitizeOptions,
   rehypeStringifyOptions,
   remarkRehypeOptions,
 } from './options'
+import { remarkStrikethrough } from './plugins'
 
 const formatter = unified()
   .use(remarkParse)
@@ -28,6 +29,7 @@ const formatter = unified()
   .use(rehypeRewrite, rehypeRewriteOptions)
   .use(rehypeRaw)
   .use(rehypeSanitize, rehypeSanitizeOptions)
+  .use(rehypeExternalLinks, { rel: ['noopener', 'nofollow', 'noreferrer'] })
   .use(rehypeFormat)
   .use(rehypeStringify, rehypeStringifyOptions)
 
