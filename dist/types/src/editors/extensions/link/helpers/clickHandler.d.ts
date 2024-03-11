@@ -1,7 +1,7 @@
-import { MarkType } from '@tiptap/pm/model';
+import { type MarkType } from '@tiptap/pm/model';
 import { Plugin } from '@tiptap/pm/state';
-type ClickHandlerOptions = {
+interface ClickHandlerOptions {
     type: MarkType;
-};
+}
 export declare function clickHandler(options: ClickHandlerOptions): Plugin;
 export {};

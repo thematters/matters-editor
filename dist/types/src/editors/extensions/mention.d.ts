@@ -1,6 +1,6 @@
 import { Node } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
-import { SuggestionOptions } from '@tiptap/suggestion';
+import { type SuggestionOptions } from '@tiptap/suggestion';
 /**
  * Mention extension
  *
@@ -20,8 +20,8 @@ import { SuggestionOptions } from '@tiptap/suggestion';
  * ```
  */
 export type MentionSuggestion = Omit<SuggestionOptions, 'editor'>;
-export type MentionOptions = {
+export interface MentionOptions {
     suggestion: MentionSuggestion;
-};
+}
 export declare const MentionPluginKey: PluginKey<any>;
 export declare const Mention: Node<MentionOptions, any>;

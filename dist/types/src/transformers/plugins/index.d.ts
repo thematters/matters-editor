@@ -1,2 +1,2 @@
-export * from './remarkStrikethrough';
 export * from './directives';
+export * from './remarkStrikethrough';

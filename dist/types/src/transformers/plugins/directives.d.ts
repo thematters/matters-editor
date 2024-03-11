@@ -1,3 +1,3 @@
-import { Root } from 'mdast';
-import { Plugin } from 'unified';
+import { type Root } from 'mdast';
+import { type Plugin } from 'unified';
 export declare const directives: Plugin<[], Root>;
