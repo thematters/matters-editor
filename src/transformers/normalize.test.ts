@@ -286,6 +286,20 @@ describe('Normalization: Article', () => {
 })
 
 describe('Normalization: Comment', () => {
+  test('quote', () => {
+    expectNormalizeCommentHTML(
+      '<blockquote><p>abc</p></blockquote>',
+      '<blockquote><p>abc</p></blockquote>',
+    )
+  })
+
+  test('link', () => {
+    expectNormalizeCommentHTML(
+      '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
+      '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
+    )
+  })
+
   test('bolds is not supported', () => {
     expectNormalizeCommentHTML('<p><strong>abc</strong></p>', '<p>abc</p>')
     expectNormalizeCommentHTML('<p><b>abc</b></p>', '<p>abc</p>')
