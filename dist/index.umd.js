@@ -55809,14 +55809,14 @@ img.ProseMirror-separator {
     }
     var remarkStrikethrough = _remarkStrikethrough;
 
-    var formatter$2 = unified()
+    var formatter$1 = unified()
         .use(rehypeParse, rehypeParseOptions)
         .use(rehypeRewrite, rehypeRewriteOptions)
         .use(rehypeRemark, rehypeRemarkOptions)
         .use(remarkStrikethrough)
         .use(remarkStringify, remarkStringifyOptions);
     var html2md = function (html) {
-        var result = formatter$2.processSync(html);
+        var result = formatter$1.processSync(html);
         return String(result);
     };
 
@@ -71135,7 +71135,7 @@ img.ProseMirror-separator {
       }
     }
 
-    var formatter$1 = unified()
+    var formatter = unified()
         .use(remarkParse)
         .use(remarkDirective)
         .use(remarkDirectiveRehype)
@@ -71149,7 +71149,7 @@ img.ProseMirror-separator {
         .use(rehypeFormat)
         .use(rehypeStringify, rehypeStringifyOptions);
     var md2html = function (md) {
-        var result = formatter$1.processSync(md);
+        var result = formatter.processSync(md);
         return String(result);
     };
 
@@ -75093,7 +75093,7 @@ img.ProseMirror-separator {
      * e.g.
      * <p></p><p></p><p></p><p></p><p></p><p></p>
      * =>
-     * <p></p><p></p>
+     * <p><br></p><p><br></p>
      *
      * @param {number} maxCount
      */
@@ -75135,7 +75135,14 @@ img.ProseMirror-separator {
                         type: 'element',
                         tagName: 'p',
                         properties: {},
-                        children: [],
+                        children: [
+                            {
+                                type: 'element',
+                                tagName: 'br',
+                                properties: {},
+                                children: [],
+                            },
+                        ],
                     });
                 }
                 else {
@@ -75147,14 +75154,16 @@ img.ProseMirror-separator {
             }
         };
     };
-    var formatter = unified()
-        .use(rehypeParse, rehypeParseOptions)
-        .use(rehypeRaw)
-        .use(rehypeSanitize, rehypeSanitizeOptions)
-        .use(rehypeSqueezeParagraphs, { maxCount: 2 })
-        .use(rehypeFormat)
-        .use(rehypeStringify, rehypeStringifyOptions);
-    var sanitizeHTML = function (html) {
+
+    var sanitizeHTML = function (html, _a) {
+        var _b = _a === void 0 ? {} : _a, maxEmptyParagraphs = _b.maxEmptyParagraphs;
+        var formatter = unified()
+            .use(rehypeParse, rehypeParseOptions)
+            .use(rehypeRaw)
+            .use(rehypeSanitize, rehypeSanitizeOptions)
+            .use(rehypeSqueezeParagraphs, { maxCount: maxEmptyParagraphs !== null && maxEmptyParagraphs !== void 0 ? maxEmptyParagraphs : 2 })
+            .use(rehypeFormat)
+            .use(rehypeStringify, rehypeStringifyOptions);
         var result = formatter.processSync(html);
         return String(result);
     };
