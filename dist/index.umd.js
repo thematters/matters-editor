@@ -75160,10 +75160,13 @@ img.ProseMirror-separator {
         var formatter = unified()
             .use(rehypeParse, rehypeParseOptions)
             .use(rehypeRaw)
-            .use(rehypeSanitize, rehypeSanitizeOptions)
-            .use(rehypeSqueezeParagraphs, { maxCount: maxEmptyParagraphs !== null && maxEmptyParagraphs !== void 0 ? maxEmptyParagraphs : 2 })
-            .use(rehypeFormat)
-            .use(rehypeStringify, rehypeStringifyOptions);
+            .use(rehypeSanitize, rehypeSanitizeOptions);
+        if (maxEmptyParagraphs) {
+            formatter.use(rehypeSqueezeParagraphs, {
+                maxCount: maxEmptyParagraphs,
+            });
+        }
+        formatter.use(rehypeFormat).use(rehypeStringify, rehypeStringifyOptions);
         var result = formatter.processSync(html);
         return String(result);
     };
