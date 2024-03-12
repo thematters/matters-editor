@@ -6,7 +6,7 @@ import { type Root, type RootContent } from 'hast'
  * e.g.
  * <p></p><p></p><p></p><p></p><p></p><p></p>
  * =>
- * <p></p><p></p>
+ * <p><br></p><p><br></p>
  *
  * @param {number} maxCount
  */
