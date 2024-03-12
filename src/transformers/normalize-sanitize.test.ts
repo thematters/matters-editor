@@ -6,9 +6,9 @@ import rehypeStringify from 'rehype-stringify'
 import { unified } from 'unified'
 import { describe, expect, test } from 'vitest'
 
-import { normalizeArticleHTML } from './normalize'
+import { normalizeArticleHTML, normalizeCommentHTML } from './normalize'
 import { rehypeParseOptions, rehypeStringifyOptions } from './options'
-import { sanitizeHTML } from './sanitize'
+import { sanitizeHTML, type SanitizeHTMLOptions } from './sanitize'
 
 const formatter = unified()
   .use(rehypeParse, rehypeParseOptions)
@@ -21,15 +21,23 @@ const formatHTML = (html: string): string => {
   return String(result)
 }
 
-const expectProcessArticleHTML = (input: string, output: string) => {
-  const result = normalizeArticleHTML(sanitizeHTML(input))
+const expectProcessArticleHTML = (
+  input: string,
+  output: string,
+  options?: SanitizeHTMLOptions,
+) => {
+  const result = normalizeArticleHTML(sanitizeHTML(input, options))
   expect(formatHTML(result).trim()).toBe(output)
 }
 
-// const expectProcessCommentHTML = (input: string, output: string) => {
-//   const result = normalizeCommentHTML(sanitizeHTML(input))
-//   expect(formatHTML(result).trim()).toBe(output)
-// }
+const expectProcessCommentHTML = (
+  input: string,
+  output: string,
+  options?: SanitizeHTMLOptions,
+) => {
+  const result = normalizeCommentHTML(sanitizeHTML(input, options))
+  expect(formatHTML(result).trim()).toBe(output)
+}
 
 describe('Sanitize and normalize article', () => {
   test('squeeze empty paragraphys', () => {
@@ -48,7 +56,6 @@ describe('Sanitize and normalize article', () => {
         <p></p>
         <p><br></p>
         <p><br/></p>
-        <p><br></br></p>
         <p><br/><br/><br/></p>
         <p></p>
       `,
@@ -65,8 +72,48 @@ describe('Sanitize and normalize article', () => {
         <p><br class="smart"></p>
         <p><br class="smart"></p>
       `,
+      { maxEmptyParagraphs: 2 },
     )
   })
 })
 
-// describe('Sanitize and normalize comment', () => {})
+describe('Sanitize and normalize comment', () => {
+  test('skip squeezing empty paragraphys', () => {
+    expectProcessCommentHTML(
+      stripIndent`
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        abc
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p><br></p>
+        <p><br/></p>
+        <p><br/><br/><br/></p>
+        <p></p>
+      `,
+      stripIndent`
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p><br class="smart"></p>
+        <p><br class="smart"></p>
+        <p><br class="smart"><br class="smart"><br class="smart"></p>
+        <p></p>
+      `,
+    )
+  })
+})

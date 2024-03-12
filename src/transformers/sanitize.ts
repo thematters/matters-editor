@@ -24,9 +24,14 @@ export const sanitizeHTML = (
     .use(rehypeParse, rehypeParseOptions)
     .use(rehypeRaw)
     .use(rehypeSanitize, rehypeSanitizeOptions)
-    .use(rehypeSqueezeParagraphs, { maxCount: maxEmptyParagraphs ?? 2 })
-    .use(rehypeFormat)
-    .use(rehypeStringify, rehypeStringifyOptions)
+
+  if (maxEmptyParagraphs) {
+    formatter.use(rehypeSqueezeParagraphs, {
+      maxCount: maxEmptyParagraphs,
+    })
+  }
+
+  formatter.use(rehypeFormat).use(rehypeStringify, rehypeStringifyOptions)
 
   const result = formatter.processSync(html)
   return String(result)
