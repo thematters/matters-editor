@@ -7,7 +7,7 @@ const expectNormalizeArticleHTML = (input: string, output: string) => {
   expect(result.trim()).toBe(output)
 }
 
-export const expectNormalizeCommentHTML = (input: string, output: string) => {
+const expectNormalizeCommentHTML = (input: string, output: string) => {
   const result = normalizeCommentHTML(input)
   expect(result.trim()).toBe(output)
 }
