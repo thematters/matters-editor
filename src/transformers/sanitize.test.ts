@@ -1,10 +1,14 @@
 import { stripIndent } from 'common-tags'
 import { describe, expect, test } from 'vitest'
 
-import { sanitizeHTML } from './sanitize'
+import { sanitizeHTML, type SanitizeHTMLOptions } from './sanitize'
 
-const expectSanitizeHTML = (input: string, output: string): void => {
-  const result = sanitizeHTML(input)
+const expectSanitizeHTML = (
+  input: string,
+  output: string,
+  options?: SanitizeHTMLOptions,
+): void => {
+  const result = sanitizeHTML(input, options)
   expect(result.trim()).toBe(output)
 }
 
@@ -42,16 +46,49 @@ describe('Sanitization: custom', () => {
       `,
       stripIndent`
         <p>abc</p>
+        <p><br></p>
+        <p><br></p>abc
+        <p><br></p>
+        <p>abc</p>
+        <p><br></p>
+        <p><br></p>
+        <p>abc</p>
+        <p><br></p>
+        <p><br></p>
+      `,
+    )
+  })
+
+  test('allow max one empty paragraphys', () => {
+    expectSanitizeHTML(
+      stripIndent`
+        <p>abc</p>
         <p></p>
-        <p></p>abc
+        <p></p>
+        abc
         <p></p>
         <p>abc</p>
         <p></p>
         <p></p>
+        <p></p>
         <p>abc</p>
         <p></p>
+        <p><br></p>
+        <p><br/></p>
+        <p><br></br></p>
+        <p><br/><br/><br/></p>
         <p></p>
       `,
+      stripIndent`
+        <p>abc</p>
+        <p><br></p>abc
+        <p><br></p>
+        <p>abc</p>
+        <p><br></p>
+        <p>abc</p>
+        <p><br></p>
+      `,
+      { maxEmptyParagraphs: 1 },
     )
   })
 })
