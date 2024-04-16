@@ -24,7 +24,7 @@ describe('Sanitization: custom', () => {
     )
   })
 
-  test('allow max two empty paragraphys', () => {
+  test('allow max two empty paragraphs', () => {
     expectSanitizeHTML(
       stripIndent`
         <p>abc</p>
@@ -56,6 +56,45 @@ describe('Sanitization: custom', () => {
         <p><br></p>
       `,
       { maxEmptyParagraphs: 2 },
+    )
+  })
+
+  test('squeeze and retain all empty paragraphs', () => {
+    expectSanitizeHTML(
+      stripIndent`
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        abc
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p><br></p>
+        <p><br/></p>
+        <p><br/><br/><br/></p>
+        <p></p>
+      `,
+      stripIndent`
+        <p>abc</p>
+        <p><br></p>
+        <p><br></p>abc
+        <p><br></p>
+        <p>abc</p>
+        <p><br></p>
+        <p><br></p>
+        <p><br></p>
+        <p>abc</p>
+        <p><br></p>
+        <p><br></p>
+        <p><br></p>
+        <p><br></p>
+        <p><br></p>
+      `,
+      { maxEmptyParagraphs: -1 },
     )
   })
 

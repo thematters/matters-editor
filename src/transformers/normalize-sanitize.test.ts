@@ -40,7 +40,7 @@ const expectProcessCommentHTML = (
 }
 
 describe('Sanitize and normalize article', () => {
-  test('squeeze empty paragraphys', () => {
+  test('squeeze empty paragraphs', () => {
     expectProcessArticleHTML(
       stripIndent`
         <p>abc</p>
@@ -75,10 +75,50 @@ describe('Sanitize and normalize article', () => {
       { maxEmptyParagraphs: 2 },
     )
   })
+
+  test('squeeze and retain all empty paragraphs', () => {
+    expectProcessArticleHTML(
+      stripIndent`
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        abc
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p></p>
+        <p></p>
+        <p>abc</p>
+        <p></p>
+        <p><br></p>
+        <p><br/></p>
+        <p><br/><br/><br/></p>
+        <p></p>
+      `,
+      stripIndent`
+        <p>abc</p>
+        <p><br class="smart"></p>
+        <p><br class="smart"></p>
+        <p>abc</p>
+        <p><br class="smart"></p>
+        <p>abc</p>
+        <p><br class="smart"></p>
+        <p><br class="smart"></p>
+        <p><br class="smart"></p>
+        <p>abc</p>
+        <p><br class="smart"></p>
+        <p><br class="smart"></p>
+        <p><br class="smart"></p>
+        <p><br class="smart"></p>
+        <p><br class="smart"></p>
+      `,
+      { maxEmptyParagraphs: -1 },
+    )
+  })
 })
 
 describe('Sanitize and normalize comment', () => {
-  test('skip squeezing empty paragraphys', () => {
+  test('skip squeezing empty paragraphs', () => {
     expectProcessCommentHTML(
       stripIndent`
         <p>abc</p>
