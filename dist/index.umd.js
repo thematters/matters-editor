@@ -75095,7 +75095,8 @@ img.ProseMirror-separator {
      * =>
      * <p><br></p><p><br></p>
      *
-     * @param {number} maxCount
+     * @param {number} maxCount: maximum number of empty paragraphs, -1 to retain all
+     *
      */
     var rehypeSqueezeParagraphs = function (_a) {
         var maxCount = _a.maxCount;
@@ -75104,6 +75105,7 @@ img.ProseMirror-separator {
                 return;
             }
             var children = [];
+            var isRetainAll = maxCount < 0;
             var count = 0;
             var touched = false;
             tree.children.forEach(function (node) {
@@ -75128,9 +75130,9 @@ img.ProseMirror-separator {
                     children.push(node);
                     return;
                 }
-                // cap empty paragraphs
+                // cap empty paragraphs or retain all by adding <br>
                 count++;
-                if (count <= maxCount) {
+                if (count <= maxCount || isRetainAll) {
                     children.push({
                         type: 'element',
                         tagName: 'p',
@@ -75149,7 +75151,7 @@ img.ProseMirror-separator {
                     touched = true;
                 }
             });
-            if (touched) {
+            if (touched || isRetainAll) {
                 tree.children = children;
             }
         };
