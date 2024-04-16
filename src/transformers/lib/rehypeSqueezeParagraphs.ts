@@ -8,7 +8,8 @@ import { type Root, type RootContent } from 'hast'
  * =>
  * <p><br></p><p><br></p>
  *
- * @param {number} maxCount
+ * @param {number} maxCount: maximum number of empty paragraphs, -1 to retain all
+ *
  */
 export const rehypeSqueezeParagraphs =
   ({ maxCount }: { maxCount: number }) =>
@@ -18,6 +19,7 @@ export const rehypeSqueezeParagraphs =
     }
 
     const children: RootContent[] = []
+    const isRetainAll = maxCount < 0
     let count = 0
     let touched = false
 
@@ -47,9 +49,9 @@ export const rehypeSqueezeParagraphs =
         return
       }
 
-      // cap empty paragraphs
+      // cap empty paragraphs or retain all by adding <br>
       count++
-      if (count <= maxCount) {
+      if (count <= maxCount || isRetainAll) {
         children.push({
           type: 'element',
           tagName: 'p',
@@ -68,7 +70,7 @@ export const rehypeSqueezeParagraphs =
       }
     })
 
-    if (touched) {
+    if (touched || isRetainAll) {
       tree.children = children
     }
   }
