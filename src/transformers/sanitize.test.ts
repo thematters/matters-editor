@@ -24,7 +24,23 @@ describe('Sanitization: custom', () => {
     )
   })
 
-  test('allow max two empty paragraphs', () => {
+  test('squeeze empty paragraphs', () => {
+    expectSanitizeHTML(
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p></p>
+        <p>3</p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p><br></p>
+        <p>3</p>
+      `,
+      { maxEmptyParagraphs: 1 },
+    )
+
     expectSanitizeHTML(
       stripIndent`
         <p>abc</p>

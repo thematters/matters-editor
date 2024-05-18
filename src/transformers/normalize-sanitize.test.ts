@@ -43,6 +43,22 @@ describe('Sanitize and normalize article', () => {
   test('squeeze empty paragraphs', () => {
     expectProcessArticleHTML(
       stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p></p>
+        <p>3</p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p><br class="smart"></p>
+        <p>3</p>
+      `,
+      { maxEmptyParagraphs: 1 },
+    )
+
+    expectProcessArticleHTML(
+      stripIndent`
         <p>abc</p>
         <p></p>
         <p></p>
