@@ -75146,8 +75146,6 @@ img.ProseMirror-separator {
                             },
                         ],
                     });
-                }
-                else {
                     touched = true;
                 }
             });
