@@ -44,6 +44,23 @@ describe('Sanitize and normalize article', () => {
     expectProcessArticleHTML(
       stripIndent`
         <p>1</p>
+        <p></p>
+        <p>2</p>
+        <p></p>
+        <p></p>
+        <p>3</p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>3</p>
+      `,
+      { maxHardBreaks: 0 },
+    )
+
+    expectProcessArticleHTML(
+      stripIndent`
+        <p>1</p>
         <p>2</p>
         <p></p>
         <p>3</p>
@@ -54,7 +71,27 @@ describe('Sanitize and normalize article', () => {
         <p><br class="smart"></p>
         <p>3</p>
       `,
-      { maxEmptyParagraphs: 1 },
+      { maxHardBreaks: 1 },
+    )
+
+    expectProcessArticleHTML(
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p></p>
+          <p>3</p>
+        </blockquote>
+      `,
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p><br class="smart"></p>
+          <p>3</p>
+        </blockquote>
+      `,
+      { maxHardBreaks: 1 },
     )
 
     expectProcessArticleHTML(
@@ -88,7 +125,69 @@ describe('Sanitize and normalize article', () => {
         <p><br class="smart"></p>
         <p><br class="smart"></p>
       `,
-      { maxEmptyParagraphs: 2 },
+      { maxHardBreaks: 2 },
+    )
+  })
+
+  test('squeeze <br>', () => {
+    expectProcessArticleHTML(
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br>2</p>
+        <p>1<br><br>2</p>
+        <p>1<br><br></p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>12</p>
+        <p>12</p>
+        <p>1</p>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: 0 },
+    )
+
+    // max 1 soft break
+    expectProcessArticleHTML(
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br>2</p>
+        <p>1<br><br>2</p>
+        <p>1<br><br></p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br class="smart">2</p>
+        <p>1<br class="smart">2</p>
+        <p>1<br class="smart"></p>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: 1 },
+    )
+
+    // blockquote
+    expectProcessArticleHTML(
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p>1<br>2</p>
+          <p>1<br><br>2</p>
+          <p>1<br><br></p>
+        </blockquote>
+      `,
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p>12</p>
+          <p>12</p>
+          <p>1</p>
+        </blockquote>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: 0 },
     )
   })
 
@@ -128,7 +227,7 @@ describe('Sanitize and normalize article', () => {
         <p><br class="smart"></p>
         <p><br class="smart"></p>
       `,
-      { maxEmptyParagraphs: -1 },
+      { maxHardBreaks: -1 },
     )
   })
 })

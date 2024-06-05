@@ -5,7 +5,7 @@ import rehypeSanitize from 'rehype-sanitize'
 import rehypeStringify from 'rehype-stringify'
 import { unified } from 'unified'
 
-import { rehypeSqueezeParagraphs } from './lib'
+import { rehypeSqueezeBreaks } from './lib'
 import {
   rehypeParseOptions,
   rehypeSanitizeOptions,
@@ -13,21 +13,23 @@ import {
 } from './options'
 
 export interface SanitizeHTMLOptions {
-  maxEmptyParagraphs?: number
+  maxHardBreaks?: number
+  maxSoftBreaks?: number
 }
 
 export const sanitizeHTML = (
   html: string,
-  { maxEmptyParagraphs }: SanitizeHTMLOptions = {},
+  { maxHardBreaks, maxSoftBreaks }: SanitizeHTMLOptions = {},
 ): string => {
   const formatter = unified()
     .use(rehypeParse, rehypeParseOptions)
     .use(rehypeRaw)
     .use(rehypeSanitize, rehypeSanitizeOptions)
 
-  if (maxEmptyParagraphs) {
-    formatter.use(rehypeSqueezeParagraphs, {
-      maxCount: maxEmptyParagraphs,
+  if (typeof maxHardBreaks === 'number' || typeof maxSoftBreaks === 'number') {
+    formatter.use(rehypeSqueezeBreaks, {
+      maxHardBreaks,
+      maxSoftBreaks,
     })
   }
 
