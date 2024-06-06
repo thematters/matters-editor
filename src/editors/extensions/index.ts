@@ -111,3 +111,24 @@ export const makeCommentEditorExtensions = ({
 
   return extensions
 }
+
+/**
+ * Journal
+ */
+export interface MakeJournalEditorExtensionsProps {
+  placeholder?: string
+  mentionSuggestion?: MentionSuggestion
+}
+
+export const makeJournalEditorExtensions = ({
+  placeholder,
+  mentionSuggestion,
+}: MakeJournalEditorExtensionsProps) => {
+  const extensions = [...baseExtensions(placeholder)]
+
+  if (mentionSuggestion) {
+    extensions.push(Mention.configure({ suggestion: mentionSuggestion }))
+  }
+
+  return extensions
+}
