@@ -20,7 +20,7 @@ const squeezeSoftBreaks = ({
   let breakCount = 0
 
   children.forEach((node) => {
-    if (node.type !== 'element' || node.tagName !== 'br') {
+    if (!isBr(node)) {
       breakCount = 0
       newChildren.push(node)
       return

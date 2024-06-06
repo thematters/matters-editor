@@ -129,68 +129,6 @@ describe('Sanitize and normalize article', () => {
     )
   })
 
-  test('squeeze <br>', () => {
-    expectProcessArticleHTML(
-      stripIndent`
-        <p>1</p>
-        <p>2</p>
-        <p>1<br>2</p>
-        <p>1<br><br>2</p>
-        <p>1<br><br></p>
-      `,
-      stripIndent`
-        <p>1</p>
-        <p>2</p>
-        <p>12</p>
-        <p>12</p>
-        <p>1</p>
-      `,
-      { maxHardBreaks: 0, maxSoftBreaks: 0 },
-    )
-
-    // max 1 soft break
-    expectProcessArticleHTML(
-      stripIndent`
-        <p>1</p>
-        <p>2</p>
-        <p>1<br>2</p>
-        <p>1<br><br>2</p>
-        <p>1<br><br></p>
-      `,
-      stripIndent`
-        <p>1</p>
-        <p>2</p>
-        <p>1<br class="smart">2</p>
-        <p>1<br class="smart">2</p>
-        <p>1<br class="smart"></p>
-      `,
-      { maxHardBreaks: 0, maxSoftBreaks: 1 },
-    )
-
-    // blockquote
-    expectProcessArticleHTML(
-      stripIndent`
-        <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p>1<br>2</p>
-          <p>1<br><br>2</p>
-          <p>1<br><br></p>
-        </blockquote>
-      `,
-      stripIndent`
-        <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p>12</p>
-          <p>12</p>
-          <p>1</p>
-        </blockquote>
-      `,
-      { maxHardBreaks: 0, maxSoftBreaks: 0 },
-    )
-  })
-
   test('squeeze and retain all empty paragraphs', () => {
     expectProcessArticleHTML(
       stripIndent`
@@ -269,6 +207,68 @@ describe('Sanitize and normalize comment', () => {
         <p><br class="smart"><br class="smart"><br class="smart"></p>
         <p></p>
       `,
+    )
+  })
+
+  test('squeeze <br>', () => {
+    expectProcessCommentHTML(
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br>2</p>
+        <p>1<br><br>2</p>
+        <p>1<br><br></p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>12</p>
+        <p>12</p>
+        <p>1</p>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: 0 },
+    )
+
+    // max 1 soft break
+    expectProcessCommentHTML(
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br>2</p>
+        <p>1<br><br>2</p>
+        <p>1<br><br></p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br class="smart">2</p>
+        <p>1<br class="smart">2</p>
+        <p>1<br class="smart"></p>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: 1 },
+    )
+
+    // blockquote
+    expectProcessCommentHTML(
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p>1<br>2</p>
+          <p>1<br><br>2</p>
+          <p>1<br><br></p>
+        </blockquote>
+      `,
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p>12</p>
+          <p>12</p>
+          <p>1</p>
+        </blockquote>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: 0 },
     )
   })
 })

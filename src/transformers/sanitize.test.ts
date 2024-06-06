@@ -48,26 +48,6 @@ describe('Sanitization: custom', () => {
       { maxHardBreaks: 0 },
     )
 
-    // blockquote
-    expectSanitizeHTML(
-      stripIndent`
-        <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p></p>
-          <p>3</p>
-        </blockquote>
-      `,
-      stripIndent`
-        <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p>3</p>
-        </blockquote>
-      `,
-      { maxHardBreaks: 0 },
-    )
-
     // max 1 empty paragraph
     expectSanitizeHTML(
       stripIndent`
@@ -120,65 +100,25 @@ describe('Sanitization: custom', () => {
     )
   })
 
-  test('squeeze <br>', () => {
-    expectSanitizeHTML(
-      stripIndent`
-        <p>1</p>
-        <p>2</p>
-        <p>1<br>2</p>
-        <p>1<br><br>2</p>
-        <p>1<br><br></p>
-      `,
-      stripIndent`
-        <p>1</p>
-        <p>2</p>
-        <p>12</p>
-        <p>12</p>
-        <p>1</p>
-      `,
-      { maxHardBreaks: 0, maxSoftBreaks: 0 },
-    )
-
-    // max 1 soft break
-    expectSanitizeHTML(
-      stripIndent`
-        <p>1</p>
-        <p>2</p>
-        <p>1<br>2</p>
-        <p>1<br><br>2</p>
-        <p>1<br><br></p>
-      `,
-      stripIndent`
-        <p>1</p>
-        <p>2</p>
-        <p>1<br>2</p>
-        <p>1<br>2</p>
-        <p>1<br></p>
-      `,
-      { maxHardBreaks: 0, maxSoftBreaks: 1 },
-    )
-
+  test('squeeze empty paragraphs in blockquote', () => {
     // blockquote
     expectSanitizeHTML(
       stripIndent`
-        <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p>1<br>2</p>
-          <p>1<br><br>2</p>
-          <p>1<br><br></p>
-        </blockquote>
-      `,
+            <blockquote>
+              <p>1</p>
+              <p>2</p>
+              <p></p>
+              <p>3</p>
+            </blockquote>
+          `,
       stripIndent`
-        <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p>12</p>
-          <p>12</p>
-          <p>1</p>
-        </blockquote>
-      `,
-      { maxHardBreaks: 0, maxSoftBreaks: 0 },
+            <blockquote>
+              <p>1</p>
+              <p>2</p>
+              <p>3</p>
+            </blockquote>
+          `,
+      { maxHardBreaks: 0 },
     )
   })
 
@@ -256,6 +196,87 @@ describe('Sanitization: custom', () => {
         <p><br><br><br></p>
         <p></p>
       `,
+    )
+  })
+
+  test('squeeze <br>', () => {
+    expectSanitizeHTML(
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br>2</p>
+        <p>1<br><br>2</p>
+        <p>1<br><br></p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>12</p>
+        <p>12</p>
+        <p>1</p>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: 0 },
+    )
+
+    // max 1 soft break
+    expectSanitizeHTML(
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br>2</p>
+        <p>1<br><br>2</p>
+        <p>1<br><br></p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br>2</p>
+        <p>1<br>2</p>
+        <p>1<br></p>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: 1 },
+    )
+
+    // retain all
+    expectSanitizeHTML(
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br>2</p>
+        <p>1<br><br>2</p>
+        <p>1<br><br></p>
+      `,
+      stripIndent`
+        <p>1</p>
+        <p>2</p>
+        <p>1<br>2</p>
+        <p>1<br><br>2</p>
+        <p>1<br><br></p>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: -1 },
+    )
+
+    // blockquote
+    expectSanitizeHTML(
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p>1<br>2</p>
+          <p>1<br><br>2</p>
+          <p>1<br><br></p>
+        </blockquote>
+      `,
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p>12</p>
+          <p>12</p>
+          <p>1</p>
+        </blockquote>
+      `,
+      { maxHardBreaks: 0, maxSoftBreaks: 0 },
     )
   })
 })
