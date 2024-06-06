@@ -27096,6 +27096,13 @@ img.ProseMirror-separator {
         return editor;
     };
 
+    var useJournalEditor = function (_a) {
+        var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
+        var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
+        var editor = useEditor(__assign$2({ extensions: __spreadArray(__spreadArray([], makeJournalEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions !== null && extensions !== void 0 ? extensions : []), true), content: content }, restProps));
+        return editor;
+    };
+
     function ok$1() {}
 
     /**
@@ -75357,6 +75364,7 @@ img.ProseMirror-separator {
     exports.useCommentEditor = useCommentEditor;
     exports.useCurrentEditor = useCurrentEditor;
     exports.useEditor = useEditor;
+    exports.useJournalEditor = useJournalEditor;
     exports.wrappingInputRule = wrappingInputRule;
 
 }));
