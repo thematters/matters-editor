@@ -27073,6 +27073,14 @@ img.ProseMirror-separator {
         }
         return extensions;
     };
+    var makeJournalEditorExtensions = function (_a) {
+        var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
+        var extensions = __spreadArray([], baseExtensions(placeholder), true);
+        if (mentionSuggestion) {
+            extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
+        }
+        return extensions;
+    };
 
     var useArticleEdtor = function (_a) {
         var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
@@ -75086,54 +75094,103 @@ img.ProseMirror-separator {
         var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
         return normalizer(html);
     };
+    var normalizeJournalHTML = function (html) {
+        var extensions = makeJournalEditorExtensions({});
+        var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
+        return normalizer(html);
+    };
 
-    /**
-     * Squeeze empty paragraphs to a maximum of N
-     *
-     * e.g.
-     * <p></p><p></p><p></p><p></p><p></p><p></p>
-     * =>
-     * <p><br></p><p><br></p>
-     *
-     * @param {number} maxCount: maximum number of empty paragraphs, -1 to retain all
-     *
-     */
-    var rehypeSqueezeParagraphs = function (_a) {
-        var maxCount = _a.maxCount;
-        return function (tree) {
-            if (tree.type !== 'root') {
+    var isEmptyText = function (node) {
+        return node.type === 'text' && node.value.replace(/\s/g, '') === '';
+    };
+    var isBr = function (node) {
+        return node.type === 'element' && node.tagName === 'br';
+    };
+    var isEmptyParagraph = function (nodes) {
+        // - <p></p>
+        // - <p>  </p>
+        // - <p><br></p>
+        // - <p>  <br></p>
+        return nodes.length === 0 || nodes.every(function (n) { return isBr(n) || isEmptyText(n); });
+    };
+    var squeezeSoftBreaks = function (_a) {
+        var children = _a.children, maxSoftBreaks = _a.maxSoftBreaks;
+        var newChildren = [];
+        var isRetainAll = maxSoftBreaks === -1;
+        var breakCount = 0;
+        children.forEach(function (node) {
+            if (!isBr(node)) {
+                breakCount = 0;
+                newChildren.push(node);
                 return;
             }
-            var children = [];
-            var isRetainAll = maxCount < 0;
-            var count = 0;
-            var touched = false;
-            tree.children.forEach(function (node) {
-                // skip empty text nodes
-                if (node.type === 'text' && node.value.replace(/\s/g, '') === '') {
-                    children.push(node);
-                    return;
-                }
-                // skip non-paragraph nodes
-                if (node.type !== 'element' || node.tagName !== 'p') {
-                    count = 0;
-                    children.push(node);
-                    return;
-                }
-                // skip non-empty paragraphs:
-                // - <p></p>
-                // - <p><br/></p>
-                var isEmptyParagraph = node.children.length === 0 ||
-                    node.children.every(function (n) { return n.type === 'element' && n.tagName === 'br'; });
-                if (!isEmptyParagraph) {
-                    count = 0;
-                    children.push(node);
-                    return;
-                }
-                // cap empty paragraphs or retain all by adding <br>
-                count++;
-                if (count <= maxCount || isRetainAll) {
-                    children.push({
+            // cap empty paragraphs or retain all by adding <br>
+            breakCount++;
+            if (isRetainAll || (maxSoftBreaks && breakCount <= maxSoftBreaks)) {
+                newChildren.push({
+                    type: 'element',
+                    tagName: 'br',
+                    properties: {},
+                    children: [],
+                });
+            }
+        });
+        return newChildren;
+    };
+    var squeezeHardBreaks = function (_a) {
+        var children = _a.children, maxHardBreaks = _a.maxHardBreaks, maxSoftBreaks = _a.maxSoftBreaks;
+        var newChildren = [];
+        var isRetainAll = maxHardBreaks === -1;
+        var breakCount = 0;
+        if (maxHardBreaks === undefined) {
+            return children;
+        }
+        children.forEach(function (node) {
+            // skip empty text nodes
+            if (isEmptyText(node)) {
+                newChildren.push(node);
+                return;
+            }
+            // skip non-element nodes
+            if (node.type !== 'element') {
+                breakCount = 0;
+                newChildren.push(node);
+                return;
+            }
+            switch (node.tagName) {
+                case 'blockquote':
+                    newChildren.push({
+                        type: 'element',
+                        tagName: 'blockquote',
+                        properties: node.properties,
+                        children: squeezeHardBreaks({
+                            children: node.children,
+                            maxHardBreaks: maxHardBreaks,
+                            maxSoftBreaks: maxSoftBreaks,
+                        }),
+                    });
+                    break;
+                case 'p':
+                    // skip non-empty paragraph:
+                    if (!isEmptyParagraph(node.children)) {
+                        breakCount = 0;
+                        newChildren.push({
+                            type: 'element',
+                            tagName: 'p',
+                            properties: node.properties,
+                            children: squeezeSoftBreaks({
+                                children: node.children,
+                                maxSoftBreaks: maxSoftBreaks,
+                            }),
+                        });
+                        break;
+                    }
+                    // cap empty paragraphs or retain all by adding <br>
+                    breakCount++;
+                    if (!isRetainAll && !(maxHardBreaks && breakCount <= maxHardBreaks)) {
+                        break;
+                    }
+                    newChildren.push({
                         type: 'element',
                         tagName: 'p',
                         properties: {},
@@ -75146,27 +75203,44 @@ img.ProseMirror-separator {
                             },
                         ],
                     });
-                    touched = true;
-                }
-            });
-            if (touched || isRetainAll) {
-                tree.children = children;
+                    break;
+                // skip non-paragraph node
+                default:
+                    breakCount = 0;
+                    newChildren.push(node);
             }
-        };
+        });
+        return newChildren;
     };
+    /**
+     * Squeeze hard and soft breaks to a maximum of N
+     *
+     * e.g.
+     * <p></p><p></p><p></p><p></p><p></p><p></p>
+     * =>
+     * <p><br></p><p><br></p>
+     *
+     */
+    var rehypeSqueezeBreaks = function (props) { return function (tree) {
+        if (tree.type !== 'root') {
+            return;
+        }
+        if (typeof props.maxHardBreaks !== 'number' &&
+            typeof props.maxSoftBreaks !== 'number') {
+            return;
+        }
+        tree.children = squeezeHardBreaks(__assign$2({ children: tree.children }, props));
+    }; };
 
     var sanitizeHTML = function (html, _a) {
-        var _b = _a === void 0 ? {} : _a, maxEmptyParagraphs = _b.maxEmptyParagraphs;
+        var _b = _a === void 0 ? {} : _a, maxHardBreaks = _b.maxHardBreaks, maxSoftBreaks = _b.maxSoftBreaks;
         var formatter = unified()
             .use(rehypeParse, rehypeParseOptions)
             .use(rehypeRaw)
-            .use(rehypeSanitize, rehypeSanitizeOptions);
-        if (maxEmptyParagraphs) {
-            formatter.use(rehypeSqueezeParagraphs, {
-                maxCount: maxEmptyParagraphs,
-            });
-        }
-        formatter.use(rehypeFormat).use(rehypeStringify, rehypeStringifyOptions);
+            .use(rehypeSanitize, rehypeSanitizeOptions)
+            .use(rehypeSqueezeBreaks, { maxHardBreaks: maxHardBreaks, maxSoftBreaks: maxSoftBreaks })
+            .use(rehypeFormat)
+            .use(rehypeStringify, rehypeStringifyOptions);
         var result = formatter.processSync(html);
         return String(result);
     };
@@ -75267,6 +75341,7 @@ img.ProseMirror-separator {
     exports.nodePasteRule = nodePasteRule;
     exports.normalizeArticleHTML = normalizeArticleHTML;
     exports.normalizeCommentHTML = normalizeCommentHTML;
+    exports.normalizeJournalHTML = normalizeJournalHTML;
     exports.objectIncludes = objectIncludes;
     exports.pasteRulesPlugin = pasteRulesPlugin;
     exports.posToDOMRect = posToDOMRect;

@@ -1,4 +1,3 @@
-export interface SanitizeHTMLOptions {
-    maxEmptyParagraphs?: number;
-}
-export declare const sanitizeHTML: (html: string, { maxEmptyParagraphs }?: SanitizeHTMLOptions) => string;
+import { type RehypeSqueezeBreaksOptions } from './lib';
+export type SanitizeHTMLOptions = RehypeSqueezeBreaksOptions;
+export declare const sanitizeHTML: (html: string, { maxHardBreaks, maxSoftBreaks }?: SanitizeHTMLOptions) => string;

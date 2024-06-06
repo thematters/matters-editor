@@ -1,1 +1,1 @@
-export * from './rehypeSqueezeParagraphs';
+export * from './rehypeSqueezeBreaks';
