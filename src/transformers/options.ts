@@ -104,8 +104,12 @@ export const rehypeSanitizeOptions: Schema = {
   },
   attributes: {
     ...defaultSchema.attributes,
+    p: [
+      // for plainParagraph extension
+      ['className', 'plain'],
+    ],
     a: [
-      // classes
+      // for mention extension
       ['className', 'mention'],
       'href',
       'ref',

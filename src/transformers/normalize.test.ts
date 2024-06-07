@@ -1,3 +1,4 @@
+import { stripIndent } from 'common-tags'
 import { describe, expect, test } from 'vitest'
 
 import { normalizeArticleHTML, normalizeCommentHTML } from './normalize'
@@ -288,8 +289,27 @@ describe('Normalization: Article', () => {
 describe('Normalization: Comment', () => {
   test('quote', () => {
     expectNormalizeCommentHTML(
-      '<blockquote><p>abc</p></blockquote>',
-      '<blockquote><p>abc</p></blockquote>',
+      stripIndent`
+        <blockquote>
+          <p class="plain">hello,<br>world</p>
+          <p class="plain">how are you today</p>
+          <p class="plain"><strong>strong</strong></p>
+          <p>normal paragraph</p>
+          <h2>heading</h2>hello,world
+        </blockquote>
+      `,
+      '<blockquote><p class="plain">hello,<br class="smart">world</p><p class="plain">how are you today</p><p class="plain">strong</p><p class="plain">normal paragraph</p><p class="plain">heading</p><p class="plain">hello,world</p></blockquote>',
+    )
+
+    expectNormalizeCommentHTML(
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p>3</p>
+        </blockquote>
+      `,
+      '<blockquote><p class="plain">1 2 3</p></blockquote>',
     )
   })
 
