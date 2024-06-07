@@ -77,18 +77,18 @@ describe('Sanitize and normalize article', () => {
     expectProcessArticleHTML(
       stripIndent`
         <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p></p>
-          <p>3</p>
+          <p class="plain">1</p>
+          <p class="plain">2</p>
+          <p class="plain"></p>
+          <p class="plain">3</p>
         </blockquote>
       `,
       stripIndent`
         <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p><br class="smart"></p>
-          <p>3</p>
+          <p class="plain">1</p>
+          <p class="plain">2</p>
+          <p class="plain"><br class="smart"></p>
+          <p class="plain">3</p>
         </blockquote>
       `,
       { maxHardBreaks: 1 },
@@ -252,20 +252,20 @@ describe('Sanitize and normalize comment', () => {
     expectProcessCommentHTML(
       stripIndent`
         <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p>1<br>2</p>
-          <p>1<br><br>2</p>
-          <p>1<br><br></p>
+          <p class="plain">1</p>
+          <p class="plain">2</p>
+          <p class="plain">1<br>2</p>
+          <p class="plain">1<br><br>2</p>
+          <p class="plain">1<br><br></p>
         </blockquote>
       `,
       stripIndent`
         <blockquote>
-          <p>1</p>
-          <p>2</p>
-          <p>12</p>
-          <p>12</p>
-          <p>1</p>
+          <p class="plain">1</p>
+          <p class="plain">2</p>
+          <p class="plain">12</p>
+          <p class="plain">12</p>
+          <p class="plain">1</p>
         </blockquote>
       `,
       { maxHardBreaks: 0, maxSoftBreaks: 0 },

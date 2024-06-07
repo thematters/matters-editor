@@ -104,20 +104,20 @@ describe('Sanitization: custom', () => {
     // blockquote
     expectSanitizeHTML(
       stripIndent`
-            <blockquote>
-              <p>1</p>
-              <p>2</p>
-              <p></p>
-              <p>3</p>
-            </blockquote>
-          `,
+        <blockquote>
+          <p class="plain">1</p>
+          <p>2</p>
+          <p></p>
+          <p>3</p>
+        </blockquote>
+      `,
       stripIndent`
-            <blockquote>
-              <p>1</p>
-              <p>2</p>
-              <p>3</p>
-            </blockquote>
-          `,
+        <blockquote>
+          <p class="plain">1</p>
+          <p>2</p>
+          <p>3</p>
+        </blockquote>
+      `,
       { maxHardBreaks: 0 },
     )
   })

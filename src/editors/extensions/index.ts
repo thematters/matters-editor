@@ -1,4 +1,3 @@
-import Blockquote from '@tiptap/extension-blockquote'
 import BulletList from '@tiptap/extension-bullet-list'
 import Code from '@tiptap/extension-code'
 import CodeBlock from '@tiptap/extension-code-block'
@@ -21,6 +20,8 @@ import { FigureImage } from './figureImage'
 import { HorizontalRule } from './horizontalRule'
 import { Link } from './link'
 import { Mention, type MentionSuggestion } from './mention'
+import { PlainBlockquote } from './plainBlockquote'
+import { PlainParagraph } from './plainParagraph'
 
 export * from './bold'
 export * from './figureAudio'
@@ -39,7 +40,6 @@ const baseExtensions = (placeholder?: string) => [
   // Basic Formats
   Text,
   Paragraph,
-  Blockquote,
   HardBreak.configure({
     HTMLAttributes: {
       class: 'smart',
@@ -47,6 +47,8 @@ const baseExtensions = (placeholder?: string) => [
   }),
   // Custom Formats
   Link,
+  PlainParagraph,
+  PlainBlockquote,
 ]
 
 const baseArticleExtensions = (placeholder?: string) => [
