@@ -21990,53 +21990,6 @@ img.ProseMirror-separator {
         };
     }
 
-    const inputRegex$4 = /^\s*>\s$/;
-    const Blockquote = Node.create({
-        name: 'blockquote',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        content: 'block+',
-        group: 'block',
-        defining: true,
-        parseHTML() {
-            return [
-                { tag: 'blockquote' },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['blockquote', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                setBlockquote: () => ({ commands }) => {
-                    return commands.wrapIn(this.name);
-                },
-                toggleBlockquote: () => ({ commands }) => {
-                    return commands.toggleWrap(this.name);
-                },
-                unsetBlockquote: () => ({ commands }) => {
-                    return commands.lift(this.name);
-                },
-            };
-        },
-        addKeyboardShortcuts() {
-            return {
-                'Mod-Shift-b': () => this.editor.commands.toggleBlockquote(),
-            };
-        },
-        addInputRules() {
-            return [
-                wrappingInputRule({
-                    find: inputRegex$4,
-                    type: this.type,
-                }),
-            ];
-        },
-    });
-
     const ListItem$2 = Node.create({
         name: 'listItem',
         addOptions() {
@@ -22105,7 +22058,7 @@ img.ProseMirror-separator {
         },
     });
 
-    const inputRegex$3 = /^\s*([-+*])\s$/;
+    const inputRegex$4 = /^\s*([-+*])\s$/;
     const BulletList = Node.create({
         name: 'bulletList',
         addOptions() {
@@ -22145,12 +22098,12 @@ img.ProseMirror-separator {
         },
         addInputRules() {
             let inputRule = wrappingInputRule({
-                find: inputRegex$3,
+                find: inputRegex$4,
                 type: this.type,
             });
             if (this.options.keepMarks || this.options.keepAttributes) {
                 inputRule = wrappingInputRule({
-                    find: inputRegex$3,
+                    find: inputRegex$4,
                     type: this.type,
                     keepMarks: this.options.keepMarks,
                     keepAttributes: this.options.keepAttributes,
@@ -22164,7 +22117,7 @@ img.ProseMirror-separator {
         },
     });
 
-    const inputRegex$2 = /(?:^|\s)((?:`)((?:[^`]+))(?:`))$/;
+    const inputRegex$3 = /(?:^|\s)((?:`)((?:[^`]+))(?:`))$/;
     const pasteRegex$1 = /(?:^|\s)((?:`)((?:[^`]+))(?:`))/g;
     const Code = Mark.create({
         name: 'code',
@@ -22205,7 +22158,7 @@ img.ProseMirror-separator {
         addInputRules() {
             return [
                 markInputRule({
-                    find: inputRegex$2,
+                    find: inputRegex$3,
                     type: this.type,
                 }),
             ];
@@ -23554,7 +23507,7 @@ img.ProseMirror-separator {
         },
     });
 
-    const inputRegex$1 = /^(\d+)\.\s$/;
+    const inputRegex$2 = /^(\d+)\.\s$/;
     const OrderedList = Node.create({
         name: 'orderedList',
         addOptions() {
@@ -23611,14 +23564,14 @@ img.ProseMirror-separator {
         },
         addInputRules() {
             let inputRule = wrappingInputRule({
-                find: inputRegex$1,
+                find: inputRegex$2,
                 type: this.type,
                 getAttributes: match => ({ start: +match[1] }),
                 joinPredicate: (match, node) => node.childCount + node.attrs.start === +match[1],
             });
             if (this.options.keepMarks || this.options.keepAttributes) {
                 inputRule = wrappingInputRule({
-                    find: inputRegex$1,
+                    find: inputRegex$2,
                     type: this.type,
                     keepMarks: this.options.keepMarks,
                     keepAttributes: this.options.keepAttributes,
@@ -23733,7 +23686,7 @@ img.ProseMirror-separator {
         },
     });
 
-    const inputRegex = /(?:^|\s)((?:~~)((?:[^~]+))(?:~~))$/;
+    const inputRegex$1 = /(?:^|\s)((?:~~)((?:[^~]+))(?:~~))$/;
     const pasteRegex = /(?:^|\s)((?:~~)((?:[^~]+))(?:~~))/g;
     const Strike = Mark.create({
         name: 'strike',
@@ -23789,7 +23742,7 @@ img.ProseMirror-separator {
         addInputRules() {
             return [
                 markInputRule({
-                    find: inputRegex,
+                    find: inputRegex$1,
                     type: this.type,
                 }),
             ];
@@ -27021,6 +26974,111 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * Matches a blockquote to a `>` as input.
+     */
+    var inputRegex = /^\s*>\s$/;
+    /**
+     * This extension allows you to create plain blockquotes,
+     * contains only plainParagraph.
+     *
+     * Forked from:
+     * @see https://tiptap.dev/api/nodes/blockquote
+     */
+    var PlainBlockquote = Node.create({
+        name: 'plainBlockquote',
+        addOptions: function () {
+            return {
+                HTMLAttributes: {},
+            };
+        },
+        group: 'block',
+        content: 'plainBlock+',
+        defining: true,
+        parseHTML: function () {
+            return [{ tag: 'blockquote' }];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            return [
+                'blockquote',
+                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+                0,
+            ];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setPlainBlockquote: function () {
+                    return function (_a) {
+                        var chain = _a.chain;
+                        return chain().setPlainParagraph().wrapIn(_this.name).run();
+                    };
+                },
+            };
+        },
+        addKeyboardShortcuts: function () {
+            var _this = this;
+            return {
+                'Mod-Shift-b': function () { return _this.editor.commands.setPlainBlockquote(); },
+            };
+        },
+        addInputRules: function () {
+            return [
+                wrappingInputRule({
+                    find: inputRegex,
+                    type: this.type,
+                }),
+            ];
+        },
+    });
+
+    /**
+     * This extension allows you to create
+     * plain paragraphs (only support plain text and hard break)
+     * for plainBlockquote extension.
+     *
+     * Forked from:
+     * @see https://www.tiptap.dev/api/nodes/paragraph
+     */
+    var PlainParagraph = Node.create({
+        name: 'plainParagraph',
+        // higher priority to override the default paragraph node
+        // https://github.com/ueberdosis/tiptap/blob/f635d7b4f511530496377a8ef051875e30e301a4/packages/extension-paragraph/src/paragraph.ts#L31
+        priority: 2000,
+        addOptions: function () {
+            return {
+                HTMLAttributes: { class: 'plain' },
+            };
+        },
+        group: 'plainBlock',
+        content: 'inline*',
+        marks: '',
+        defining: true,
+        parseHTML: function () {
+            return [{ tag: 'p[class="plain"]' }];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            return [
+                'p',
+                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+                0,
+            ];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setPlainParagraph: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.setNode(_this.name);
+                    };
+                },
+            };
+        },
+    });
+
     var baseExtensions = function (placeholder) { return [
         Document,
         History,
@@ -27030,7 +27088,6 @@ img.ProseMirror-separator {
         // Basic Formats
         Text$1,
         Paragraph,
-        Blockquote,
         HardBreak.configure({
             HTMLAttributes: {
                 class: 'smart',
@@ -27038,6 +27095,8 @@ img.ProseMirror-separator {
         }),
         // Custom Formats
         Link,
+        PlainParagraph,
+        PlainBlockquote,
     ]; };
     var baseArticleExtensions = function (placeholder) { return __spreadArray(__spreadArray([], baseExtensions(placeholder), true), [
         Gapcursor,
@@ -54991,8 +55050,11 @@ img.ProseMirror-separator {
             'figcaption',
         ], false),
         protocols: __assign$2(__assign$2({}, defaultSchema.protocols), { href: ['http', 'https', 'mailto', 'tel'] }),
-        attributes: __assign$2(__assign$2({}, defaultSchema.attributes), { a: [
-                // classes
+        attributes: __assign$2(__assign$2({}, defaultSchema.attributes), { p: [
+                // for plainParagraph extension
+                ['className', 'plain'],
+            ], a: [
+                // for mention extension
                 ['className', 'mention'],
                 'href',
                 'ref',
