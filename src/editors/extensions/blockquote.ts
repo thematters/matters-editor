@@ -12,12 +12,22 @@ export interface BlockquoteOptions {
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
-    blockquote: {
+    blockQuote: {
+      /**
+       * Set a blockquote node
+       */
       setBlockquote: () => ReturnType
+      /**
+       * Toggle a blockquote node
+       */
+      toggleBlockquote: () => ReturnType
+      /**
+       * Unset a blockquote node
+       */
+      unsetBlockquote: () => ReturnType
     }
   }
 }
-
 /**
  * Matches a blockquote to a `>` as input.
  */
@@ -61,15 +71,25 @@ export const Blockquote = Node.create<BlockquoteOptions>({
     return {
       setBlockquote:
         () =>
-        ({ chain }) => {
-          return chain().wrapIn(this.name).run()
+        ({ commands }) => {
+          return commands.wrapIn(this.name)
+        },
+      toggleBlockquote:
+        () =>
+        ({ commands }) => {
+          return commands.toggleWrap(this.name)
+        },
+      unsetBlockquote:
+        () =>
+        ({ commands }) => {
+          return commands.lift(this.name)
         },
     }
   },
 
   addKeyboardShortcuts() {
     return {
-      'Mod-Shift-b': () => this.editor.commands.setBlockquote(),
+      'Mod-Shift-b': () => this.editor.commands.toggleBlockquote(),
     }
   },
 
