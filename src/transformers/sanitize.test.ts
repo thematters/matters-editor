@@ -105,7 +105,7 @@ describe('Sanitization: custom', () => {
     expectSanitizeHTML(
       stripIndent`
         <blockquote>
-          <p class="plain">1</p>
+          <p>1</p>
           <p>2</p>
           <p></p>
           <p>3</p>
@@ -113,7 +113,7 @@ describe('Sanitization: custom', () => {
       `,
       stripIndent`
         <blockquote>
-          <p class="plain">1</p>
+          <p>1</p>
           <p>2</p>
           <p>3</p>
         </blockquote>

@@ -291,25 +291,25 @@ describe('Normalization: Comment', () => {
     expectNormalizeCommentHTML(
       stripIndent`
         <blockquote>
-          <p class="plain">hello,<br>world</p>
-          <p class="plain">how are you today</p>
-          <p class="plain"><strong>strong</strong></p>
-          <p>normal paragraph</p>
-          <h2>heading</h2>hello,world
-        </blockquote>
-      `,
-      '<blockquote><p class="plain">hello,<br class="smart">world</p><p class="plain">how are you today</p><p class="plain">strong</p><p class="plain">normal paragraph</p><p class="plain">heading</p><p class="plain">hello,world</p></blockquote>',
-    )
-
-    expectNormalizeCommentHTML(
-      stripIndent`
-        <blockquote>
           <p>1</p>
           <p>2</p>
           <p>3</p>
         </blockquote>
       `,
-      '<blockquote><p class="plain">1 2 3</p></blockquote>',
+      '<blockquote><p>1</p><p>2</p><p>3</p></blockquote>',
+    )
+
+    expectNormalizeCommentHTML(
+      stripIndent`
+        <blockquote>
+          <p>hello,<br>world</p>
+          <p>how are you today</p>
+          <p><strong>strong</strong></p>
+          <p>normal paragraph</p>
+          <h2>heading</h2>hello,world
+        </blockquote>
+      `,
+      '<blockquote><p>hello,<br class="smart">world</p><p>how are you today</p><p>strong</p><p>normal paragraph</p><p>heading</p><p>hello,world</p></blockquote>',
     )
   })
 

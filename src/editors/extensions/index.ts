@@ -13,6 +13,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Strike from '@tiptap/extension-strike'
 import Text from '@tiptap/extension-text'
 
+import { Blockquote } from './blockquote'
 import { Bold } from './bold'
 import { FigureAudio } from './figureAudio'
 import { FigureEmbed } from './figureEmbed'
@@ -20,8 +21,6 @@ import { FigureImage } from './figureImage'
 import { HorizontalRule } from './horizontalRule'
 import { Link } from './link'
 import { Mention, type MentionSuggestion } from './mention'
-import { PlainBlockquote } from './plainBlockquote'
-import { PlainParagraph } from './plainParagraph'
 
 export * from './bold'
 export * from './figureAudio'
@@ -47,8 +46,7 @@ const baseExtensions = (placeholder?: string) => [
   }),
   // Custom Formats
   Link,
-  PlainParagraph,
-  PlainBlockquote,
+  Blockquote,
 ]
 
 const baseArticleExtensions = (placeholder?: string) => [
