@@ -13215,6 +13215,11 @@
         };
     }
 
+    /**
+     * Takes a Transaction & Editor State and turns it into a chainable state object
+     * @param config The transaction and state to create the chainable state from
+     * @returns A chainable Editor state object
+     */
     function createChainableState(config) {
         const { state, transaction } = config;
         let { selection } = transaction;
@@ -13381,6 +13386,13 @@
         }
     }
 
+    /**
+     * Returns a field from an extension
+     * @param extension The Tiptap extension
+     * @param field The field, for example `renderHTML` or `priority`
+     * @param context The context object that should be passed as `this` into the function
+     * @returns The field value
+     */
     function getExtensionField(extension, field, context) {
         if (extension.config[field] === undefined && extension.parent) {
             return getExtensionField(extension.parent, field, context);
@@ -13625,6 +13637,12 @@
             return value !== null && value !== undefined;
         }));
     }
+    /**
+     * Creates a new Prosemirror schema based on the given extensions.
+     * @param extensions An array of Tiptap extensions
+     * @param editor The editor instance
+     * @returns A Prosemirror schema
+     */
     function getSchemaByResolvedExtensions(extensions, editor) {
         var _a;
         const allAttributes = getAttributesFromExtensions(extensions);
@@ -13726,6 +13744,12 @@
         });
     }
 
+    /**
+     * Tries to get a node or mark type by its name.
+     * @param name The name of the node or mark type
+     * @param schema The Prosemiror schema to search in
+     * @returns The node or mark type, or null if it doesn't exist
+     */
     function getSchemaTypeByName(name, schema) {
         return schema.nodes[name] || schema.marks[name] || null;
     }
@@ -13742,6 +13766,12 @@
         return enabled;
     }
 
+    /**
+     * Returns the text content of a resolved prosemirror position
+     * @param $from The resolved position to get the text content from
+     * @param maxMatch The maximum number of characters to match
+     * @returns The text content
+     */
     const getTextContentFromNodes = ($from, maxMatch = 500) => {
         let textBefore = '';
         const sliceEndPos = $from.parentOffset;
@@ -13870,6 +13900,23 @@
                     if (stored) {
                         return stored;
                     }
+                    // if InputRule is triggered by insertContent()
+                    const simulatedInputMeta = tr.getMeta('applyInputRules');
+                    const isSimulatedInput = !!simulatedInputMeta;
+                    if (isSimulatedInput) {
+                        setTimeout(() => {
+                            const { from, text } = simulatedInputMeta;
+                            const to = from + text.length;
+                            run$1$1({
+                                editor,
+                                from,
+                                to,
+                                text,
+                                rules,
+                                plugin,
+                            });
+                        });
+                    }
                     return tr.selectionSet || tr.docChanged ? null : prev;
                 },
             },
@@ -13932,6 +13979,10 @@
         return typeof value === 'number';
     }
 
+    /**
+     * Paste rules are used to react to pasted content.
+     * @see https://tiptap.dev/guide/custom-extensions/#paste-rules
+     */
     class PasteRule {
         constructor(config) {
             this.find = config.find;
@@ -14001,6 +14052,14 @@
         const success = handlers.every(handler => handler !== null);
         return success;
     }
+    const createClipboardPasteEvent = (text) => {
+        var _a;
+        const event = new ClipboardEvent('paste', {
+            clipboardData: new DataTransfer(),
+        });
+        (_a = event.clipboardData) === null || _a === void 0 ? void 0 : _a.setData('text/html', text);
+        return event;
+    };
     /**
      * Create an paste rules plugin. When enabled, it will cause pasted
      * text that matches any of the given rules to trigger the rule’s
@@ -14013,6 +14072,28 @@
         let isDroppedFromProseMirror = false;
         let pasteEvent = typeof ClipboardEvent !== 'undefined' ? new ClipboardEvent('paste') : null;
         let dropEvent = typeof DragEvent !== 'undefined' ? new DragEvent('drop') : null;
+        const processEvent = ({ state, from, to, rule, pasteEvt, }) => {
+            const tr = state.tr;
+            const chainableState = createChainableState({
+                state,
+                transaction: tr,
+            });
+            const handler = run$2({
+                editor,
+                state: chainableState,
+                from: Math.max(from - 1, 0),
+                to: to.b - 1,
+                rule,
+                pasteEvent: pasteEvt,
+                dropEvent,
+            });
+            if (!handler || !tr.steps.length) {
+                return;
+            }
+            dropEvent = typeof DragEvent !== 'undefined' ? new DragEvent('drop') : null;
+            pasteEvent = typeof ClipboardEvent !== 'undefined' ? new ClipboardEvent('paste') : null;
+            return tr;
+        };
         const plugins = rules.map(rule => {
             return new Plugin({
                 // we register a global drag handler to track the current drag source element
@@ -14050,38 +14131,39 @@
                     const transaction = transactions[0];
                     const isPaste = transaction.getMeta('uiEvent') === 'paste' && !isPastedFromProseMirror;
                     const isDrop = transaction.getMeta('uiEvent') === 'drop' && !isDroppedFromProseMirror;
-                    if (!isPaste && !isDrop) {
+                    // if PasteRule is triggered by insertContent()
+                    const simulatedPasteMeta = transaction.getMeta('applyPasteRules');
+                    const isSimulatedPaste = !!simulatedPasteMeta;
+                    if (!isPaste && !isDrop && !isSimulatedPaste) {
                         return;
                     }
-                    // stop if there is no changed range
+                    // Handle simulated paste
+                    if (isSimulatedPaste) {
+                        const { from, text } = simulatedPasteMeta;
+                        const to = from + text.length;
+                        const pasteEvt = createClipboardPasteEvent(text);
+                        return processEvent({
+                            rule,
+                            state,
+                            from,
+                            to: { b: to },
+                            pasteEvt,
+                        });
+                    }
+                    // handle actual paste/drop
                     const from = oldState.doc.content.findDiffStart(state.doc.content);
                     const to = oldState.doc.content.findDiffEnd(state.doc.content);
+                    // stop if there is no changed range
                     if (!isNumber$1(from) || !to || from === to.b) {
                         return;
                     }
-                    // build a chainable state
-                    // so we can use a single transaction for all paste rules
-                    const tr = state.tr;
-                    const chainableState = createChainableState({
-                        state,
-                        transaction: tr,
-                    });
-                    const handler = run$2({
-                        editor,
-                        state: chainableState,
-                        from: Math.max(from - 1, 0),
-                        to: to.b - 1,
+                    return processEvent({
                         rule,
-                        pasteEvent,
-                        dropEvent,
+                        state,
+                        from,
+                        to,
+                        pasteEvt: pasteEvent,
                     });
-                    // stop if there are no changes
-                    if (!handler || !tr.steps.length) {
-                        return;
-                    }
-                    dropEvent = typeof DragEvent !== 'undefined' ? new DragEvent('drop') : null;
-                    pasteEvent = typeof ClipboardEvent !== 'undefined' ? new ClipboardEvent('paste') : null;
-                    return tr;
                 },
             });
         });
@@ -14099,57 +14181,14 @@
             this.editor = editor;
             this.extensions = ExtensionManager.resolve(extensions);
             this.schema = getSchemaByResolvedExtensions(this.extensions, editor);
-            this.extensions.forEach(extension => {
-                var _a;
-                // store extension storage in editor
-                this.editor.extensionStorage[extension.name] = extension.storage;
-                const context = {
-                    name: extension.name,
-                    options: extension.options,
-                    storage: extension.storage,
-                    editor: this.editor,
-                    type: getSchemaTypeByName(extension.name, this.schema),
-                };
-                if (extension.type === 'mark') {
-                    const keepOnSplit = (_a = callOrReturn(getExtensionField(extension, 'keepOnSplit', context))) !== null && _a !== void 0 ? _a : true;
-                    if (keepOnSplit) {
-                        this.splittableMarks.push(extension.name);
-                    }
-                }
-                const onBeforeCreate = getExtensionField(extension, 'onBeforeCreate', context);
-                if (onBeforeCreate) {
-                    this.editor.on('beforeCreate', onBeforeCreate);
-                }
-                const onCreate = getExtensionField(extension, 'onCreate', context);
-                if (onCreate) {
-                    this.editor.on('create', onCreate);
-                }
-                const onUpdate = getExtensionField(extension, 'onUpdate', context);
-                if (onUpdate) {
-                    this.editor.on('update', onUpdate);
-                }
-                const onSelectionUpdate = getExtensionField(extension, 'onSelectionUpdate', context);
-                if (onSelectionUpdate) {
-                    this.editor.on('selectionUpdate', onSelectionUpdate);
-                }
-                const onTransaction = getExtensionField(extension, 'onTransaction', context);
-                if (onTransaction) {
-                    this.editor.on('transaction', onTransaction);
-                }
-                const onFocus = getExtensionField(extension, 'onFocus', context);
-                if (onFocus) {
-                    this.editor.on('focus', onFocus);
-                }
-                const onBlur = getExtensionField(extension, 'onBlur', context);
-                if (onBlur) {
-                    this.editor.on('blur', onBlur);
-                }
-                const onDestroy = getExtensionField(extension, 'onDestroy', context);
-                if (onDestroy) {
-                    this.editor.on('destroy', onDestroy);
-                }
-            });
+            this.setupExtensions();
         }
+        /**
+         * Returns a flattened and sorted extension list while
+         * also checking for duplicated extensions and warns the user.
+         * @param extensions An array of Tiptap extensions
+         * @returns An flattened and sorted array of Tiptap extensions
+         */
         static resolve(extensions) {
             const resolvedExtensions = ExtensionManager.sort(ExtensionManager.flatten(extensions));
             const duplicatedNames = findDuplicates(resolvedExtensions.map(extension => extension.name));
@@ -14160,6 +14199,11 @@
             }
             return resolvedExtensions;
         }
+        /**
+         * Create a flattened array of extensions by traversing the `addExtensions` field.
+         * @param extensions An array of Tiptap extensions
+         * @returns A flattened array of Tiptap extensions
+         */
         static flatten(extensions) {
             return (extensions
                 .map(extension => {
@@ -14177,6 +14221,11 @@
                 // `Infinity` will break TypeScript so we set a number that is probably high enough
                 .flat(10));
         }
+        /**
+         * Sort extensions by priority.
+         * @param extensions An array of Tiptap extensions
+         * @returns A sorted array of Tiptap extensions by priority
+         */
         static sort(extensions) {
             const defaultPriority = 100;
             return extensions.sort((a, b) => {
@@ -14191,6 +14240,10 @@
                 return 0;
             });
         }
+        /**
+         * Get all commands from the extensions.
+         * @returns An object with all commands where the key is the command name and the value is the command function
+         */
         get commands() {
             return this.extensions.reduce((commands, extension) => {
                 const context = {
@@ -14210,6 +14263,10 @@
                 };
             }, {});
         }
+        /**
+         * Get all registered Prosemirror plugins from the extensions.
+         * @returns An array of Prosemirror plugins
+         */
         get plugins() {
             const { editor } = this;
             // With ProseMirror, first plugins within an array are executed first.
@@ -14272,9 +14329,17 @@
                 ...allPlugins,
             ];
         }
+        /**
+         * Get all attributes from the extensions.
+         * @returns An array of attributes
+         */
         get attributes() {
             return getAttributesFromExtensions(this.extensions);
         }
+        /**
+         * Get all node views from the extensions.
+         * @returns An object with all node views where the key is the node name and the value is the node view function
+         */
         get nodeViews() {
             const { editor } = this;
             const { nodeExtensions } = splitExtensions(this.extensions);
@@ -14306,6 +14371,62 @@
                 };
                 return [extension.name, nodeview];
             }));
+        }
+        /**
+         * Go through all extensions, create extension storages & setup marks
+         * & bind editor event listener.
+         */
+        setupExtensions() {
+            this.extensions.forEach(extension => {
+                var _a;
+                // store extension storage in editor
+                this.editor.extensionStorage[extension.name] = extension.storage;
+                const context = {
+                    name: extension.name,
+                    options: extension.options,
+                    storage: extension.storage,
+                    editor: this.editor,
+                    type: getSchemaTypeByName(extension.name, this.schema),
+                };
+                if (extension.type === 'mark') {
+                    const keepOnSplit = (_a = callOrReturn(getExtensionField(extension, 'keepOnSplit', context))) !== null && _a !== void 0 ? _a : true;
+                    if (keepOnSplit) {
+                        this.splittableMarks.push(extension.name);
+                    }
+                }
+                const onBeforeCreate = getExtensionField(extension, 'onBeforeCreate', context);
+                const onCreate = getExtensionField(extension, 'onCreate', context);
+                const onUpdate = getExtensionField(extension, 'onUpdate', context);
+                const onSelectionUpdate = getExtensionField(extension, 'onSelectionUpdate', context);
+                const onTransaction = getExtensionField(extension, 'onTransaction', context);
+                const onFocus = getExtensionField(extension, 'onFocus', context);
+                const onBlur = getExtensionField(extension, 'onBlur', context);
+                const onDestroy = getExtensionField(extension, 'onDestroy', context);
+                if (onBeforeCreate) {
+                    this.editor.on('beforeCreate', onBeforeCreate);
+                }
+                if (onCreate) {
+                    this.editor.on('create', onCreate);
+                }
+                if (onUpdate) {
+                    this.editor.on('update', onUpdate);
+                }
+                if (onSelectionUpdate) {
+                    this.editor.on('selectionUpdate', onSelectionUpdate);
+                }
+                if (onTransaction) {
+                    this.editor.on('transaction', onTransaction);
+                }
+                if (onFocus) {
+                    this.editor.on('focus', onFocus);
+                }
+                if (onBlur) {
+                    this.editor.on('blur', onBlur);
+                }
+                if (onDestroy) {
+                    this.editor.on('destroy', onDestroy);
+                }
+            });
         }
     }
 
@@ -14340,6 +14461,10 @@
         return output;
     }
 
+    /**
+     * The Extension class is the base class for all extensions.
+     * @see https://tiptap.dev/api/extensions#create-a-new-extension
+     */
     class Extension {
         constructor(config = {}) {
             this.type = 'extension';
@@ -14377,6 +14502,7 @@
             // return a new instance so we can use the same extension
             // with different calls of `configure`
             const extension = this.extend();
+            extension.parent = this.parent;
             extension.options = mergeDeep(this.options, options);
             extension.storage = callOrReturn(getExtensionField(extension, 'addStorage', {
                 name: extension.name,
@@ -14403,19 +14529,25 @@
         }
     }
 
+    /**
+     * Gets the text between two positions in a Prosemirror node
+     * and serializes it using the given text serializers and block separator (see getText)
+     * @param startNode The Prosemirror node to start from
+     * @param range The range of the text to get
+     * @param options Options for the text serializer & block separator
+     * @returns The text between the two positions
+     */
     function getTextBetween(startNode, range, options) {
         const { from, to } = range;
         const { blockSeparator = '\n\n', textSerializers = {} } = options || {};
         let text = '';
-        let separated = true;
         startNode.nodesBetween(from, to, (node, pos, parent, index) => {
             var _a;
+            if (node.isBlock && pos > from) {
+                text += blockSeparator;
+            }
             const textSerializer = textSerializers === null || textSerializers === void 0 ? void 0 : textSerializers[node.type.name];
             if (textSerializer) {
-                if (node.isBlock && !separated) {
-                    text += blockSeparator;
-                    separated = true;
-                }
                 if (parent) {
                     text += textSerializer({
                         node,
@@ -14425,19 +14557,21 @@
                         range,
                     });
                 }
+                // do not descend into child nodes when there exists a serializer
+                return false;
             }
-            else if (node.isText) {
+            if (node.isText) {
                 text += (_a = node === null || node === void 0 ? void 0 : node.text) === null || _a === void 0 ? void 0 : _a.slice(Math.max(from, pos) - pos, to - pos); // eslint-disable-line
-                separated = false;
-            }
-            else if (node.isBlock && !separated) {
-                text += blockSeparator;
-                separated = true;
             }
         });
         return text;
     }
 
+    /**
+     * Find text serializers `toText` in a Prosemirror schema
+     * @param schema The Prosemirror schema to search in
+     * @returns A record of text serializers by node name
+     */
     function getTextSerializersFromSchema(schema) {
         return Object.fromEntries(Object.entries(schema.nodes)
             .filter(([, node]) => node.spec.toText)
@@ -14446,6 +14580,11 @@
 
     const ClipboardTextSerializer = Extension.create({
         name: 'clipboardTextSerializer',
+        addOptions() {
+            return {
+                blockSeparator: undefined,
+            };
+        },
         addProseMirrorPlugins() {
             return [
                 new Plugin({
@@ -14461,6 +14600,9 @@
                             const textSerializers = getTextSerializersFromSchema(schema);
                             const range = { from, to };
                             return getTextBetween(doc, range, {
+                                ...(this.options.blockSeparator !== undefined
+                                    ? { blockSeparator: this.options.blockSeparator }
+                                    : {}),
                                 textSerializers,
                             });
                         },
@@ -14812,15 +14954,26 @@
         return removeWhitespaces(html);
     }
 
+    /**
+     * Takes a JSON or HTML content and creates a Prosemirror node or fragment from it.
+     * @param content The JSON or HTML content to create the node from
+     * @param schema The Prosemirror schema to use for the node
+     * @param options Options for the parser
+     * @returns The created Prosemirror node or fragment
+     */
     function createNodeFromContent(content, schema, options) {
         options = {
             slice: true,
             parseOptions: {},
             ...options,
         };
-        if (typeof content === 'object' && content !== null) {
+        const isJSONContent = typeof content === 'object' && content !== null;
+        const isTextContent = typeof content === 'string';
+        if (isJSONContent) {
             try {
-                if (Array.isArray(content) && content.length > 0) {
+                const isArrayContent = Array.isArray(content) && content.length > 0;
+                // if the JSON Content is an array of nodes, create a fragment for each node
+                if (isArrayContent) {
                     return Fragment.fromArray(content.map(item => schema.nodeFromJSON(item)));
                 }
                 return schema.nodeFromJSON(content);
@@ -14830,7 +14983,7 @@
                 return createNodeFromContent('', schema, options);
             }
         }
-        if (typeof content === 'string') {
+        if (isTextContent) {
             const parser = DOMParser.fromSchema(schema);
             return options.slice
                 ? parser.parseSlice(elementFromString(content), options.parseOptions).content
@@ -14867,6 +15020,8 @@
             options = {
                 parseOptions: {},
                 updateSelection: true,
+                applyInputRules: false,
+                applyPasteRules: false,
                 ...options,
             };
             const content = createNodeFromContent(value, editor.schema, {
@@ -14902,27 +15057,36 @@
                     to += 1;
                 }
             }
+            let newContent;
             // if there is only plain text we have to use `insertText`
             // because this will keep the current marks
             if (isOnlyTextContent) {
                 // if value is string, we can use it directly
                 // otherwise if it is an array, we have to join it
                 if (Array.isArray(value)) {
-                    tr.insertText(value.map(v => v.text || '').join(''), from, to);
+                    newContent = value.map(v => v.text || '').join('');
                 }
                 else if (typeof value === 'object' && !!value && !!value.text) {
-                    tr.insertText(value.text, from, to);
+                    newContent = value.text;
                 }
                 else {
-                    tr.insertText(value, from, to);
+                    newContent = value;
                 }
+                tr.insertText(newContent, from, to);
             }
             else {
-                tr.replaceWith(from, to, content);
+                newContent = content;
+                tr.replaceWith(from, to, newContent);
             }
             // set cursor at end of inserted content
             if (options.updateSelection) {
                 selectionToInsertionEnd(tr, tr.steps.length - 1, -1);
+            }
+            if (options.applyInputRules) {
+                tr.setMeta('applyInputRules', { from, text: newContent });
+            }
+            if (options.applyPasteRules) {
+                tr.setMeta('applyPasteRules', { from, text: newContent });
             }
         }
         return true;
@@ -15119,6 +15283,12 @@
         return newlineInCode$1(state, dispatch);
     };
 
+    /**
+     * Get the type of a schema item by its name.
+     * @param name The name of the schema item
+     * @param schema The Prosemiror schema to search in
+     * @returns The type of the schema item (`node` or `mark`), or null if it doesn't exist
+     */
     function getSchemaTypeNameByName(name, schema) {
         if (schema.nodes[name]) {
             return 'node';
@@ -15216,6 +15386,13 @@
         return selectTextblockStart$1(state, dispatch);
     };
 
+    /**
+     * Create a new Prosemirror document node from content.
+     * @param content The JSON or HTML content to create the document from
+     * @param schema The Prosemirror schema to use for the document
+     * @param parseOptions Options for the parser
+     * @returns The created Prosemirror document node
+     */
     function createDocument$1(content, schema, parseOptions = {}) {
         return createNodeFromContent(content, schema, { slice: false, parseOptions });
     }
@@ -15253,6 +15430,9 @@
 
     /**
      * Returns a new `Transform` based on all steps of the passed transactions.
+     * @param oldDoc The Prosemirror node to start from
+     * @param transactions The transactions to combine
+     * @returns A new `Transform` with all steps of the passed transactions
      */
     function combineTransactionSteps(oldDoc, transactions) {
         const transform = new Transform(oldDoc);
@@ -15264,6 +15444,11 @@
         return transform;
     }
 
+    /**
+     * Gets the default block type at a given match
+     * @param match The content match to get the default block type from
+     * @returns The default block type or null
+     */
     function defaultBlockAt(match) {
         for (let i = 0; i < match.edgeCount; i += 1) {
             const { type } = match.edge(i);
@@ -15274,6 +15459,12 @@
         return null;
     }
 
+    /**
+     * Find children inside a Prosemirror node that match a predicate.
+     * @param node The Prosemirror node to search in
+     * @param predicate The predicate to match
+     * @returns An array of nodes with their positions
+     */
     function findChildren(node, predicate) {
         const nodesWithPos = [];
         node.descendants((child, pos) => {
@@ -15289,6 +15480,10 @@
 
     /**
      * Same as `findChildren` but searches only within a `range`.
+     * @param node The Prosemirror node to search in
+     * @param range The range to search in
+     * @param predicate The predicate to match
+     * @returns An array of nodes with their positions
      */
     function findChildrenInRange(node, range, predicate) {
         const nodesWithPos = [];
@@ -15312,6 +15507,15 @@
         return nodesWithPos;
     }
 
+    /**
+     * Finds the closest parent node to a resolved position that matches a predicate.
+     * @param $pos The resolved position to search from
+     * @param predicate The predicate to match
+     * @returns The closest parent node to the resolved position that matches the predicate
+     * @example ```js
+     * findParentNodeClosestToPos($from, node => node.type.name === 'paragraph')
+     * ```
+     */
     function findParentNodeClosestToPos($pos, predicate) {
         for (let i = $pos.depth; i > 0; i -= 1) {
             const node = $pos.node(i);
@@ -15326,6 +15530,14 @@
         }
     }
 
+    /**
+     * Finds the closest parent node to the current selection that matches a predicate.
+     * @param predicate The predicate to match
+     * @returns A command that finds the closest parent node to the current selection that matches the predicate
+     * @example ```js
+     * findParentNode(node => node.type.name === 'paragraph')
+     * ```
+     */
     function findParentNode(predicate) {
         return (selection) => findParentNodeClosestToPos(selection.$from, predicate);
     }
@@ -15343,18 +15555,39 @@
         return getSchemaByResolvedExtensions(resolvedExtensions, editor);
     }
 
+    /**
+     * Generate HTML from a JSONContent
+     * @param doc The JSONContent to generate HTML from
+     * @param extensions The extensions to use for the schema
+     * @returns The generated HTML
+     */
     function generateHTML(doc, extensions) {
         const schema = getSchema(extensions);
         const contentNode = Node$1.fromJSON(schema, doc);
         return getHTMLFromFragment(contentNode.content, schema);
     }
 
+    /**
+     * Generate JSONContent from HTML
+     * @param html The HTML to generate JSONContent from
+     * @param extensions The extensions to use for the schema
+     * @returns The generated JSONContent
+     */
     function generateJSON(html, extensions) {
         const schema = getSchema(extensions);
         const dom = elementFromString(html);
         return DOMParser.fromSchema(schema).parse(dom).toJSON();
     }
 
+    /**
+     * Gets the text of a Prosemirror node
+     * @param node The Prosemirror node
+     * @param options Options for the text serializer & block separator
+     * @returns The text of the node
+     * @example ```js
+     * const text = getText(node, { blockSeparator: '\n' })
+     * ```
+     */
     function getText(node, options) {
         const range = {
             from: 0,
@@ -15363,6 +15596,13 @@
         return getTextBetween(node, range, options);
     }
 
+    /**
+     * Generate raw text from a JSONContent
+     * @param doc The JSONContent to generate text from
+     * @param extensions The extensions to use for the schema
+     * @param options Options for the text generation f.e. blockSeparator or textSerializers
+     * @returns The generated text
+     */
     function generateText(doc, extensions, options) {
         const { blockSeparator = '\n\n', textSerializers = {} } = options || {};
         const schema = getSchema(extensions);
@@ -15390,6 +15630,12 @@
         return { ...node.attrs };
     }
 
+    /**
+     * Get node or mark attributes by type or name on the current editor state
+     * @param state The current editor state
+     * @param typeOrName The node or mark type or name
+     * @returns The attributes of the node or mark or an empty object
+     */
     function getAttributes(state, typeOrName) {
         const schemaType = getSchemaTypeNameByName(typeof typeOrName === 'string' ? typeOrName : typeOrName.name, state.schema);
         if (schemaType === 'node') {
@@ -15574,6 +15820,13 @@
         return [node, currentDepth];
     };
 
+    /**
+     * Return attributes of an extension that should be splitted by keepOnSplit flag
+     * @param extensionAttributes Array of extension attributes
+     * @param typeName The type of the extension
+     * @param attributes The attributes of the extension
+     * @returns The splitted attributes
+     */
     function getSplittedAttributes(extensionAttributes, typeName, attributes) {
         return Object.fromEntries(Object
             .entries(attributes)
@@ -16418,13 +16671,18 @@
                     const { selection, doc } = tr;
                     const { empty, $anchor } = selection;
                     const { pos, parent } = $anchor;
-                    const $parentPos = $anchor.parent.isTextblock ? tr.doc.resolve(pos - 1) : $anchor;
+                    const $parentPos = $anchor.parent.isTextblock && pos > 0 ? tr.doc.resolve(pos - 1) : $anchor;
                     const parentIsIsolating = $parentPos.parent.type.spec.isolating;
                     const parentPos = $anchor.pos - $anchor.parentOffset;
                     const isAtStart = (parentIsIsolating && $parentPos.parent.childCount === 1)
                         ? parentPos === $anchor.pos
                         : Selection.atStart(doc).from === pos;
-                    if (!empty || !isAtStart || !parent.type.isTextblock || parent.textContent.length) {
+                    if (!empty
+                        || !parent.type.isTextblock
+                        || parent.textContent.length
+                        || !isAtStart
+                        || (isAtStart && $anchor.parent.type.name === 'paragraph') // prevent clearNodes when no nodes to clear, otherwise history stack is appended
+                    ) {
                         return false;
                     }
                     return commands.clearNodes();
@@ -16534,7 +16792,7 @@
         },
     });
 
-    var extensions = /*#__PURE__*/Object.freeze({
+    var index$1 = /*#__PURE__*/Object.freeze({
       __proto__: null,
       ClipboardTextSerializer: ClipboardTextSerializer,
       Commands: Commands,
@@ -16638,7 +16896,7 @@
             const children = [];
             this.node.content.forEach((node, offset) => {
                 const isBlock = node.isBlock && !node.isTextblock;
-                const targetPos = this.pos + offset + (isBlock ? 0 : 1);
+                const targetPos = this.pos + offset + 1;
                 const $pos = this.resolvedPos.doc.resolve(targetPos);
                 if (!isBlock && $pos.depth <= this.depth) {
                     return;
@@ -16686,28 +16944,30 @@
         }
         querySelectorAll(selector, attributes = {}, firstItemOnly = false) {
             let nodes = [];
-            // iterate through children recursively finding all nodes which match the selector with the node name
-            if (this.isBlock || !this.children || this.children.length === 0) {
+            if (!this.children || this.children.length === 0) {
                 return nodes;
             }
+            const attrKeys = Object.keys(attributes);
+            /**
+             * Finds all children recursively that match the selector and attributes
+             * If firstItemOnly is true, it will return the first item found
+             */
             this.children.forEach(childPos => {
+                // If we already found a node and we only want the first item, we dont need to keep going
+                if (firstItemOnly && nodes.length > 0) {
+                    return;
+                }
                 if (childPos.node.type.name === selector) {
-                    if (Object.keys(attributes).length > 0) {
-                        const nodeAttributes = childPos.node.attrs;
-                        const attrKeys = Object.keys(attributes);
-                        for (let index = 0; index < attrKeys.length; index += 1) {
-                            const key = attrKeys[index];
-                            if (nodeAttributes[key] !== attributes[key]) {
-                                return;
-                            }
-                        }
-                    }
-                    nodes.push(childPos);
-                    if (firstItemOnly) {
-                        return;
+                    const doesAllAttributesMatch = attrKeys.every(key => attributes[key] === childPos.node.attrs[key]);
+                    if (doesAllAttributesMatch) {
+                        nodes.push(childPos);
                     }
                 }
-                nodes = nodes.concat(childPos.querySelectorAll(selector));
+                // If we already found a node and we only want the first item, we can stop here and skip the recursion
+                if (firstItemOnly && nodes.length > 0) {
+                    return;
+                }
+                nodes = nodes.concat(childPos.querySelectorAll(selector, attributes, firstItemOnly));
             });
             return nodes;
         }
@@ -16824,6 +17084,7 @@ img.ProseMirror-separator {
                 editable: true,
                 editorProps: {},
                 parseOptions: {},
+                coreExtensionOptions: {},
                 enableInputRules: true,
                 enablePasteRules: true,
                 enableCoreExtensions: true,
@@ -16969,7 +17230,17 @@ img.ProseMirror-separator {
          * Creates an extension manager.
          */
         createExtensionManager() {
-            const coreExtensions = this.options.enableCoreExtensions ? Object.values(extensions) : [];
+            var _a, _b;
+            const coreExtensions = this.options.enableCoreExtensions ? [
+                Editable,
+                ClipboardTextSerializer.configure({
+                    blockSeparator: (_b = (_a = this.options.coreExtensionOptions) === null || _a === void 0 ? void 0 : _a.clipboardTextSerializer) === null || _b === void 0 ? void 0 : _b.blockSeparator,
+                }),
+                Commands,
+                FocusEvents,
+                Keymap,
+                Tabindex,
+            ] : [];
             const allExtensions = [...coreExtensions, ...this.options.extensions].filter(extension => {
                 return ['extension', 'node', 'mark'].includes(extension === null || extension === void 0 ? void 0 : extension.type);
             });
@@ -17183,6 +17454,7 @@ img.ProseMirror-separator {
     /**
      * Build an input rule that adds a mark when the
      * matched text is typed into it.
+     * @see https://tiptap.dev/guide/custom-extensions/#input-rules
      */
     function markInputRule(config) {
         return new InputRule({
@@ -17226,6 +17498,7 @@ img.ProseMirror-separator {
     /**
      * Build an input rule that adds a node when the
      * matched text is typed into it.
+     * @see https://tiptap.dev/guide/custom-extensions/#input-rules
      */
     function nodeInputRule(config) {
         return new InputRule({
@@ -17264,6 +17537,7 @@ img.ProseMirror-separator {
      * matched text is typed into it. When using a regular expresion you’ll
      * probably want the regexp to start with `^`, so that the pattern can
      * only occur at the start of a textblock.
+     * @see https://tiptap.dev/guide/custom-extensions/#input-rules
      */
     function textblockTypeInputRule(config) {
         return new InputRule({
@@ -17284,6 +17558,7 @@ img.ProseMirror-separator {
     /**
      * Build an input rule that replaces text when the
      * matched text is typed into it.
+     * @see https://tiptap.dev/guide/custom-extensions/#input-rules
      */
     function textInputRule(config) {
         return new InputRule({
@@ -17320,6 +17595,7 @@ img.ProseMirror-separator {
      * two nodes. You can pass a join predicate, which takes a regular
      * expression match and the node before the wrapped node, and can
      * return a boolean to indicate whether a join should happen.
+     * @see https://tiptap.dev/guide/custom-extensions/#input-rules
      */
     function wrappingInputRule(config) {
         return new InputRule({
@@ -17359,6 +17635,10 @@ img.ProseMirror-separator {
         });
     }
 
+    /**
+     * The Mark class is used to create custom mark extensions.
+     * @see https://tiptap.dev/api/extensions#create-a-new-extension
+     */
     class Mark {
         constructor(config = {}) {
             this.type = 'mark';
@@ -17442,6 +17722,10 @@ img.ProseMirror-separator {
         }
     }
 
+    /**
+     * The Node class is used to create custom node extensions.
+     * @see https://tiptap.dev/api/extensions#create-a-new-extension
+     */
     class Node {
         constructor(config = {}) {
             this.type = 'node';
@@ -17509,6 +17793,10 @@ img.ProseMirror-separator {
         return navigator.platform === 'Android' || /android/i.test(navigator.userAgent);
     }
 
+    /**
+     * Node views are used to customize the rendered DOM structure of a node.
+     * @see https://tiptap.dev/guide/node-views
+     */
     class NodeView {
         constructor(component, props, options) {
             this.isDragging = false;
@@ -17699,6 +17987,7 @@ img.ProseMirror-separator {
     /**
      * Build an paste rule that adds a mark when the
      * matched text is pasted into it.
+     * @see https://tiptap.dev/guide/custom-extensions/#paste-rules
      */
     function markPasteRule(config) {
         return new PasteRule({
@@ -17752,6 +18041,7 @@ img.ProseMirror-separator {
     /**
      * Build an paste rule that adds a node when the
      * matched text is pasted into it.
+     * @see https://tiptap.dev/guide/custom-extensions/#paste-rules
      */
     function nodePasteRule(config) {
         return new PasteRule({
@@ -17774,6 +18064,7 @@ img.ProseMirror-separator {
     /**
      * Build an paste rule that replaces text when the
      * matched text is pasted into it.
+     * @see https://tiptap.dev/guide/custom-extensions/#paste-rules
      */
     function textPasteRule(config) {
         return new PasteRule({
@@ -18059,7 +18350,7 @@ img.ProseMirror-separator {
       };
     }
 
-    function contains$1(parent, child) {
+    function contains(parent, child) {
       var rootNode = child.getRootNode && child.getRootNode(); // First, attempt with faster native method
 
       if (parent.contains(child)) {
@@ -18270,7 +18561,7 @@ img.ProseMirror-separator {
         }
       }
 
-      if (!contains$1(state.elements.popper, arrowElement)) {
+      if (!contains(state.elements.popper, arrowElement)) {
         return;
       }
 
@@ -18683,7 +18974,7 @@ img.ProseMirror-separator {
 
 
       return clippingParents.filter(function (clippingParent) {
-        return isElement$2(clippingParent) && contains$1(clippingParent, clipperElement) && getNodeName(clippingParent) !== 'body';
+        return isElement$2(clippingParent) && contains(clippingParent, clipperElement) && getNodeName(clippingParent) !== 'body';
       });
     } // Gets the maximum area that the element is visible in due to any number of
     // clipping parents
@@ -21293,6 +21584,10 @@ img.ProseMirror-separator {
         });
     };
 
+    /**
+     * This extension allows you to create a bubble menu.
+     * @see https://tiptap.dev/api/extensions/bubble-menu
+     */
     Extension.create({
         name: 'bubbleMenu',
         addOptions() {
@@ -21445,6 +21740,10 @@ img.ProseMirror-separator {
         });
     };
 
+    /**
+     * This extension allows you to create a floating menu.
+     * @see https://tiptap.dev/api/extensions/floating-menu
+     */
     Extension.create({
         name: 'floatingMenu',
         addOptions() {
@@ -21599,6 +21898,13 @@ img.ProseMirror-separator {
         }
     }
 
+    /**
+     * This hook allows you to create an editor instance.
+     * @param options The editor options
+     * @param deps The dependencies to watch for changes
+     * @returns The editor instance
+     * @example const editor = useEditor({ extensions: [...] })
+     */
     const useEditor = (options = {}, deps = []) => {
         const editorRef = React.useRef(null);
         const [, forceUpdate] = React.useState({});
@@ -21660,7 +21966,8 @@ img.ProseMirror-separator {
         }, [onBeforeCreate, onBlur, onCreate, onDestroy, onFocus, onSelectionUpdate, onTransaction, onUpdate, editorRef.current]);
         React.useEffect(() => {
             let isMounted = true;
-            editorRef.current = new Editor(options);
+            const editor = new Editor(options);
+            editorRef.current = editor;
             editorRef.current.on('transaction', () => {
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
@@ -21672,14 +21979,9 @@ img.ProseMirror-separator {
             });
             return () => {
                 isMounted = false;
+                editor.destroy();
             };
         }, deps);
-        React.useEffect(() => {
-            return () => {
-                var _a;
-                return (_a = editorRef.current) === null || _a === void 0 ? void 0 : _a.destroy();
-            };
-        }, []);
         return editorRef.current;
     };
 
@@ -21788,16 +22090,37 @@ img.ProseMirror-separator {
             } }));
     });
 
+    /**
+     * Check if a component is a class component.
+     * @param Component
+     * @returns {boolean}
+     */
     function isClassComponent(Component) {
         return !!(typeof Component === 'function'
             && Component.prototype
             && Component.prototype.isReactComponent);
     }
+    /**
+     * Check if a component is a forward ref component.
+     * @param Component
+     * @returns {boolean}
+     */
     function isForwardRefComponent(Component) {
         var _a;
         return !!(typeof Component === 'object'
             && ((_a = Component.$$typeof) === null || _a === void 0 ? void 0 : _a.toString()) === 'Symbol(react.forward_ref)');
     }
+    /**
+     * The ReactRenderer class. It's responsible for rendering React components inside the editor.
+     * @example
+     * new ReactRenderer(MyComponent, {
+     *   editor,
+     *   props: {
+     *     foo: 'bar',
+     *   },
+     *   as: 'span',
+     * })
+    */
     class ReactRenderer {
         constructor(component, { editor, props = {}, as = 'div', className = '', attrs, }) {
             this.ref = null;
@@ -21990,6 +22313,10 @@ img.ProseMirror-separator {
         };
     }
 
+    /**
+     * This extension allows you to create list items.
+     * @see https://www.tiptap.dev/api/nodes/list-item
+     */
     const ListItem$2 = Node.create({
         name: 'listItem',
         addOptions() {
@@ -22020,6 +22347,11 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * This extension allows you to create text styles. It is required by default
+     * for the `textColor` and `backgroundColor` extensions.
+     * @see https://www.tiptap.dev/api/marks/text-style
+     */
     const TextStyle$1 = Mark.create({
         name: 'textStyle',
         addOptions() {
@@ -22058,7 +22390,16 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * Matches a bullet list to a dash or asterisk.
+     */
     const inputRegex$4 = /^\s*([-+*])\s$/;
+    /**
+     * This extension allows you to create bullet lists.
+     * This requires the ListItem extension
+     * @see https://tiptap.dev/api/nodes/bullet-list
+     * @see https://tiptap.dev/api/nodes/list-item.
+     */
     const BulletList = Node.create({
         name: 'bulletList',
         addOptions() {
@@ -22117,8 +22458,18 @@ img.ProseMirror-separator {
         },
     });
 
-    const inputRegex$3 = /(?:^|\s)((?:`)((?:[^`]+))(?:`))$/;
-    const pasteRegex$1 = /(?:^|\s)((?:`)((?:[^`]+))(?:`))/g;
+    /**
+     * Matches inline code.
+     */
+    const inputRegex$3 = /(?:^|\s)(`(?!\s+`)((?:[^`]+))`(?!\s+`))$/;
+    /**
+     * Matches inline code while pasting.
+     */
+    const pasteRegex$1 = /(?:^|\s)(`(?!\s+`)((?:[^`]+))`(?!\s+`))/g;
+    /**
+     * This extension allows you to mark text as inline code.
+     * @see https://tiptap.dev/api/marks/code
+     */
     const Code = Mark.create({
         name: 'code',
         addOptions() {
@@ -22173,8 +22524,18 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * Matches a code block with backticks.
+     */
     const backtickInputRegex = /^```([a-z]+)?[\s\n]$/;
+    /**
+     * Matches a code block with tildes.
+     */
     const tildeInputRegex = /^~~~([a-z]+)?[\s\n]$/;
+    /**
+     * This extension allows you to create code blocks.
+     * @see https://tiptap.dev/api/nodes/code-block
+     */
     const CodeBlock = Node.create({
         name: 'codeBlock',
         addOptions() {
@@ -22352,8 +22713,16 @@ img.ProseMirror-separator {
                                 return false;
                             }
                             const { tr } = view.state;
-                            // create an empty code block
-                            tr.replaceSelectionWith(this.type.create({ language }));
+                            // create an empty code block´
+                            // if the cursor is at the absolute end of the document, insert the code block before the cursor instead
+                            // of replacing the selection as the replaceSelectionWith function will cause the insertion to
+                            // happen at the previous node
+                            if (view.state.selection.from === view.state.doc.nodeSize - (1 + (view.state.selection.$to.depth * 2))) {
+                                tr.insert(view.state.selection.from - 1, this.type.create({ language }));
+                            }
+                            else {
+                                tr.replaceSelectionWith(this.type.create({ language }));
+                            }
                             // put cursor inside the newly created code block
                             tr.setSelection(TextSelection.near(tr.doc.resolve(Math.max(0, tr.selection.from - 2))));
                             // add text to code block
@@ -22373,6 +22742,10 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * The default document node which represents the top level node of the editor.
+     * @see https://tiptap.dev/api/nodes/document
+     */
     const Document = Node.create({
         name: 'doc',
         topNode: true,
@@ -22609,6 +22982,12 @@ img.ProseMirror-separator {
         return DecorationSet.create(state.doc, [Decoration.widget(state.selection.head, node, { key: "gapcursor" })]);
     }
 
+    /**
+     * This extension allows you to add a gap cursor to your editor.
+     * A gap cursor is a cursor that appears when you click on a place
+     * where no content is present, for example inbetween nodes.
+     * @see https://tiptap.dev/api/extensions/gapcursor
+     */
     const Gapcursor = Extension.create({
         name: 'gapCursor',
         addProseMirrorPlugins() {
@@ -22629,6 +23008,10 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * This extension allows you to insert hard breaks.
+     * @see https://www.tiptap.dev/api/nodes/hard-break
+     */
     const HardBreak = Node.create({
         name: 'hardBreak',
         addOptions() {
@@ -22689,6 +23072,10 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * This extension allows you to create headings.
+     * @see https://www.tiptap.dev/api/nodes/heading
+     */
     const Heading = Node.create({
         name: 'heading',
         addOptions() {
@@ -23374,6 +23761,15 @@ img.ProseMirror-separator {
         return true;
     };
 
+    /**
+     * This extension allows you to undo and redo recent changes.
+     * @see https://www.tiptap.dev/api/extensions/history
+     *
+     * **Important**: If the `@tiptap/extension-collaboration` package is used, make sure to remove
+     * the `history` extension, as it is not compatible with the `collaboration` extension.
+     *
+     * `@tiptap/extension-collaboration` uses its own history implementation.
+     */
     const History = Extension.create({
         name: 'history',
         addOptions() {
@@ -23409,6 +23805,10 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * This extension allows you to create list items.
+     * @see https://www.tiptap.dev/api/nodes/list-item
+     */
     const ListItem$1 = Node.create({
         name: 'listItem',
         addOptions() {
@@ -23439,6 +23839,10 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * This extension allows you to create list items.
+     * @see https://www.tiptap.dev/api/nodes/list-item
+     */
     const ListItem = Node.create({
         name: 'listItem',
         addOptions() {
@@ -23469,6 +23873,11 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * This extension allows you to create text styles. It is required by default
+     * for the `textColor` and `backgroundColor` extensions.
+     * @see https://www.tiptap.dev/api/marks/text-style
+     */
     const TextStyle = Mark.create({
         name: 'textStyle',
         addOptions() {
@@ -23507,7 +23916,16 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * Matches an ordered list to a 1. on input (or any number followed by a dot).
+     */
     const inputRegex$2 = /^(\d+)\.\s$/;
+    /**
+     * This extension allows you to create ordered lists.
+     * This requires the ListItem extension
+     * @see https://www.tiptap.dev/api/nodes/ordered-list
+     * @see https://www.tiptap.dev/api/nodes/list-item
+     */
     const OrderedList = Node.create({
         name: 'orderedList',
         addOptions() {
@@ -23586,6 +24004,10 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * This extension allows you to create paragraphs.
+     * @see https://www.tiptap.dev/api/nodes/paragraph
+     */
     const Paragraph = Node.create({
         name: 'paragraph',
         priority: 1000,
@@ -23618,6 +24040,11 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * This extension allows you to add a placeholder to your editor.
+     * A placeholder is a text that appears when the editor or a node is empty.
+     * @see https://www.tiptap.dev/api/extensions/placeholder
+     */
     const Placeholder = Extension.create({
         name: 'placeholder',
         addOptions() {
@@ -23686,8 +24113,18 @@ img.ProseMirror-separator {
         },
     });
 
-    const inputRegex$1 = /(?:^|\s)((?:~~)((?:[^~]+))(?:~~))$/;
-    const pasteRegex = /(?:^|\s)((?:~~)((?:[^~]+))(?:~~))/g;
+    /**
+     * Matches a strike to a ~~strike~~ on input.
+     */
+    const inputRegex$1 = /(?:^|\s)(~~(?!\s+~~)((?:[^~]+))~~(?!\s+~~))$/;
+    /**
+     * Matches a strike to a ~~strike~~ on paste.
+     */
+    const pasteRegex = /(?:^|\s)(~~(?!\s+~~)((?:[^~]+))~~(?!\s+~~))/g;
+    /**
+     * This extension allows you to create strike text.
+     * @see https://www.tiptap.dev/api/marks/strike
+     */
     const Strike = Mark.create({
         name: 'strike',
         addOptions() {
@@ -23730,14 +24167,9 @@ img.ProseMirror-separator {
             };
         },
         addKeyboardShortcuts() {
-            const shortcuts = {};
-            if (isMacOS()) {
-                shortcuts['Mod-Shift-s'] = () => this.editor.commands.toggleStrike();
-            }
-            else {
-                shortcuts['Ctrl-Shift-s'] = () => this.editor.commands.toggleStrike();
-            }
-            return shortcuts;
+            return {
+                'Mod-Shift-s': () => this.editor.commands.toggleStrike(),
+            };
         },
         addInputRules() {
             return [
@@ -23757,9 +24189,110 @@ img.ProseMirror-separator {
         },
     });
 
+    /**
+     * This extension allows you to create text nodes.
+     * @see https://www.tiptap.dev/api/nodes/text
+     */
     const Text$1 = Node.create({
         name: 'text',
         group: 'inline',
+    });
+
+    /**
+     * Matches a blockquote to a `>` as input.
+     */
+    var inputRegex = /^\s*>\s$/;
+    /**
+     * This extension allows you to create blockquotes,
+     * contains only plain text paragraph and soft break (<br>).
+     *
+     * Forked from:
+     * @see https://tiptap.dev/api/nodes/blockquote
+     */
+    var Blockquote = Node.create({
+        name: 'blockquote',
+        addOptions: function () {
+            return {
+                HTMLAttributes: {},
+            };
+        },
+        group: 'block',
+        content: 'paragraph+',
+        defining: true,
+        parseHTML: function () {
+            return [{ tag: 'blockquote' }];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            return [
+                'blockquote',
+                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+                0,
+            ];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setBlockquote: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.wrapIn(_this.name);
+                    };
+                },
+                toggleBlockquote: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.toggleWrap(_this.name);
+                    };
+                },
+                unsetBlockquote: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.lift(_this.name);
+                    };
+                },
+            };
+        },
+        addKeyboardShortcuts: function () {
+            var _this = this;
+            return {
+                'Mod-Shift-b': function () { return _this.editor.commands.toggleBlockquote(); },
+            };
+        },
+        addInputRules: function () {
+            return [
+                wrappingInputRule({
+                    find: inputRegex,
+                    type: this.type,
+                }),
+            ];
+        },
+        addProseMirrorPlugins: function () {
+            var _this = this;
+            return [
+                new Plugin({
+                    key: new PluginKey('restrictBlockquoteMarks'),
+                    filterTransaction: function (transaction) {
+                        // Nothing has changed, ignore it.
+                        if (!transaction.docChanged) {
+                            return true;
+                        }
+                        // Skip if not in a blockquote
+                        var $anchor = transaction.selection.$anchor;
+                        var $grandParent = $anchor.node($anchor.depth - 1);
+                        var isInBlockquote = $grandParent.type.name === _this.name;
+                        if (!isInBlockquote) {
+                            return true;
+                        }
+                        // Prevent adding marks (except <br>) to blockquote
+                        var $start = $anchor.start($anchor.depth - 1);
+                        var $end = $anchor.end($anchor.depth - 1);
+                        transaction.removeMark($start, $end);
+                        return true;
+                    },
+                }),
+            ];
+        },
     });
 
     var italicStarInputRegex = /(?:^|\s)((?:\*)((?:[^*]+))(?:\*))$/;
@@ -26675,6 +27208,10 @@ img.ProseMirror-separator {
     }
 
     const SuggestionPluginKey = new PluginKey('suggestion');
+    /**
+     * This utility allows you to create suggestions.
+     * @see https://tiptap.dev/api/utilities/suggestion
+     */
     function Suggestion({ pluginKey = SuggestionPluginKey, editor, char = '@', allowSpaces = false, allowedPrefixes = [' '], startOfLine = false, decorationTag = 'span', decorationClass = 'suggestion', command = () => null, items = () => [], render = () => ({}), allow = () => true, findSuggestionMatch: findSuggestionMatch$1 = findSuggestionMatch, }) {
         let props;
         const renderer = render === null || render === void 0 ? void 0 : render();
@@ -26707,7 +27244,7 @@ img.ProseMirror-separator {
                             text: state.text,
                             items: [],
                             command: commandProps => {
-                                command({
+                                return command({
                                     editor,
                                     range: state.range,
                                     props: commandProps,
@@ -26974,111 +27511,6 @@ img.ProseMirror-separator {
         },
     });
 
-    /**
-     * Matches a blockquote to a `>` as input.
-     */
-    var inputRegex = /^\s*>\s$/;
-    /**
-     * This extension allows you to create plain blockquotes,
-     * contains only plainParagraph.
-     *
-     * Forked from:
-     * @see https://tiptap.dev/api/nodes/blockquote
-     */
-    var PlainBlockquote = Node.create({
-        name: 'plainBlockquote',
-        addOptions: function () {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        group: 'block',
-        content: 'plainBlock+',
-        defining: true,
-        parseHTML: function () {
-            return [{ tag: 'blockquote' }];
-        },
-        renderHTML: function (_a) {
-            var HTMLAttributes = _a.HTMLAttributes;
-            return [
-                'blockquote',
-                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-                0,
-            ];
-        },
-        addCommands: function () {
-            var _this = this;
-            return {
-                setPlainBlockquote: function () {
-                    return function (_a) {
-                        var chain = _a.chain;
-                        return chain().setPlainParagraph().wrapIn(_this.name).run();
-                    };
-                },
-            };
-        },
-        addKeyboardShortcuts: function () {
-            var _this = this;
-            return {
-                'Mod-Shift-b': function () { return _this.editor.commands.setPlainBlockquote(); },
-            };
-        },
-        addInputRules: function () {
-            return [
-                wrappingInputRule({
-                    find: inputRegex,
-                    type: this.type,
-                }),
-            ];
-        },
-    });
-
-    /**
-     * This extension allows you to create
-     * plain paragraphs (only support plain text and hard break)
-     * for plainBlockquote extension.
-     *
-     * Forked from:
-     * @see https://www.tiptap.dev/api/nodes/paragraph
-     */
-    var PlainParagraph = Node.create({
-        name: 'plainParagraph',
-        // higher priority to override the default paragraph node
-        // https://github.com/ueberdosis/tiptap/blob/f635d7b4f511530496377a8ef051875e30e301a4/packages/extension-paragraph/src/paragraph.ts#L31
-        priority: 2000,
-        addOptions: function () {
-            return {
-                HTMLAttributes: { class: 'plain' },
-            };
-        },
-        group: 'plainBlock',
-        content: 'inline*',
-        marks: '',
-        defining: true,
-        parseHTML: function () {
-            return [{ tag: 'p[class="plain"]' }];
-        },
-        renderHTML: function (_a) {
-            var HTMLAttributes = _a.HTMLAttributes;
-            return [
-                'p',
-                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-                0,
-            ];
-        },
-        addCommands: function () {
-            var _this = this;
-            return {
-                setPlainParagraph: function () {
-                    return function (_a) {
-                        var commands = _a.commands;
-                        return commands.setNode(_this.name);
-                    };
-                },
-            };
-        },
-    });
-
     var baseExtensions = function (placeholder) { return [
         Document,
         History,
@@ -27095,8 +27527,7 @@ img.ProseMirror-separator {
         }),
         // Custom Formats
         Link,
-        PlainParagraph,
-        PlainBlockquote,
+        Blockquote,
     ]; };
     var baseArticleExtensions = function (placeholder) { return __spreadArray(__spreadArray([], baseExtensions(placeholder), true), [
         Gapcursor,
@@ -27204,7 +27635,7 @@ img.ProseMirror-separator {
      * @param {string} [space]
      * @returns {Schema}
      */
-    function merge$1(definitions, space) {
+    function merge(definitions, space) {
       /** @type {Properties} */
       const property = {};
       /** @type {Normal} */
@@ -28410,8 +28841,8 @@ img.ProseMirror-separator {
      * @typedef {import('./lib/util/schema.js').Schema} Schema
      */
 
-    const html$5 = merge$1([xml, xlink, xmlns, aria$1, html$6], 'html');
-    const svg = merge$1([xml, xlink, xmlns, aria$1, svg$1], 'svg');
+    const html$5 = merge([xml, xlink, xmlns, aria$1, html$6], 'html');
+    const svg = merge([xml, xlink, xmlns, aria$1, svg$1], 'svg');
 
     /**
      * @typedef Options
@@ -29793,7 +30224,7 @@ img.ProseMirror-separator {
 
     // Adapted from https://github.com/mathiasbynens/he/blob/36afe179392226cf1b6ccdb16ebbb7a5a844d93a/src/he.js#L106-L134
     var _a$1;
-    const decodeMap$1 = new Map([
+    const decodeMap = new Map([
         [0, 65533],
         // C1 Unicode control character reference replacements
         [128, 8364],
@@ -29849,7 +30280,7 @@ img.ProseMirror-separator {
         if ((codePoint >= 0xd800 && codePoint <= 0xdfff) || codePoint > 0x10ffff) {
             return 0xfffd;
         }
-        return (_a = decodeMap$1.get(codePoint)) !== null && _a !== void 0 ? _a : codePoint;
+        return (_a = decodeMap.get(codePoint)) !== null && _a !== void 0 ? _a : codePoint;
     }
 
     var CharCodes;
@@ -30302,8 +30733,18 @@ img.ProseMirror-separator {
         }
         return -1;
     }
-    getDecoder(htmlDecodeTree);
+    const htmlDecoder = getDecoder(htmlDecodeTree);
     getDecoder(xmlDecodeTree);
+    /**
+     * Decodes an HTML string.
+     *
+     * @param str The string to decode.
+     * @param mode The decoding mode.
+     * @returns The decoded string.
+     */
+    function decodeHTML(str, mode = DecodingMode.Legacy) {
+        return htmlDecoder(str, mode);
+    }
 
     /** All valid namespaces in HTML. */
     var NS;
@@ -50140,7 +50581,7 @@ img.ProseMirror-separator {
      *   Decoded value.
      */
     function decodeString(value) {
-      return value.replace(characterEscapeOrReference, decode$1)
+      return value.replace(characterEscapeOrReference, decode)
     }
 
     /**
@@ -50149,7 +50590,7 @@ img.ProseMirror-separator {
      * @param {string} $2
      * @returns {string}
      */
-    function decode$1($0, $1, $2) {
+    function decode($0, $1, $2) {
       if ($1) {
         // Escape.
         return $1
@@ -52966,6 +53407,12 @@ img.ProseMirror-separator {
      */
 
 
+    const htmlCommentRegex = /^>|^->|<!--|-->|--!>|<!-$/g;
+
+    // Declare arrays as variables so it can be cached by `stringifyEntities`
+    const bogusCommentEntitySubset = ['>'];
+    const commentEntitySubset = ['<', '>'];
+
     /**
      * Serialize a comment.
      *
@@ -52986,10 +53433,12 @@ img.ProseMirror-separator {
         ? '<?' +
             stringifyEntities(
               node.value,
-              Object.assign({}, state.settings.characterReferences, {subset: ['>']})
+              Object.assign({}, state.settings.characterReferences, {
+                subset: bogusCommentEntitySubset
+              })
             ) +
             '>'
-        : '<!--' + node.value.replace(/^>|^->|<!--|-->|--!>|<!-$/g, encode) + '-->'
+        : '<!--' + node.value.replace(htmlCommentRegex, encode) + '-->'
 
       /**
        * @param {string} $0
@@ -52998,7 +53447,7 @@ img.ProseMirror-separator {
         return stringifyEntities(
           $0,
           Object.assign({}, state.settings.characterReferences, {
-            subset: ['<', '>']
+            subset: commentEntitySubset
           })
         )
       }
@@ -53732,7 +54181,7 @@ img.ProseMirror-separator {
         state.schema = svg;
       }
 
-      const attrs = serializeAttributes(state, node.properties);
+      const attributes = serializeAttributes(state, node.properties);
 
       const content = state.all(
         schema.space === 'html' && node.tagName === 'template' ? node.content : node
@@ -53748,14 +54197,14 @@ img.ProseMirror-separator {
       // longer void.
       if (content) selfClosing = false;
 
-      if (attrs || !omit || !opening(node, index, parent)) {
-        parts.push('<', node.tagName, attrs ? ' ' + attrs : '');
+      if (attributes || !omit || !opening(node, index, parent)) {
+        parts.push('<', node.tagName, attributes ? ' ' + attributes : '');
 
         if (
           selfClosing &&
           (schema.space === 'svg' || state.settings.closeSelfClosing)
         ) {
-          last = attrs.charAt(attrs.length - 1);
+          last = attributes.charAt(attributes.length - 1);
           if (
             !state.settings.tightSelfClosing ||
             last === '/' ||
@@ -53781,20 +54230,20 @@ img.ProseMirror-separator {
 
     /**
      * @param {State} state
-     * @param {Properties | null | undefined} props
+     * @param {Properties | null | undefined} properties
      * @returns {string}
      */
-    function serializeAttributes(state, props) {
+    function serializeAttributes(state, properties) {
       /** @type {Array<string>} */
       const values = [];
       let index = -1;
       /** @type {string} */
       let key;
 
-      if (props) {
-        for (key in props) {
-          if (props[key] !== null && props[key] !== undefined) {
-            const value = serializeAttribute(state, key, props[key]);
+      if (properties) {
+        for (key in properties) {
+          if (properties[key] !== null && properties[key] !== undefined) {
+            const value = serializeAttribute(state, key, properties[key]);
             if (value) values.push(value);
           }
         }
@@ -53933,6 +54382,9 @@ img.ProseMirror-separator {
      */
 
 
+    // Declare array as variable so it can be cached by `stringifyEntities`
+    const textEntitySubset = ['<', '&'];
+
     /**
      * Serialize a text node.
      *
@@ -53956,7 +54408,7 @@ img.ProseMirror-separator {
         : stringifyEntities(
             node.value,
             Object.assign({}, state.settings.characterReferences, {
-              subset: ['<', '&']
+              subset: textEntitySubset
             })
           )
     }
@@ -54987,7 +55439,7 @@ img.ProseMirror-separator {
     var makeBrHandler = function (defaultHandler) {
         return function (state, node, parent) {
             var isBrOnly = node.children.length > 0 &&
-                node.children.every(function (child) { return child.tagName === 'br'; });
+                node.children.every(function (child) { return 'tagName' in child && child.tagName === 'br'; });
             if (isBrOnly) {
                 var result = { type: 'html', value: toHtml(node) };
                 state.patch(node, result);
@@ -55024,7 +55476,7 @@ img.ProseMirror-separator {
         closeEmptyElements: true,
     };
     var rehypeRewriteOptions = {
-        rewrite: function (node, index, parent) {
+        rewrite: function (node) {
             if (node.type === 'element' &&
                 node.tagName === 'a' &&
                 node.properties !== undefined) {
@@ -55050,10 +55502,7 @@ img.ProseMirror-separator {
             'figcaption',
         ], false),
         protocols: __assign$2(__assign$2({}, defaultSchema.protocols), { href: ['http', 'https', 'mailto', 'tel'] }),
-        attributes: __assign$2(__assign$2({}, defaultSchema.attributes), { p: [
-                // for plainParagraph extension
-                ['className', 'plain'],
-            ], a: [
+        attributes: __assign$2(__assign$2({}, defaultSchema.attributes), { a: [
                 // for mention extension
                 ['className', 'mention'],
                 'href',
@@ -71677,2518 +72126,6 @@ img.ProseMirror-separator {
         return selectorIndex;
     }
 
-    // src/encoding-he.ts
-    var regexInvalidEntity = /&#(?:[xX][^a-fA-F0-9]|[^0-9xX])/;
-    var regexDecode = /&(CounterClockwiseContourIntegral|DoubleLongLeftRightArrow|ClockwiseContourIntegral|NotNestedGreaterGreater|NotSquareSupersetEqual|DiacriticalDoubleAcute|NotRightTriangleEqual|NotSucceedsSlantEqual|NotPrecedesSlantEqual|CloseCurlyDoubleQuote|NegativeVeryThinSpace|DoubleContourIntegral|FilledVerySmallSquare|CapitalDifferentialD|OpenCurlyDoubleQuote|EmptyVerySmallSquare|NestedGreaterGreater|DoubleLongRightArrow|NotLeftTriangleEqual|NotGreaterSlantEqual|ReverseUpEquilibrium|DoubleLeftRightArrow|NotSquareSubsetEqual|NotDoubleVerticalBar|RightArrowLeftArrow|NotGreaterFullEqual|NotRightTriangleBar|SquareSupersetEqual|DownLeftRightVector|DoubleLongLeftArrow|leftrightsquigarrow|LeftArrowRightArrow|NegativeMediumSpace|blacktriangleright|RightDownVectorBar|PrecedesSlantEqual|RightDoubleBracket|SucceedsSlantEqual|NotLeftTriangleBar|RightTriangleEqual|SquareIntersection|RightDownTeeVector|ReverseEquilibrium|NegativeThickSpace|longleftrightarrow|Longleftrightarrow|LongLeftRightArrow|DownRightTeeVector|DownRightVectorBar|GreaterSlantEqual|SquareSubsetEqual|LeftDownVectorBar|LeftDoubleBracket|VerticalSeparator|rightleftharpoons|NotGreaterGreater|NotSquareSuperset|blacktriangleleft|blacktriangledown|NegativeThinSpace|LeftDownTeeVector|NotLessSlantEqual|leftrightharpoons|DoubleUpDownArrow|DoubleVerticalBar|LeftTriangleEqual|FilledSmallSquare|twoheadrightarrow|NotNestedLessLess|DownLeftTeeVector|DownLeftVectorBar|RightAngleBracket|NotTildeFullEqual|NotReverseElement|RightUpDownVector|DiacriticalTilde|NotSucceedsTilde|circlearrowright|NotPrecedesEqual|rightharpoondown|DoubleRightArrow|NotSucceedsEqual|NonBreakingSpace|NotRightTriangle|LessEqualGreater|RightUpTeeVector|LeftAngleBracket|GreaterFullEqual|DownArrowUpArrow|RightUpVectorBar|twoheadleftarrow|GreaterEqualLess|downharpoonright|RightTriangleBar|ntrianglerighteq|NotSupersetEqual|LeftUpDownVector|DiacriticalAcute|rightrightarrows|vartriangleright|UpArrowDownArrow|DiacriticalGrave|UnderParenthesis|EmptySmallSquare|LeftUpVectorBar|leftrightarrows|DownRightVector|downharpoonleft|trianglerighteq|ShortRightArrow|OverParenthesis|DoubleLeftArrow|DoubleDownArrow|NotSquareSubset|bigtriangledown|ntrianglelefteq|UpperRightArrow|curvearrowright|vartriangleleft|NotLeftTriangle|nleftrightarrow|LowerRightArrow|NotHumpDownHump|NotGreaterTilde|rightthreetimes|LeftUpTeeVector|NotGreaterEqual|straightepsilon|LeftTriangleBar|rightsquigarrow|ContourIntegral|rightleftarrows|CloseCurlyQuote|RightDownVector|LeftRightVector|nLeftrightarrow|leftharpoondown|circlearrowleft|SquareSuperset|OpenCurlyQuote|hookrightarrow|HorizontalLine|DiacriticalDot|NotLessGreater|ntriangleright|DoubleRightTee|InvisibleComma|InvisibleTimes|LowerLeftArrow|DownLeftVector|NotSubsetEqual|curvearrowleft|trianglelefteq|NotVerticalBar|TildeFullEqual|downdownarrows|NotGreaterLess|RightTeeVector|ZeroWidthSpace|looparrowright|LongRightArrow|doublebarwedge|ShortLeftArrow|ShortDownArrow|RightVectorBar|GreaterGreater|ReverseElement|rightharpoonup|LessSlantEqual|leftthreetimes|upharpoonright|rightarrowtail|LeftDownVector|Longrightarrow|NestedLessLess|UpperLeftArrow|nshortparallel|leftleftarrows|leftrightarrow|Leftrightarrow|LeftRightArrow|longrightarrow|upharpoonleft|RightArrowBar|ApplyFunction|LeftTeeVector|leftarrowtail|NotEqualTilde|varsubsetneqq|varsupsetneqq|RightTeeArrow|SucceedsEqual|SucceedsTilde|LeftVectorBar|SupersetEqual|hookleftarrow|DifferentialD|VerticalTilde|VeryThinSpace|blacktriangle|bigtriangleup|LessFullEqual|divideontimes|leftharpoonup|UpEquilibrium|ntriangleleft|RightTriangle|measuredangle|shortparallel|longleftarrow|Longleftarrow|LongLeftArrow|DoubleLeftTee|Poincareplane|PrecedesEqual|triangleright|DoubleUpArrow|RightUpVector|fallingdotseq|looparrowleft|PrecedesTilde|NotTildeEqual|NotTildeTilde|smallsetminus|Proportional|triangleleft|triangledown|UnderBracket|NotHumpEqual|exponentiale|ExponentialE|NotLessTilde|HilbertSpace|RightCeiling|blacklozenge|varsupsetneq|HumpDownHump|GreaterEqual|VerticalLine|LeftTeeArrow|NotLessEqual|DownTeeArrow|LeftTriangle|varsubsetneq|Intersection|NotCongruent|DownArrowBar|LeftUpVector|LeftArrowBar|risingdotseq|GreaterTilde|RoundImplies|SquareSubset|ShortUpArrow|NotSuperset|quaternions|precnapprox|backepsilon|preccurlyeq|OverBracket|blacksquare|MediumSpace|VerticalBar|circledcirc|circleddash|CircleMinus|CircleTimes|LessGreater|curlyeqprec|curlyeqsucc|diamondsuit|UpDownArrow|Updownarrow|RuleDelayed|Rrightarrow|updownarrow|RightVector|nRightarrow|nrightarrow|eqslantless|LeftCeiling|Equilibrium|SmallCircle|expectation|NotSucceeds|thickapprox|GreaterLess|SquareUnion|NotPrecedes|NotLessLess|straightphi|succnapprox|succcurlyeq|SubsetEqual|sqsupseteq|Proportion|Laplacetrf|ImaginaryI|supsetneqq|NotGreater|gtreqqless|NotElement|ThickSpace|TildeEqual|TildeTilde|Fouriertrf|rmoustache|EqualTilde|eqslantgtr|UnderBrace|LeftVector|UpArrowBar|nLeftarrow|nsubseteqq|subsetneqq|nsupseteqq|nleftarrow|succapprox|lessapprox|UpTeeArrow|upuparrows|curlywedge|lesseqqgtr|varepsilon|varnothing|RightFloor|complement|CirclePlus|sqsubseteq|Lleftarrow|circledast|RightArrow|Rightarrow|rightarrow|lmoustache|Bernoullis|precapprox|mapstoleft|mapstodown|longmapsto|dotsquare|downarrow|DoubleDot|nsubseteq|supsetneq|leftarrow|nsupseteq|subsetneq|ThinSpace|ngeqslant|subseteqq|HumpEqual|NotSubset|triangleq|NotCupCap|lesseqgtr|heartsuit|TripleDot|Leftarrow|Coproduct|Congruent|varpropto|complexes|gvertneqq|LeftArrow|LessTilde|supseteqq|MinusPlus|CircleDot|nleqslant|NotExists|gtreqless|nparallel|UnionPlus|LeftFloor|checkmark|CenterDot|centerdot|Mellintrf|gtrapprox|bigotimes|OverBrace|spadesuit|therefore|pitchfork|rationals|PlusMinus|Backslash|Therefore|DownBreve|backsimeq|backprime|DownArrow|nshortmid|Downarrow|lvertneqq|eqvparsl|imagline|imagpart|infintie|integers|Integral|intercal|LessLess|Uarrocir|intlarhk|sqsupset|angmsdaf|sqsubset|llcorner|vartheta|cupbrcap|lnapprox|Superset|SuchThat|succnsim|succneqq|angmsdag|biguplus|curlyvee|trpezium|Succeeds|NotTilde|bigwedge|angmsdah|angrtvbd|triminus|cwconint|fpartint|lrcorner|smeparsl|subseteq|urcorner|lurdshar|laemptyv|DDotrahd|approxeq|ldrushar|awconint|mapstoup|backcong|shortmid|triangle|geqslant|gesdotol|timesbar|circledR|circledS|setminus|multimap|naturals|scpolint|ncongdot|RightTee|boxminus|gnapprox|boxtimes|andslope|thicksim|angmsdaa|varsigma|cirfnint|rtriltri|angmsdab|rppolint|angmsdac|barwedge|drbkarow|clubsuit|thetasym|bsolhsub|capbrcup|dzigrarr|doteqdot|DotEqual|dotminus|UnderBar|NotEqual|realpart|otimesas|ulcorner|hksearow|hkswarow|parallel|PartialD|elinters|emptyset|plusacir|bbrktbrk|angmsdad|pointint|bigoplus|angmsdae|Precedes|bigsqcup|varkappa|notindot|supseteq|precneqq|precnsim|profalar|profline|profsurf|leqslant|lesdotor|raemptyv|subplus|notnivb|notnivc|subrarr|zigrarr|vzigzag|submult|subedot|Element|between|cirscir|larrbfs|larrsim|lotimes|lbrksld|lbrkslu|lozenge|ldrdhar|dbkarow|bigcirc|epsilon|simrarr|simplus|ltquest|Epsilon|luruhar|gtquest|maltese|npolint|eqcolon|npreceq|bigodot|ddagger|gtrless|bnequiv|harrcir|ddotseq|equivDD|backsim|demptyv|nsqsube|nsqsupe|Upsilon|nsubset|upsilon|minusdu|nsucceq|swarrow|nsupset|coloneq|searrow|boxplus|napprox|natural|asympeq|alefsym|congdot|nearrow|bigstar|diamond|supplus|tritime|LeftTee|nvinfin|triplus|NewLine|nvltrie|nvrtrie|nwarrow|nexists|Diamond|ruluhar|Implies|supmult|angzarr|suplarr|suphsub|questeq|because|digamma|Because|olcross|bemptyv|omicron|Omicron|rotimes|NoBreak|intprod|angrtvb|orderof|uwangle|suphsol|lesdoto|orslope|DownTee|realine|cudarrl|rdldhar|OverBar|supedot|lessdot|supdsub|topfork|succsim|rbrkslu|rbrksld|pertenk|cudarrr|isindot|planckh|lessgtr|pluscir|gesdoto|plussim|plustwo|lesssim|cularrp|rarrsim|Cayleys|notinva|notinvb|notinvc|UpArrow|Uparrow|uparrow|NotLess|dwangle|precsim|Product|curarrm|Cconint|dotplus|rarrbfs|ccupssm|Cedilla|cemptyv|notniva|quatint|frac35|frac38|frac45|frac56|frac58|frac78|tridot|xoplus|gacute|gammad|Gammad|lfisht|lfloor|bigcup|sqsupe|gbreve|Gbreve|lharul|sqsube|sqcups|Gcedil|apacir|llhard|lmidot|Lmidot|lmoust|andand|sqcaps|approx|Abreve|spades|circeq|tprime|divide|topcir|Assign|topbot|gesdot|divonx|xuplus|timesd|gesles|atilde|solbar|SOFTcy|loplus|timesb|lowast|lowbar|dlcorn|dlcrop|softcy|dollar|lparlt|thksim|lrhard|Atilde|lsaquo|smashp|bigvee|thinsp|wreath|bkarow|lsquor|lstrok|Lstrok|lthree|ltimes|ltlarr|DotDot|simdot|ltrPar|weierp|xsqcup|angmsd|sigmav|sigmaf|zeetrf|Zcaron|zcaron|mapsto|vsupne|thetav|cirmid|marker|mcomma|Zacute|vsubnE|there4|gtlPar|vsubne|bottom|gtrarr|SHCHcy|shchcy|midast|midcir|middot|minusb|minusd|gtrdot|bowtie|sfrown|mnplus|models|colone|seswar|Colone|mstpos|searhk|gtrsim|nacute|Nacute|boxbox|telrec|hairsp|Tcedil|nbumpe|scnsim|ncaron|Ncaron|ncedil|Ncedil|hamilt|Scedil|nearhk|hardcy|HARDcy|tcedil|Tcaron|commat|nequiv|nesear|tcaron|target|hearts|nexist|varrho|scedil|Scaron|scaron|hellip|Sacute|sacute|hercon|swnwar|compfn|rtimes|rthree|rsquor|rsaquo|zacute|wedgeq|homtht|barvee|barwed|Barwed|rpargt|horbar|conint|swarhk|roplus|nltrie|hslash|hstrok|Hstrok|rmoust|Conint|bprime|hybull|hyphen|iacute|Iacute|supsup|supsub|supsim|varphi|coprod|brvbar|agrave|Supset|supset|igrave|Igrave|notinE|Agrave|iiiint|iinfin|copysr|wedbar|Verbar|vangrt|becaus|incare|verbar|inodot|bullet|drcorn|intcal|drcrop|cularr|vellip|Utilde|bumpeq|cupcap|dstrok|Dstrok|CupCap|cupcup|cupdot|eacute|Eacute|supdot|iquest|easter|ecaron|Ecaron|ecolon|isinsv|utilde|itilde|Itilde|curarr|succeq|Bumpeq|cacute|ulcrop|nparsl|Cacute|nprcue|egrave|Egrave|nrarrc|nrarrw|subsup|subsub|nrtrie|jsercy|nsccue|Jsercy|kappav|kcedil|Kcedil|subsim|ulcorn|nsimeq|egsdot|veebar|kgreen|capand|elsdot|Subset|subset|curren|aacute|lacute|Lacute|emptyv|ntilde|Ntilde|lagran|lambda|Lambda|capcap|Ugrave|langle|subdot|emsp13|numero|emsp14|nvdash|nvDash|nVdash|nVDash|ugrave|ufisht|nvHarr|larrfs|nvlArr|larrhk|larrlp|larrpl|nvrArr|Udblac|nwarhk|larrtl|nwnear|oacute|Oacute|latail|lAtail|sstarf|lbrace|odblac|Odblac|lbrack|udblac|odsold|eparsl|lcaron|Lcaron|ograve|Ograve|lcedil|Lcedil|Aacute|ssmile|ssetmn|squarf|ldquor|capcup|ominus|cylcty|rharul|eqcirc|dagger|rfloor|rfisht|Dagger|daleth|equals|origof|capdot|equest|dcaron|Dcaron|rdquor|oslash|Oslash|otilde|Otilde|otimes|Otimes|urcrop|Ubreve|ubreve|Yacute|Uacute|uacute|Rcedil|rcedil|urcorn|parsim|Rcaron|Vdashl|rcaron|Tstrok|percnt|period|permil|Exists|yacute|rbrack|rbrace|phmmat|ccaron|Ccaron|planck|ccedil|plankv|tstrok|female|plusdo|plusdu|ffilig|plusmn|ffllig|Ccedil|rAtail|dfisht|bernou|ratail|Rarrtl|rarrtl|angsph|rarrpl|rarrlp|rarrhk|xwedge|xotime|forall|ForAll|Vvdash|vsupnE|preceq|bigcap|frac12|frac13|frac14|primes|rarrfs|prnsim|frac15|Square|frac16|square|lesdot|frac18|frac23|propto|prurel|rarrap|rangle|puncsp|frac25|Racute|qprime|racute|lesges|frac34|abreve|AElig|eqsim|utdot|setmn|urtri|Equal|Uring|seArr|uring|searr|dashv|Dashv|mumap|nabla|iogon|Iogon|sdote|sdotb|scsim|napid|napos|equiv|natur|Acirc|dblac|erarr|nbump|iprod|erDot|ucirc|awint|esdot|angrt|ncong|isinE|scnap|Scirc|scirc|ndash|isins|Ubrcy|nearr|neArr|isinv|nedot|ubrcy|acute|Ycirc|iukcy|Iukcy|xutri|nesim|caret|jcirc|Jcirc|caron|twixt|ddarr|sccue|exist|jmath|sbquo|ngeqq|angst|ccaps|lceil|ngsim|UpTee|delta|Delta|rtrif|nharr|nhArr|nhpar|rtrie|jukcy|Jukcy|kappa|rsquo|Kappa|nlarr|nlArr|TSHcy|rrarr|aogon|Aogon|fflig|xrarr|tshcy|ccirc|nleqq|filig|upsih|nless|dharl|nlsim|fjlig|ropar|nltri|dharr|robrk|roarr|fllig|fltns|roang|rnmid|subnE|subne|lAarr|trisb|Ccirc|acirc|ccups|blank|VDash|forkv|Vdash|langd|cedil|blk12|blk14|laquo|strns|diams|notin|vDash|larrb|blk34|block|disin|uplus|vdash|vBarv|aelig|starf|Wedge|check|xrArr|lates|lbarr|lBarr|notni|lbbrk|bcong|frasl|lbrke|frown|vrtri|vprop|vnsup|gamma|Gamma|wedge|xodot|bdquo|srarr|doteq|ldquo|boxdl|boxdL|gcirc|Gcirc|boxDl|boxDL|boxdr|boxdR|boxDr|TRADE|trade|rlhar|boxDR|vnsub|npart|vltri|rlarr|boxhd|boxhD|nprec|gescc|nrarr|nrArr|boxHd|boxHD|boxhu|boxhU|nrtri|boxHu|clubs|boxHU|times|colon|Colon|gimel|xlArr|Tilde|nsime|tilde|nsmid|nspar|THORN|thorn|xlarr|nsube|nsubE|thkap|xhArr|comma|nsucc|boxul|boxuL|nsupe|nsupE|gneqq|gnsim|boxUl|boxUL|grave|boxur|boxuR|boxUr|boxUR|lescc|angle|bepsi|boxvh|varpi|boxvH|numsp|Theta|gsime|gsiml|theta|boxVh|boxVH|boxvl|gtcir|gtdot|boxvL|boxVl|boxVL|crarr|cross|Cross|nvsim|boxvr|nwarr|nwArr|sqsup|dtdot|Uogon|lhard|lharu|dtrif|ocirc|Ocirc|lhblk|duarr|odash|sqsub|Hacek|sqcup|llarr|duhar|oelig|OElig|ofcir|boxvR|uogon|lltri|boxVr|csube|uuarr|ohbar|csupe|ctdot|olarr|olcir|harrw|oline|sqcap|omacr|Omacr|omega|Omega|boxVR|aleph|lneqq|lnsim|loang|loarr|rharu|lobrk|hcirc|operp|oplus|rhard|Hcirc|orarr|Union|order|ecirc|Ecirc|cuepr|szlig|cuesc|breve|reals|eDDot|Breve|hoarr|lopar|utrif|rdquo|Umacr|umacr|efDot|swArr|ultri|alpha|rceil|ovbar|swarr|Wcirc|wcirc|smtes|smile|bsemi|lrarr|aring|parsl|lrhar|bsime|uhblk|lrtri|cupor|Aring|uharr|uharl|slarr|rbrke|bsolb|lsime|rbbrk|RBarr|lsimg|phone|rBarr|rbarr|icirc|lsquo|Icirc|emacr|Emacr|ratio|simne|plusb|simlE|simgE|simeq|pluse|ltcir|ltdot|empty|xharr|xdtri|iexcl|Alpha|ltrie|rarrw|pound|ltrif|xcirc|bumpe|prcue|bumpE|asymp|amacr|cuvee|Sigma|sigma|iiint|udhar|iiota|ijlig|IJlig|supnE|imacr|Imacr|prime|Prime|image|prnap|eogon|Eogon|rarrc|mdash|mDDot|cuwed|imath|supne|imped|Amacr|udarr|prsim|micro|rarrb|cwint|raquo|infin|eplus|range|rangd|Ucirc|radic|minus|amalg|veeeq|rAarr|epsiv|ycirc|quest|sharp|quot|zwnj|Qscr|race|qscr|Qopf|qopf|qint|rang|Rang|Zscr|zscr|Zopf|zopf|rarr|rArr|Rarr|Pscr|pscr|prop|prod|prnE|prec|ZHcy|zhcy|prap|Zeta|zeta|Popf|popf|Zdot|plus|zdot|Yuml|yuml|phiv|YUcy|yucy|Yscr|yscr|perp|Yopf|yopf|part|para|YIcy|Ouml|rcub|yicy|YAcy|rdca|ouml|osol|Oscr|rdsh|yacy|real|oscr|xvee|andd|rect|andv|Xscr|oror|ordm|ordf|xscr|ange|aopf|Aopf|rHar|Xopf|opar|Oopf|xopf|xnis|rhov|oopf|omid|xmap|oint|apid|apos|ogon|ascr|Ascr|odot|odiv|xcup|xcap|ocir|oast|nvlt|nvle|nvgt|nvge|nvap|Wscr|wscr|auml|ntlg|ntgl|nsup|nsub|nsim|Nscr|nscr|nsce|Wopf|ring|npre|wopf|npar|Auml|Barv|bbrk|Nopf|nopf|nmid|nLtv|beta|ropf|Ropf|Beta|beth|nles|rpar|nleq|bnot|bNot|nldr|NJcy|rscr|Rscr|Vscr|vscr|rsqb|njcy|bopf|nisd|Bopf|rtri|Vopf|nGtv|ngtr|vopf|boxh|boxH|boxv|nges|ngeq|boxV|bscr|scap|Bscr|bsim|Vert|vert|bsol|bull|bump|caps|cdot|ncup|scnE|ncap|nbsp|napE|Cdot|cent|sdot|Vbar|nang|vBar|chcy|Mscr|mscr|sect|semi|CHcy|Mopf|mopf|sext|circ|cire|mldr|mlcp|cirE|comp|shcy|SHcy|vArr|varr|cong|copf|Copf|copy|COPY|malt|male|macr|lvnE|cscr|ltri|sime|ltcc|simg|Cscr|siml|csub|Uuml|lsqb|lsim|uuml|csup|Lscr|lscr|utri|smid|lpar|cups|smte|lozf|darr|Lopf|Uscr|solb|lopf|sopf|Sopf|lneq|uscr|spar|dArr|lnap|Darr|dash|Sqrt|LJcy|ljcy|lHar|dHar|Upsi|upsi|diam|lesg|djcy|DJcy|leqq|dopf|Dopf|dscr|Dscr|dscy|ldsh|ldca|squf|DScy|sscr|Sscr|dsol|lcub|late|star|Star|Uopf|Larr|lArr|larr|uopf|dtri|dzcy|sube|subE|Lang|lang|Kscr|kscr|Kopf|kopf|KJcy|kjcy|KHcy|khcy|DZcy|ecir|edot|eDot|Jscr|jscr|succ|Jopf|jopf|Edot|uHar|emsp|ensp|Iuml|iuml|eopf|isin|Iscr|iscr|Eopf|epar|sung|epsi|escr|sup1|sup2|sup3|Iota|iota|supe|supE|Iopf|iopf|IOcy|iocy|Escr|esim|Esim|imof|Uarr|QUOT|uArr|uarr|euml|IEcy|iecy|Idot|Euml|euro|excl|Hscr|hscr|Hopf|hopf|TScy|tscy|Tscr|hbar|tscr|flat|tbrk|fnof|hArr|harr|half|fopf|Fopf|tdot|gvnE|fork|trie|gtcc|fscr|Fscr|gdot|gsim|Gscr|gscr|Gopf|gopf|gneq|Gdot|tosa|gnap|Topf|topf|geqq|toea|GJcy|gjcy|tint|gesl|mid|Sfr|ggg|top|ges|gla|glE|glj|geq|gne|gEl|gel|gnE|Gcy|gcy|gap|Tfr|tfr|Tcy|tcy|Hat|Tau|Ffr|tau|Tab|hfr|Hfr|ffr|Fcy|fcy|icy|Icy|iff|ETH|eth|ifr|Ifr|Eta|eta|int|Int|Sup|sup|ucy|Ucy|Sum|sum|jcy|ENG|ufr|Ufr|eng|Jcy|jfr|els|ell|egs|Efr|efr|Jfr|uml|kcy|Kcy|Ecy|ecy|kfr|Kfr|lap|Sub|sub|lat|lcy|Lcy|leg|Dot|dot|lEg|leq|les|squ|div|die|lfr|Lfr|lgE|Dfr|dfr|Del|deg|Dcy|dcy|lne|lnE|sol|loz|smt|Cup|lrm|cup|lsh|Lsh|sim|shy|map|Map|mcy|Mcy|mfr|Mfr|mho|gfr|Gfr|sfr|cir|Chi|chi|nap|Cfr|vcy|Vcy|cfr|Scy|scy|ncy|Ncy|vee|Vee|Cap|cap|nfr|scE|sce|Nfr|nge|ngE|nGg|vfr|Vfr|ngt|bot|nGt|nis|niv|Rsh|rsh|nle|nlE|bne|Bfr|bfr|nLl|nlt|nLt|Bcy|bcy|not|Not|rlm|wfr|Wfr|npr|nsc|num|ocy|ast|Ocy|ofr|xfr|Xfr|Ofr|ogt|ohm|apE|olt|Rho|ape|rho|Rfr|rfr|ord|REG|ang|reg|orv|And|and|AMP|Rcy|amp|Afr|ycy|Ycy|yen|yfr|Yfr|rcy|par|pcy|Pcy|pfr|Pfr|phi|Phi|afr|Acy|acy|zcy|Zcy|piv|acE|acd|zfr|Zfr|pre|prE|psi|Psi|qfr|Qfr|zwj|Or|ge|Gg|gt|gg|el|oS|lt|Lt|LT|Re|lg|gl|eg|ne|Im|it|le|DD|wp|wr|nu|Nu|dd|lE|Sc|sc|pi|Pi|ee|af|ll|Ll|rx|gE|xi|pm|Xi|ic|pr|Pr|in|ni|mp|mu|ac|Mu|or|ap|Gt|GT|ii);|&(Aacute|Agrave|Atilde|Ccedil|Eacute|Egrave|Iacute|Igrave|Ntilde|Oacute|Ograve|Oslash|Otilde|Uacute|Ugrave|Yacute|aacute|agrave|atilde|brvbar|ccedil|curren|divide|eacute|egrave|frac12|frac14|frac34|iacute|igrave|iquest|middot|ntilde|oacute|ograve|oslash|otilde|plusmn|uacute|ugrave|yacute|AElig|Acirc|Aring|Ecirc|Icirc|Ocirc|THORN|Ucirc|acirc|acute|aelig|aring|cedil|ecirc|icirc|iexcl|laquo|micro|ocirc|pound|raquo|szlig|thorn|times|ucirc|Auml|COPY|Euml|Iuml|Ouml|QUOT|Uuml|auml|cent|copy|euml|iuml|macr|nbsp|ordf|ordm|ouml|para|quot|sect|sup1|sup2|sup3|uuml|yuml|AMP|ETH|REG|amp|deg|eth|not|reg|shy|uml|yen|GT|LT|gt|lt)(?!;)([=a-zA-Z0-9]?)|&#([0-9]+)(;?)|&#[xX]([a-fA-F0-9]+)(;?)|&([0-9a-zA-Z]+)/g;
-    var decodeMap = {
-      aacute: "\xE1",
-      Aacute: "\xC1",
-      abreve: "\u0103",
-      Abreve: "\u0102",
-      ac: "\u223E",
-      acd: "\u223F",
-      acE: "\u223E\u0333",
-      acirc: "\xE2",
-      Acirc: "\xC2",
-      acute: "\xB4",
-      acy: "\u0430",
-      Acy: "\u0410",
-      aelig: "\xE6",
-      AElig: "\xC6",
-      af: "\u2061",
-      afr: "\u{1D51E}",
-      Afr: "\u{1D504}",
-      agrave: "\xE0",
-      Agrave: "\xC0",
-      alefsym: "\u2135",
-      aleph: "\u2135",
-      alpha: "\u03B1",
-      Alpha: "\u0391",
-      amacr: "\u0101",
-      Amacr: "\u0100",
-      amalg: "\u2A3F",
-      amp: "&",
-      AMP: "&",
-      and: "\u2227",
-      And: "\u2A53",
-      andand: "\u2A55",
-      andd: "\u2A5C",
-      andslope: "\u2A58",
-      andv: "\u2A5A",
-      ang: "\u2220",
-      ange: "\u29A4",
-      angle: "\u2220",
-      angmsd: "\u2221",
-      angmsdaa: "\u29A8",
-      angmsdab: "\u29A9",
-      angmsdac: "\u29AA",
-      angmsdad: "\u29AB",
-      angmsdae: "\u29AC",
-      angmsdaf: "\u29AD",
-      angmsdag: "\u29AE",
-      angmsdah: "\u29AF",
-      angrt: "\u221F",
-      angrtvb: "\u22BE",
-      angrtvbd: "\u299D",
-      angsph: "\u2222",
-      angst: "\xC5",
-      angzarr: "\u237C",
-      aogon: "\u0105",
-      Aogon: "\u0104",
-      aopf: "\u{1D552}",
-      Aopf: "\u{1D538}",
-      ap: "\u2248",
-      apacir: "\u2A6F",
-      ape: "\u224A",
-      apE: "\u2A70",
-      apid: "\u224B",
-      apos: "'",
-      ApplyFunction: "\u2061",
-      approx: "\u2248",
-      approxeq: "\u224A",
-      aring: "\xE5",
-      Aring: "\xC5",
-      ascr: "\u{1D4B6}",
-      Ascr: "\u{1D49C}",
-      Assign: "\u2254",
-      ast: "*",
-      asymp: "\u2248",
-      asympeq: "\u224D",
-      atilde: "\xE3",
-      Atilde: "\xC3",
-      auml: "\xE4",
-      Auml: "\xC4",
-      awconint: "\u2233",
-      awint: "\u2A11",
-      backcong: "\u224C",
-      backepsilon: "\u03F6",
-      backprime: "\u2035",
-      backsim: "\u223D",
-      backsimeq: "\u22CD",
-      Backslash: "\u2216",
-      Barv: "\u2AE7",
-      barvee: "\u22BD",
-      barwed: "\u2305",
-      Barwed: "\u2306",
-      barwedge: "\u2305",
-      bbrk: "\u23B5",
-      bbrktbrk: "\u23B6",
-      bcong: "\u224C",
-      bcy: "\u0431",
-      Bcy: "\u0411",
-      bdquo: "\u201E",
-      becaus: "\u2235",
-      because: "\u2235",
-      Because: "\u2235",
-      bemptyv: "\u29B0",
-      bepsi: "\u03F6",
-      bernou: "\u212C",
-      Bernoullis: "\u212C",
-      beta: "\u03B2",
-      Beta: "\u0392",
-      beth: "\u2136",
-      between: "\u226C",
-      bfr: "\u{1D51F}",
-      Bfr: "\u{1D505}",
-      bigcap: "\u22C2",
-      bigcirc: "\u25EF",
-      bigcup: "\u22C3",
-      bigodot: "\u2A00",
-      bigoplus: "\u2A01",
-      bigotimes: "\u2A02",
-      bigsqcup: "\u2A06",
-      bigstar: "\u2605",
-      bigtriangledown: "\u25BD",
-      bigtriangleup: "\u25B3",
-      biguplus: "\u2A04",
-      bigvee: "\u22C1",
-      bigwedge: "\u22C0",
-      bkarow: "\u290D",
-      blacklozenge: "\u29EB",
-      blacksquare: "\u25AA",
-      blacktriangle: "\u25B4",
-      blacktriangledown: "\u25BE",
-      blacktriangleleft: "\u25C2",
-      blacktriangleright: "\u25B8",
-      blank: "\u2423",
-      blk12: "\u2592",
-      blk14: "\u2591",
-      blk34: "\u2593",
-      block: "\u2588",
-      bne: "=\u20E5",
-      bnequiv: "\u2261\u20E5",
-      bnot: "\u2310",
-      bNot: "\u2AED",
-      bopf: "\u{1D553}",
-      Bopf: "\u{1D539}",
-      bot: "\u22A5",
-      bottom: "\u22A5",
-      bowtie: "\u22C8",
-      boxbox: "\u29C9",
-      boxdl: "\u2510",
-      boxdL: "\u2555",
-      boxDl: "\u2556",
-      boxDL: "\u2557",
-      boxdr: "\u250C",
-      boxdR: "\u2552",
-      boxDr: "\u2553",
-      boxDR: "\u2554",
-      boxh: "\u2500",
-      boxH: "\u2550",
-      boxhd: "\u252C",
-      boxhD: "\u2565",
-      boxHd: "\u2564",
-      boxHD: "\u2566",
-      boxhu: "\u2534",
-      boxhU: "\u2568",
-      boxHu: "\u2567",
-      boxHU: "\u2569",
-      boxminus: "\u229F",
-      boxplus: "\u229E",
-      boxtimes: "\u22A0",
-      boxul: "\u2518",
-      boxuL: "\u255B",
-      boxUl: "\u255C",
-      boxUL: "\u255D",
-      boxur: "\u2514",
-      boxuR: "\u2558",
-      boxUr: "\u2559",
-      boxUR: "\u255A",
-      boxv: "\u2502",
-      boxV: "\u2551",
-      boxvh: "\u253C",
-      boxvH: "\u256A",
-      boxVh: "\u256B",
-      boxVH: "\u256C",
-      boxvl: "\u2524",
-      boxvL: "\u2561",
-      boxVl: "\u2562",
-      boxVL: "\u2563",
-      boxvr: "\u251C",
-      boxvR: "\u255E",
-      boxVr: "\u255F",
-      boxVR: "\u2560",
-      bprime: "\u2035",
-      breve: "\u02D8",
-      Breve: "\u02D8",
-      brvbar: "\xA6",
-      bscr: "\u{1D4B7}",
-      Bscr: "\u212C",
-      bsemi: "\u204F",
-      bsim: "\u223D",
-      bsime: "\u22CD",
-      bsol: "\\",
-      bsolb: "\u29C5",
-      bsolhsub: "\u27C8",
-      bull: "\u2022",
-      bullet: "\u2022",
-      bump: "\u224E",
-      bumpe: "\u224F",
-      bumpE: "\u2AAE",
-      bumpeq: "\u224F",
-      Bumpeq: "\u224E",
-      cacute: "\u0107",
-      Cacute: "\u0106",
-      cap: "\u2229",
-      Cap: "\u22D2",
-      capand: "\u2A44",
-      capbrcup: "\u2A49",
-      capcap: "\u2A4B",
-      capcup: "\u2A47",
-      capdot: "\u2A40",
-      CapitalDifferentialD: "\u2145",
-      caps: "\u2229\uFE00",
-      caret: "\u2041",
-      caron: "\u02C7",
-      Cayleys: "\u212D",
-      ccaps: "\u2A4D",
-      ccaron: "\u010D",
-      Ccaron: "\u010C",
-      ccedil: "\xE7",
-      Ccedil: "\xC7",
-      ccirc: "\u0109",
-      Ccirc: "\u0108",
-      Cconint: "\u2230",
-      ccups: "\u2A4C",
-      ccupssm: "\u2A50",
-      cdot: "\u010B",
-      Cdot: "\u010A",
-      cedil: "\xB8",
-      Cedilla: "\xB8",
-      cemptyv: "\u29B2",
-      cent: "\xA2",
-      centerdot: "\xB7",
-      CenterDot: "\xB7",
-      cfr: "\u{1D520}",
-      Cfr: "\u212D",
-      chcy: "\u0447",
-      CHcy: "\u0427",
-      check: "\u2713",
-      checkmark: "\u2713",
-      chi: "\u03C7",
-      Chi: "\u03A7",
-      cir: "\u25CB",
-      circ: "\u02C6",
-      circeq: "\u2257",
-      circlearrowleft: "\u21BA",
-      circlearrowright: "\u21BB",
-      circledast: "\u229B",
-      circledcirc: "\u229A",
-      circleddash: "\u229D",
-      CircleDot: "\u2299",
-      circledR: "\xAE",
-      circledS: "\u24C8",
-      CircleMinus: "\u2296",
-      CirclePlus: "\u2295",
-      CircleTimes: "\u2297",
-      cire: "\u2257",
-      cirE: "\u29C3",
-      cirfnint: "\u2A10",
-      cirmid: "\u2AEF",
-      cirscir: "\u29C2",
-      ClockwiseContourIntegral: "\u2232",
-      CloseCurlyDoubleQuote: "\u201D",
-      CloseCurlyQuote: "\u2019",
-      clubs: "\u2663",
-      clubsuit: "\u2663",
-      colon: ":",
-      Colon: "\u2237",
-      colone: "\u2254",
-      Colone: "\u2A74",
-      coloneq: "\u2254",
-      comma: ",",
-      commat: "@",
-      comp: "\u2201",
-      compfn: "\u2218",
-      complement: "\u2201",
-      complexes: "\u2102",
-      cong: "\u2245",
-      congdot: "\u2A6D",
-      Congruent: "\u2261",
-      conint: "\u222E",
-      Conint: "\u222F",
-      ContourIntegral: "\u222E",
-      copf: "\u{1D554}",
-      Copf: "\u2102",
-      coprod: "\u2210",
-      Coproduct: "\u2210",
-      copy: "\xA9",
-      COPY: "\xA9",
-      copysr: "\u2117",
-      CounterClockwiseContourIntegral: "\u2233",
-      crarr: "\u21B5",
-      cross: "\u2717",
-      Cross: "\u2A2F",
-      cscr: "\u{1D4B8}",
-      Cscr: "\u{1D49E}",
-      csub: "\u2ACF",
-      csube: "\u2AD1",
-      csup: "\u2AD0",
-      csupe: "\u2AD2",
-      ctdot: "\u22EF",
-      cudarrl: "\u2938",
-      cudarrr: "\u2935",
-      cuepr: "\u22DE",
-      cuesc: "\u22DF",
-      cularr: "\u21B6",
-      cularrp: "\u293D",
-      cup: "\u222A",
-      Cup: "\u22D3",
-      cupbrcap: "\u2A48",
-      cupcap: "\u2A46",
-      CupCap: "\u224D",
-      cupcup: "\u2A4A",
-      cupdot: "\u228D",
-      cupor: "\u2A45",
-      cups: "\u222A\uFE00",
-      curarr: "\u21B7",
-      curarrm: "\u293C",
-      curlyeqprec: "\u22DE",
-      curlyeqsucc: "\u22DF",
-      curlyvee: "\u22CE",
-      curlywedge: "\u22CF",
-      curren: "\xA4",
-      curvearrowleft: "\u21B6",
-      curvearrowright: "\u21B7",
-      cuvee: "\u22CE",
-      cuwed: "\u22CF",
-      cwconint: "\u2232",
-      cwint: "\u2231",
-      cylcty: "\u232D",
-      dagger: "\u2020",
-      Dagger: "\u2021",
-      daleth: "\u2138",
-      darr: "\u2193",
-      dArr: "\u21D3",
-      Darr: "\u21A1",
-      dash: "\u2010",
-      dashv: "\u22A3",
-      Dashv: "\u2AE4",
-      dbkarow: "\u290F",
-      dblac: "\u02DD",
-      dcaron: "\u010F",
-      Dcaron: "\u010E",
-      dcy: "\u0434",
-      Dcy: "\u0414",
-      dd: "\u2146",
-      DD: "\u2145",
-      ddagger: "\u2021",
-      ddarr: "\u21CA",
-      DDotrahd: "\u2911",
-      ddotseq: "\u2A77",
-      deg: "\xB0",
-      Del: "\u2207",
-      delta: "\u03B4",
-      Delta: "\u0394",
-      demptyv: "\u29B1",
-      dfisht: "\u297F",
-      dfr: "\u{1D521}",
-      Dfr: "\u{1D507}",
-      dHar: "\u2965",
-      dharl: "\u21C3",
-      dharr: "\u21C2",
-      DiacriticalAcute: "\xB4",
-      DiacriticalDot: "\u02D9",
-      DiacriticalDoubleAcute: "\u02DD",
-      DiacriticalGrave: "`",
-      DiacriticalTilde: "\u02DC",
-      diam: "\u22C4",
-      diamond: "\u22C4",
-      Diamond: "\u22C4",
-      diamondsuit: "\u2666",
-      diams: "\u2666",
-      die: "\xA8",
-      DifferentialD: "\u2146",
-      digamma: "\u03DD",
-      disin: "\u22F2",
-      div: "\xF7",
-      divide: "\xF7",
-      divideontimes: "\u22C7",
-      divonx: "\u22C7",
-      djcy: "\u0452",
-      DJcy: "\u0402",
-      dlcorn: "\u231E",
-      dlcrop: "\u230D",
-      dollar: "$",
-      dopf: "\u{1D555}",
-      Dopf: "\u{1D53B}",
-      dot: "\u02D9",
-      Dot: "\xA8",
-      DotDot: "\u20DC",
-      doteq: "\u2250",
-      doteqdot: "\u2251",
-      DotEqual: "\u2250",
-      dotminus: "\u2238",
-      dotplus: "\u2214",
-      dotsquare: "\u22A1",
-      doublebarwedge: "\u2306",
-      DoubleContourIntegral: "\u222F",
-      DoubleDot: "\xA8",
-      DoubleDownArrow: "\u21D3",
-      DoubleLeftArrow: "\u21D0",
-      DoubleLeftRightArrow: "\u21D4",
-      DoubleLeftTee: "\u2AE4",
-      DoubleLongLeftArrow: "\u27F8",
-      DoubleLongLeftRightArrow: "\u27FA",
-      DoubleLongRightArrow: "\u27F9",
-      DoubleRightArrow: "\u21D2",
-      DoubleRightTee: "\u22A8",
-      DoubleUpArrow: "\u21D1",
-      DoubleUpDownArrow: "\u21D5",
-      DoubleVerticalBar: "\u2225",
-      downarrow: "\u2193",
-      Downarrow: "\u21D3",
-      DownArrow: "\u2193",
-      DownArrowBar: "\u2913",
-      DownArrowUpArrow: "\u21F5",
-      DownBreve: "\u0311",
-      downdownarrows: "\u21CA",
-      downharpoonleft: "\u21C3",
-      downharpoonright: "\u21C2",
-      DownLeftRightVector: "\u2950",
-      DownLeftTeeVector: "\u295E",
-      DownLeftVector: "\u21BD",
-      DownLeftVectorBar: "\u2956",
-      DownRightTeeVector: "\u295F",
-      DownRightVector: "\u21C1",
-      DownRightVectorBar: "\u2957",
-      DownTee: "\u22A4",
-      DownTeeArrow: "\u21A7",
-      drbkarow: "\u2910",
-      drcorn: "\u231F",
-      drcrop: "\u230C",
-      dscr: "\u{1D4B9}",
-      Dscr: "\u{1D49F}",
-      dscy: "\u0455",
-      DScy: "\u0405",
-      dsol: "\u29F6",
-      dstrok: "\u0111",
-      Dstrok: "\u0110",
-      dtdot: "\u22F1",
-      dtri: "\u25BF",
-      dtrif: "\u25BE",
-      duarr: "\u21F5",
-      duhar: "\u296F",
-      dwangle: "\u29A6",
-      dzcy: "\u045F",
-      DZcy: "\u040F",
-      dzigrarr: "\u27FF",
-      eacute: "\xE9",
-      Eacute: "\xC9",
-      easter: "\u2A6E",
-      ecaron: "\u011B",
-      Ecaron: "\u011A",
-      ecir: "\u2256",
-      ecirc: "\xEA",
-      Ecirc: "\xCA",
-      ecolon: "\u2255",
-      ecy: "\u044D",
-      Ecy: "\u042D",
-      eDDot: "\u2A77",
-      edot: "\u0117",
-      eDot: "\u2251",
-      Edot: "\u0116",
-      ee: "\u2147",
-      efDot: "\u2252",
-      efr: "\u{1D522}",
-      Efr: "\u{1D508}",
-      eg: "\u2A9A",
-      egrave: "\xE8",
-      Egrave: "\xC8",
-      egs: "\u2A96",
-      egsdot: "\u2A98",
-      el: "\u2A99",
-      Element: "\u2208",
-      elinters: "\u23E7",
-      ell: "\u2113",
-      els: "\u2A95",
-      elsdot: "\u2A97",
-      emacr: "\u0113",
-      Emacr: "\u0112",
-      empty: "\u2205",
-      emptyset: "\u2205",
-      EmptySmallSquare: "\u25FB",
-      emptyv: "\u2205",
-      EmptyVerySmallSquare: "\u25AB",
-      emsp: "\u2003",
-      emsp13: "\u2004",
-      emsp14: "\u2005",
-      eng: "\u014B",
-      ENG: "\u014A",
-      ensp: "\u2002",
-      eogon: "\u0119",
-      Eogon: "\u0118",
-      eopf: "\u{1D556}",
-      Eopf: "\u{1D53C}",
-      epar: "\u22D5",
-      eparsl: "\u29E3",
-      eplus: "\u2A71",
-      epsi: "\u03B5",
-      epsilon: "\u03B5",
-      Epsilon: "\u0395",
-      epsiv: "\u03F5",
-      eqcirc: "\u2256",
-      eqcolon: "\u2255",
-      eqsim: "\u2242",
-      eqslantgtr: "\u2A96",
-      eqslantless: "\u2A95",
-      Equal: "\u2A75",
-      equals: "=",
-      EqualTilde: "\u2242",
-      equest: "\u225F",
-      Equilibrium: "\u21CC",
-      equiv: "\u2261",
-      equivDD: "\u2A78",
-      eqvparsl: "\u29E5",
-      erarr: "\u2971",
-      erDot: "\u2253",
-      escr: "\u212F",
-      Escr: "\u2130",
-      esdot: "\u2250",
-      esim: "\u2242",
-      Esim: "\u2A73",
-      eta: "\u03B7",
-      Eta: "\u0397",
-      eth: "\xF0",
-      ETH: "\xD0",
-      euml: "\xEB",
-      Euml: "\xCB",
-      euro: "\u20AC",
-      excl: "!",
-      exist: "\u2203",
-      Exists: "\u2203",
-      expectation: "\u2130",
-      exponentiale: "\u2147",
-      ExponentialE: "\u2147",
-      fallingdotseq: "\u2252",
-      fcy: "\u0444",
-      Fcy: "\u0424",
-      female: "\u2640",
-      ffilig: "\uFB03",
-      fflig: "\uFB00",
-      ffllig: "\uFB04",
-      ffr: "\u{1D523}",
-      Ffr: "\u{1D509}",
-      filig: "\uFB01",
-      FilledSmallSquare: "\u25FC",
-      FilledVerySmallSquare: "\u25AA",
-      fjlig: "fj",
-      flat: "\u266D",
-      fllig: "\uFB02",
-      fltns: "\u25B1",
-      fnof: "\u0192",
-      fopf: "\u{1D557}",
-      Fopf: "\u{1D53D}",
-      forall: "\u2200",
-      ForAll: "\u2200",
-      fork: "\u22D4",
-      forkv: "\u2AD9",
-      Fouriertrf: "\u2131",
-      fpartint: "\u2A0D",
-      frac12: "\xBD",
-      frac13: "\u2153",
-      frac14: "\xBC",
-      frac15: "\u2155",
-      frac16: "\u2159",
-      frac18: "\u215B",
-      frac23: "\u2154",
-      frac25: "\u2156",
-      frac34: "\xBE",
-      frac35: "\u2157",
-      frac38: "\u215C",
-      frac45: "\u2158",
-      frac56: "\u215A",
-      frac58: "\u215D",
-      frac78: "\u215E",
-      frasl: "\u2044",
-      frown: "\u2322",
-      fscr: "\u{1D4BB}",
-      Fscr: "\u2131",
-      gacute: "\u01F5",
-      gamma: "\u03B3",
-      Gamma: "\u0393",
-      gammad: "\u03DD",
-      Gammad: "\u03DC",
-      gap: "\u2A86",
-      gbreve: "\u011F",
-      Gbreve: "\u011E",
-      Gcedil: "\u0122",
-      gcirc: "\u011D",
-      Gcirc: "\u011C",
-      gcy: "\u0433",
-      Gcy: "\u0413",
-      gdot: "\u0121",
-      Gdot: "\u0120",
-      ge: "\u2265",
-      gE: "\u2267",
-      gel: "\u22DB",
-      gEl: "\u2A8C",
-      geq: "\u2265",
-      geqq: "\u2267",
-      geqslant: "\u2A7E",
-      ges: "\u2A7E",
-      gescc: "\u2AA9",
-      gesdot: "\u2A80",
-      gesdoto: "\u2A82",
-      gesdotol: "\u2A84",
-      gesl: "\u22DB\uFE00",
-      gesles: "\u2A94",
-      gfr: "\u{1D524}",
-      Gfr: "\u{1D50A}",
-      gg: "\u226B",
-      Gg: "\u22D9",
-      ggg: "\u22D9",
-      gimel: "\u2137",
-      gjcy: "\u0453",
-      GJcy: "\u0403",
-      gl: "\u2277",
-      gla: "\u2AA5",
-      glE: "\u2A92",
-      glj: "\u2AA4",
-      gnap: "\u2A8A",
-      gnapprox: "\u2A8A",
-      gne: "\u2A88",
-      gnE: "\u2269",
-      gneq: "\u2A88",
-      gneqq: "\u2269",
-      gnsim: "\u22E7",
-      gopf: "\u{1D558}",
-      Gopf: "\u{1D53E}",
-      grave: "`",
-      GreaterEqual: "\u2265",
-      GreaterEqualLess: "\u22DB",
-      GreaterFullEqual: "\u2267",
-      GreaterGreater: "\u2AA2",
-      GreaterLess: "\u2277",
-      GreaterSlantEqual: "\u2A7E",
-      GreaterTilde: "\u2273",
-      gscr: "\u210A",
-      Gscr: "\u{1D4A2}",
-      gsim: "\u2273",
-      gsime: "\u2A8E",
-      gsiml: "\u2A90",
-      gt: ">",
-      Gt: "\u226B",
-      GT: ">",
-      gtcc: "\u2AA7",
-      gtcir: "\u2A7A",
-      gtdot: "\u22D7",
-      gtlPar: "\u2995",
-      gtquest: "\u2A7C",
-      gtrapprox: "\u2A86",
-      gtrarr: "\u2978",
-      gtrdot: "\u22D7",
-      gtreqless: "\u22DB",
-      gtreqqless: "\u2A8C",
-      gtrless: "\u2277",
-      gtrsim: "\u2273",
-      gvertneqq: "\u2269\uFE00",
-      gvnE: "\u2269\uFE00",
-      Hacek: "\u02C7",
-      hairsp: "\u200A",
-      half: "\xBD",
-      hamilt: "\u210B",
-      hardcy: "\u044A",
-      HARDcy: "\u042A",
-      harr: "\u2194",
-      hArr: "\u21D4",
-      harrcir: "\u2948",
-      harrw: "\u21AD",
-      Hat: "^",
-      hbar: "\u210F",
-      hcirc: "\u0125",
-      Hcirc: "\u0124",
-      hearts: "\u2665",
-      heartsuit: "\u2665",
-      hellip: "\u2026",
-      hercon: "\u22B9",
-      hfr: "\u{1D525}",
-      Hfr: "\u210C",
-      HilbertSpace: "\u210B",
-      hksearow: "\u2925",
-      hkswarow: "\u2926",
-      hoarr: "\u21FF",
-      homtht: "\u223B",
-      hookleftarrow: "\u21A9",
-      hookrightarrow: "\u21AA",
-      hopf: "\u{1D559}",
-      Hopf: "\u210D",
-      horbar: "\u2015",
-      HorizontalLine: "\u2500",
-      hscr: "\u{1D4BD}",
-      Hscr: "\u210B",
-      hslash: "\u210F",
-      hstrok: "\u0127",
-      Hstrok: "\u0126",
-      HumpDownHump: "\u224E",
-      HumpEqual: "\u224F",
-      hybull: "\u2043",
-      hyphen: "\u2010",
-      iacute: "\xED",
-      Iacute: "\xCD",
-      ic: "\u2063",
-      icirc: "\xEE",
-      Icirc: "\xCE",
-      icy: "\u0438",
-      Icy: "\u0418",
-      Idot: "\u0130",
-      iecy: "\u0435",
-      IEcy: "\u0415",
-      iexcl: "\xA1",
-      iff: "\u21D4",
-      ifr: "\u{1D526}",
-      Ifr: "\u2111",
-      igrave: "\xEC",
-      Igrave: "\xCC",
-      ii: "\u2148",
-      iiiint: "\u2A0C",
-      iiint: "\u222D",
-      iinfin: "\u29DC",
-      iiota: "\u2129",
-      ijlig: "\u0133",
-      IJlig: "\u0132",
-      Im: "\u2111",
-      imacr: "\u012B",
-      Imacr: "\u012A",
-      image: "\u2111",
-      ImaginaryI: "\u2148",
-      imagline: "\u2110",
-      imagpart: "\u2111",
-      imath: "\u0131",
-      imof: "\u22B7",
-      imped: "\u01B5",
-      Implies: "\u21D2",
-      in: "\u2208",
-      incare: "\u2105",
-      infin: "\u221E",
-      infintie: "\u29DD",
-      inodot: "\u0131",
-      int: "\u222B",
-      Int: "\u222C",
-      intcal: "\u22BA",
-      integers: "\u2124",
-      Integral: "\u222B",
-      intercal: "\u22BA",
-      Intersection: "\u22C2",
-      intlarhk: "\u2A17",
-      intprod: "\u2A3C",
-      InvisibleComma: "\u2063",
-      InvisibleTimes: "\u2062",
-      iocy: "\u0451",
-      IOcy: "\u0401",
-      iogon: "\u012F",
-      Iogon: "\u012E",
-      iopf: "\u{1D55A}",
-      Iopf: "\u{1D540}",
-      iota: "\u03B9",
-      Iota: "\u0399",
-      iprod: "\u2A3C",
-      iquest: "\xBF",
-      iscr: "\u{1D4BE}",
-      Iscr: "\u2110",
-      isin: "\u2208",
-      isindot: "\u22F5",
-      isinE: "\u22F9",
-      isins: "\u22F4",
-      isinsv: "\u22F3",
-      isinv: "\u2208",
-      it: "\u2062",
-      itilde: "\u0129",
-      Itilde: "\u0128",
-      iukcy: "\u0456",
-      Iukcy: "\u0406",
-      iuml: "\xEF",
-      Iuml: "\xCF",
-      jcirc: "\u0135",
-      Jcirc: "\u0134",
-      jcy: "\u0439",
-      Jcy: "\u0419",
-      jfr: "\u{1D527}",
-      Jfr: "\u{1D50D}",
-      jmath: "\u0237",
-      jopf: "\u{1D55B}",
-      Jopf: "\u{1D541}",
-      jscr: "\u{1D4BF}",
-      Jscr: "\u{1D4A5}",
-      jsercy: "\u0458",
-      Jsercy: "\u0408",
-      jukcy: "\u0454",
-      Jukcy: "\u0404",
-      kappa: "\u03BA",
-      Kappa: "\u039A",
-      kappav: "\u03F0",
-      kcedil: "\u0137",
-      Kcedil: "\u0136",
-      kcy: "\u043A",
-      Kcy: "\u041A",
-      kfr: "\u{1D528}",
-      Kfr: "\u{1D50E}",
-      kgreen: "\u0138",
-      khcy: "\u0445",
-      KHcy: "\u0425",
-      kjcy: "\u045C",
-      KJcy: "\u040C",
-      kopf: "\u{1D55C}",
-      Kopf: "\u{1D542}",
-      kscr: "\u{1D4C0}",
-      Kscr: "\u{1D4A6}",
-      lAarr: "\u21DA",
-      lacute: "\u013A",
-      Lacute: "\u0139",
-      laemptyv: "\u29B4",
-      lagran: "\u2112",
-      lambda: "\u03BB",
-      Lambda: "\u039B",
-      lang: "\u27E8",
-      Lang: "\u27EA",
-      langd: "\u2991",
-      langle: "\u27E8",
-      lap: "\u2A85",
-      Laplacetrf: "\u2112",
-      laquo: "\xAB",
-      larr: "\u2190",
-      lArr: "\u21D0",
-      Larr: "\u219E",
-      larrb: "\u21E4",
-      larrbfs: "\u291F",
-      larrfs: "\u291D",
-      larrhk: "\u21A9",
-      larrlp: "\u21AB",
-      larrpl: "\u2939",
-      larrsim: "\u2973",
-      larrtl: "\u21A2",
-      lat: "\u2AAB",
-      latail: "\u2919",
-      lAtail: "\u291B",
-      late: "\u2AAD",
-      lates: "\u2AAD\uFE00",
-      lbarr: "\u290C",
-      lBarr: "\u290E",
-      lbbrk: "\u2772",
-      lbrace: "{",
-      lbrack: "[",
-      lbrke: "\u298B",
-      lbrksld: "\u298F",
-      lbrkslu: "\u298D",
-      lcaron: "\u013E",
-      Lcaron: "\u013D",
-      lcedil: "\u013C",
-      Lcedil: "\u013B",
-      lceil: "\u2308",
-      lcub: "{",
-      lcy: "\u043B",
-      Lcy: "\u041B",
-      ldca: "\u2936",
-      ldquo: "\u201C",
-      ldquor: "\u201E",
-      ldrdhar: "\u2967",
-      ldrushar: "\u294B",
-      ldsh: "\u21B2",
-      le: "\u2264",
-      lE: "\u2266",
-      LeftAngleBracket: "\u27E8",
-      leftarrow: "\u2190",
-      Leftarrow: "\u21D0",
-      LeftArrow: "\u2190",
-      LeftArrowBar: "\u21E4",
-      LeftArrowRightArrow: "\u21C6",
-      leftarrowtail: "\u21A2",
-      LeftCeiling: "\u2308",
-      LeftDoubleBracket: "\u27E6",
-      LeftDownTeeVector: "\u2961",
-      LeftDownVector: "\u21C3",
-      LeftDownVectorBar: "\u2959",
-      LeftFloor: "\u230A",
-      leftharpoondown: "\u21BD",
-      leftharpoonup: "\u21BC",
-      leftleftarrows: "\u21C7",
-      leftrightarrow: "\u2194",
-      Leftrightarrow: "\u21D4",
-      LeftRightArrow: "\u2194",
-      leftrightarrows: "\u21C6",
-      leftrightharpoons: "\u21CB",
-      leftrightsquigarrow: "\u21AD",
-      LeftRightVector: "\u294E",
-      LeftTee: "\u22A3",
-      LeftTeeArrow: "\u21A4",
-      LeftTeeVector: "\u295A",
-      leftthreetimes: "\u22CB",
-      LeftTriangle: "\u22B2",
-      LeftTriangleBar: "\u29CF",
-      LeftTriangleEqual: "\u22B4",
-      LeftUpDownVector: "\u2951",
-      LeftUpTeeVector: "\u2960",
-      LeftUpVector: "\u21BF",
-      LeftUpVectorBar: "\u2958",
-      LeftVector: "\u21BC",
-      LeftVectorBar: "\u2952",
-      leg: "\u22DA",
-      lEg: "\u2A8B",
-      leq: "\u2264",
-      leqq: "\u2266",
-      leqslant: "\u2A7D",
-      les: "\u2A7D",
-      lescc: "\u2AA8",
-      lesdot: "\u2A7F",
-      lesdoto: "\u2A81",
-      lesdotor: "\u2A83",
-      lesg: "\u22DA\uFE00",
-      lesges: "\u2A93",
-      lessapprox: "\u2A85",
-      lessdot: "\u22D6",
-      lesseqgtr: "\u22DA",
-      lesseqqgtr: "\u2A8B",
-      LessEqualGreater: "\u22DA",
-      LessFullEqual: "\u2266",
-      LessGreater: "\u2276",
-      lessgtr: "\u2276",
-      LessLess: "\u2AA1",
-      lesssim: "\u2272",
-      LessSlantEqual: "\u2A7D",
-      LessTilde: "\u2272",
-      lfisht: "\u297C",
-      lfloor: "\u230A",
-      lfr: "\u{1D529}",
-      Lfr: "\u{1D50F}",
-      lg: "\u2276",
-      lgE: "\u2A91",
-      lHar: "\u2962",
-      lhard: "\u21BD",
-      lharu: "\u21BC",
-      lharul: "\u296A",
-      lhblk: "\u2584",
-      ljcy: "\u0459",
-      LJcy: "\u0409",
-      ll: "\u226A",
-      Ll: "\u22D8",
-      llarr: "\u21C7",
-      llcorner: "\u231E",
-      Lleftarrow: "\u21DA",
-      llhard: "\u296B",
-      lltri: "\u25FA",
-      lmidot: "\u0140",
-      Lmidot: "\u013F",
-      lmoust: "\u23B0",
-      lmoustache: "\u23B0",
-      lnap: "\u2A89",
-      lnapprox: "\u2A89",
-      lne: "\u2A87",
-      lnE: "\u2268",
-      lneq: "\u2A87",
-      lneqq: "\u2268",
-      lnsim: "\u22E6",
-      loang: "\u27EC",
-      loarr: "\u21FD",
-      lobrk: "\u27E6",
-      longleftarrow: "\u27F5",
-      Longleftarrow: "\u27F8",
-      LongLeftArrow: "\u27F5",
-      longleftrightarrow: "\u27F7",
-      Longleftrightarrow: "\u27FA",
-      LongLeftRightArrow: "\u27F7",
-      longmapsto: "\u27FC",
-      longrightarrow: "\u27F6",
-      Longrightarrow: "\u27F9",
-      LongRightArrow: "\u27F6",
-      looparrowleft: "\u21AB",
-      looparrowright: "\u21AC",
-      lopar: "\u2985",
-      lopf: "\u{1D55D}",
-      Lopf: "\u{1D543}",
-      loplus: "\u2A2D",
-      lotimes: "\u2A34",
-      lowast: "\u2217",
-      lowbar: "_",
-      LowerLeftArrow: "\u2199",
-      LowerRightArrow: "\u2198",
-      loz: "\u25CA",
-      lozenge: "\u25CA",
-      lozf: "\u29EB",
-      lpar: "(",
-      lparlt: "\u2993",
-      lrarr: "\u21C6",
-      lrcorner: "\u231F",
-      lrhar: "\u21CB",
-      lrhard: "\u296D",
-      lrm: "\u200E",
-      lrtri: "\u22BF",
-      lsaquo: "\u2039",
-      lscr: "\u{1D4C1}",
-      Lscr: "\u2112",
-      lsh: "\u21B0",
-      Lsh: "\u21B0",
-      lsim: "\u2272",
-      lsime: "\u2A8D",
-      lsimg: "\u2A8F",
-      lsqb: "[",
-      lsquo: "\u2018",
-      lsquor: "\u201A",
-      lstrok: "\u0142",
-      Lstrok: "\u0141",
-      lt: "<",
-      Lt: "\u226A",
-      LT: "<",
-      ltcc: "\u2AA6",
-      ltcir: "\u2A79",
-      ltdot: "\u22D6",
-      lthree: "\u22CB",
-      ltimes: "\u22C9",
-      ltlarr: "\u2976",
-      ltquest: "\u2A7B",
-      ltri: "\u25C3",
-      ltrie: "\u22B4",
-      ltrif: "\u25C2",
-      ltrPar: "\u2996",
-      lurdshar: "\u294A",
-      luruhar: "\u2966",
-      lvertneqq: "\u2268\uFE00",
-      lvnE: "\u2268\uFE00",
-      macr: "\xAF",
-      male: "\u2642",
-      malt: "\u2720",
-      maltese: "\u2720",
-      map: "\u21A6",
-      Map: "\u2905",
-      mapsto: "\u21A6",
-      mapstodown: "\u21A7",
-      mapstoleft: "\u21A4",
-      mapstoup: "\u21A5",
-      marker: "\u25AE",
-      mcomma: "\u2A29",
-      mcy: "\u043C",
-      Mcy: "\u041C",
-      mdash: "\u2014",
-      mDDot: "\u223A",
-      measuredangle: "\u2221",
-      MediumSpace: "\u205F",
-      Mellintrf: "\u2133",
-      mfr: "\u{1D52A}",
-      Mfr: "\u{1D510}",
-      mho: "\u2127",
-      micro: "\xB5",
-      mid: "\u2223",
-      midast: "*",
-      midcir: "\u2AF0",
-      middot: "\xB7",
-      minus: "\u2212",
-      minusb: "\u229F",
-      minusd: "\u2238",
-      minusdu: "\u2A2A",
-      MinusPlus: "\u2213",
-      mlcp: "\u2ADB",
-      mldr: "\u2026",
-      mnplus: "\u2213",
-      models: "\u22A7",
-      mopf: "\u{1D55E}",
-      Mopf: "\u{1D544}",
-      mp: "\u2213",
-      mscr: "\u{1D4C2}",
-      Mscr: "\u2133",
-      mstpos: "\u223E",
-      mu: "\u03BC",
-      Mu: "\u039C",
-      multimap: "\u22B8",
-      mumap: "\u22B8",
-      nabla: "\u2207",
-      nacute: "\u0144",
-      Nacute: "\u0143",
-      nang: "\u2220\u20D2",
-      nap: "\u2249",
-      napE: "\u2A70\u0338",
-      napid: "\u224B\u0338",
-      napos: "\u0149",
-      napprox: "\u2249",
-      natur: "\u266E",
-      natural: "\u266E",
-      naturals: "\u2115",
-      nbsp: "\xA0",
-      nbump: "\u224E\u0338",
-      nbumpe: "\u224F\u0338",
-      ncap: "\u2A43",
-      ncaron: "\u0148",
-      Ncaron: "\u0147",
-      ncedil: "\u0146",
-      Ncedil: "\u0145",
-      ncong: "\u2247",
-      ncongdot: "\u2A6D\u0338",
-      ncup: "\u2A42",
-      ncy: "\u043D",
-      Ncy: "\u041D",
-      ndash: "\u2013",
-      ne: "\u2260",
-      nearhk: "\u2924",
-      nearr: "\u2197",
-      neArr: "\u21D7",
-      nearrow: "\u2197",
-      nedot: "\u2250\u0338",
-      NegativeMediumSpace: "\u200B",
-      NegativeThickSpace: "\u200B",
-      NegativeThinSpace: "\u200B",
-      NegativeVeryThinSpace: "\u200B",
-      nequiv: "\u2262",
-      nesear: "\u2928",
-      nesim: "\u2242\u0338",
-      NestedGreaterGreater: "\u226B",
-      NestedLessLess: "\u226A",
-      NewLine: "\n",
-      nexist: "\u2204",
-      nexists: "\u2204",
-      nfr: "\u{1D52B}",
-      Nfr: "\u{1D511}",
-      nge: "\u2271",
-      ngE: "\u2267\u0338",
-      ngeq: "\u2271",
-      ngeqq: "\u2267\u0338",
-      ngeqslant: "\u2A7E\u0338",
-      nges: "\u2A7E\u0338",
-      nGg: "\u22D9\u0338",
-      ngsim: "\u2275",
-      ngt: "\u226F",
-      nGt: "\u226B\u20D2",
-      ngtr: "\u226F",
-      nGtv: "\u226B\u0338",
-      nharr: "\u21AE",
-      nhArr: "\u21CE",
-      nhpar: "\u2AF2",
-      ni: "\u220B",
-      nis: "\u22FC",
-      nisd: "\u22FA",
-      niv: "\u220B",
-      njcy: "\u045A",
-      NJcy: "\u040A",
-      nlarr: "\u219A",
-      nlArr: "\u21CD",
-      nldr: "\u2025",
-      nle: "\u2270",
-      nlE: "\u2266\u0338",
-      nleftarrow: "\u219A",
-      nLeftarrow: "\u21CD",
-      nleftrightarrow: "\u21AE",
-      nLeftrightarrow: "\u21CE",
-      nleq: "\u2270",
-      nleqq: "\u2266\u0338",
-      nleqslant: "\u2A7D\u0338",
-      nles: "\u2A7D\u0338",
-      nless: "\u226E",
-      nLl: "\u22D8\u0338",
-      nlsim: "\u2274",
-      nlt: "\u226E",
-      nLt: "\u226A\u20D2",
-      nltri: "\u22EA",
-      nltrie: "\u22EC",
-      nLtv: "\u226A\u0338",
-      nmid: "\u2224",
-      NoBreak: "\u2060",
-      NonBreakingSpace: "\xA0",
-      nopf: "\u{1D55F}",
-      Nopf: "\u2115",
-      not: "\xAC",
-      Not: "\u2AEC",
-      NotCongruent: "\u2262",
-      NotCupCap: "\u226D",
-      NotDoubleVerticalBar: "\u2226",
-      NotElement: "\u2209",
-      NotEqual: "\u2260",
-      NotEqualTilde: "\u2242\u0338",
-      NotExists: "\u2204",
-      NotGreater: "\u226F",
-      NotGreaterEqual: "\u2271",
-      NotGreaterFullEqual: "\u2267\u0338",
-      NotGreaterGreater: "\u226B\u0338",
-      NotGreaterLess: "\u2279",
-      NotGreaterSlantEqual: "\u2A7E\u0338",
-      NotGreaterTilde: "\u2275",
-      NotHumpDownHump: "\u224E\u0338",
-      NotHumpEqual: "\u224F\u0338",
-      notin: "\u2209",
-      notindot: "\u22F5\u0338",
-      notinE: "\u22F9\u0338",
-      notinva: "\u2209",
-      notinvb: "\u22F7",
-      notinvc: "\u22F6",
-      NotLeftTriangle: "\u22EA",
-      NotLeftTriangleBar: "\u29CF\u0338",
-      NotLeftTriangleEqual: "\u22EC",
-      NotLess: "\u226E",
-      NotLessEqual: "\u2270",
-      NotLessGreater: "\u2278",
-      NotLessLess: "\u226A\u0338",
-      NotLessSlantEqual: "\u2A7D\u0338",
-      NotLessTilde: "\u2274",
-      NotNestedGreaterGreater: "\u2AA2\u0338",
-      NotNestedLessLess: "\u2AA1\u0338",
-      notni: "\u220C",
-      notniva: "\u220C",
-      notnivb: "\u22FE",
-      notnivc: "\u22FD",
-      NotPrecedes: "\u2280",
-      NotPrecedesEqual: "\u2AAF\u0338",
-      NotPrecedesSlantEqual: "\u22E0",
-      NotReverseElement: "\u220C",
-      NotRightTriangle: "\u22EB",
-      NotRightTriangleBar: "\u29D0\u0338",
-      NotRightTriangleEqual: "\u22ED",
-      NotSquareSubset: "\u228F\u0338",
-      NotSquareSubsetEqual: "\u22E2",
-      NotSquareSuperset: "\u2290\u0338",
-      NotSquareSupersetEqual: "\u22E3",
-      NotSubset: "\u2282\u20D2",
-      NotSubsetEqual: "\u2288",
-      NotSucceeds: "\u2281",
-      NotSucceedsEqual: "\u2AB0\u0338",
-      NotSucceedsSlantEqual: "\u22E1",
-      NotSucceedsTilde: "\u227F\u0338",
-      NotSuperset: "\u2283\u20D2",
-      NotSupersetEqual: "\u2289",
-      NotTilde: "\u2241",
-      NotTildeEqual: "\u2244",
-      NotTildeFullEqual: "\u2247",
-      NotTildeTilde: "\u2249",
-      NotVerticalBar: "\u2224",
-      npar: "\u2226",
-      nparallel: "\u2226",
-      nparsl: "\u2AFD\u20E5",
-      npart: "\u2202\u0338",
-      npolint: "\u2A14",
-      npr: "\u2280",
-      nprcue: "\u22E0",
-      npre: "\u2AAF\u0338",
-      nprec: "\u2280",
-      npreceq: "\u2AAF\u0338",
-      nrarr: "\u219B",
-      nrArr: "\u21CF",
-      nrarrc: "\u2933\u0338",
-      nrarrw: "\u219D\u0338",
-      nrightarrow: "\u219B",
-      nRightarrow: "\u21CF",
-      nrtri: "\u22EB",
-      nrtrie: "\u22ED",
-      nsc: "\u2281",
-      nsccue: "\u22E1",
-      nsce: "\u2AB0\u0338",
-      nscr: "\u{1D4C3}",
-      Nscr: "\u{1D4A9}",
-      nshortmid: "\u2224",
-      nshortparallel: "\u2226",
-      nsim: "\u2241",
-      nsime: "\u2244",
-      nsimeq: "\u2244",
-      nsmid: "\u2224",
-      nspar: "\u2226",
-      nsqsube: "\u22E2",
-      nsqsupe: "\u22E3",
-      nsub: "\u2284",
-      nsube: "\u2288",
-      nsubE: "\u2AC5\u0338",
-      nsubset: "\u2282\u20D2",
-      nsubseteq: "\u2288",
-      nsubseteqq: "\u2AC5\u0338",
-      nsucc: "\u2281",
-      nsucceq: "\u2AB0\u0338",
-      nsup: "\u2285",
-      nsupe: "\u2289",
-      nsupE: "\u2AC6\u0338",
-      nsupset: "\u2283\u20D2",
-      nsupseteq: "\u2289",
-      nsupseteqq: "\u2AC6\u0338",
-      ntgl: "\u2279",
-      ntilde: "\xF1",
-      Ntilde: "\xD1",
-      ntlg: "\u2278",
-      ntriangleleft: "\u22EA",
-      ntrianglelefteq: "\u22EC",
-      ntriangleright: "\u22EB",
-      ntrianglerighteq: "\u22ED",
-      nu: "\u03BD",
-      Nu: "\u039D",
-      num: "#",
-      numero: "\u2116",
-      numsp: "\u2007",
-      nvap: "\u224D\u20D2",
-      nvdash: "\u22AC",
-      nvDash: "\u22AD",
-      nVdash: "\u22AE",
-      nVDash: "\u22AF",
-      nvge: "\u2265\u20D2",
-      nvgt: ">\u20D2",
-      nvHarr: "\u2904",
-      nvinfin: "\u29DE",
-      nvlArr: "\u2902",
-      nvle: "\u2264\u20D2",
-      nvlt: "<\u20D2",
-      nvltrie: "\u22B4\u20D2",
-      nvrArr: "\u2903",
-      nvrtrie: "\u22B5\u20D2",
-      nvsim: "\u223C\u20D2",
-      nwarhk: "\u2923",
-      nwarr: "\u2196",
-      nwArr: "\u21D6",
-      nwarrow: "\u2196",
-      nwnear: "\u2927",
-      oacute: "\xF3",
-      Oacute: "\xD3",
-      oast: "\u229B",
-      ocir: "\u229A",
-      ocirc: "\xF4",
-      Ocirc: "\xD4",
-      ocy: "\u043E",
-      Ocy: "\u041E",
-      odash: "\u229D",
-      odblac: "\u0151",
-      Odblac: "\u0150",
-      odiv: "\u2A38",
-      odot: "\u2299",
-      odsold: "\u29BC",
-      oelig: "\u0153",
-      OElig: "\u0152",
-      ofcir: "\u29BF",
-      ofr: "\u{1D52C}",
-      Ofr: "\u{1D512}",
-      ogon: "\u02DB",
-      ograve: "\xF2",
-      Ograve: "\xD2",
-      ogt: "\u29C1",
-      ohbar: "\u29B5",
-      ohm: "\u03A9",
-      oint: "\u222E",
-      olarr: "\u21BA",
-      olcir: "\u29BE",
-      olcross: "\u29BB",
-      oline: "\u203E",
-      olt: "\u29C0",
-      omacr: "\u014D",
-      Omacr: "\u014C",
-      omega: "\u03C9",
-      Omega: "\u03A9",
-      omicron: "\u03BF",
-      Omicron: "\u039F",
-      omid: "\u29B6",
-      ominus: "\u2296",
-      oopf: "\u{1D560}",
-      Oopf: "\u{1D546}",
-      opar: "\u29B7",
-      OpenCurlyDoubleQuote: "\u201C",
-      OpenCurlyQuote: "\u2018",
-      operp: "\u29B9",
-      oplus: "\u2295",
-      or: "\u2228",
-      Or: "\u2A54",
-      orarr: "\u21BB",
-      ord: "\u2A5D",
-      order: "\u2134",
-      orderof: "\u2134",
-      ordf: "\xAA",
-      ordm: "\xBA",
-      origof: "\u22B6",
-      oror: "\u2A56",
-      orslope: "\u2A57",
-      orv: "\u2A5B",
-      oS: "\u24C8",
-      oscr: "\u2134",
-      Oscr: "\u{1D4AA}",
-      oslash: "\xF8",
-      Oslash: "\xD8",
-      osol: "\u2298",
-      otilde: "\xF5",
-      Otilde: "\xD5",
-      otimes: "\u2297",
-      Otimes: "\u2A37",
-      otimesas: "\u2A36",
-      ouml: "\xF6",
-      Ouml: "\xD6",
-      ovbar: "\u233D",
-      OverBar: "\u203E",
-      OverBrace: "\u23DE",
-      OverBracket: "\u23B4",
-      OverParenthesis: "\u23DC",
-      par: "\u2225",
-      para: "\xB6",
-      parallel: "\u2225",
-      parsim: "\u2AF3",
-      parsl: "\u2AFD",
-      part: "\u2202",
-      PartialD: "\u2202",
-      pcy: "\u043F",
-      Pcy: "\u041F",
-      percnt: "%",
-      period: ".",
-      permil: "\u2030",
-      perp: "\u22A5",
-      pertenk: "\u2031",
-      pfr: "\u{1D52D}",
-      Pfr: "\u{1D513}",
-      phi: "\u03C6",
-      Phi: "\u03A6",
-      phiv: "\u03D5",
-      phmmat: "\u2133",
-      phone: "\u260E",
-      pi: "\u03C0",
-      Pi: "\u03A0",
-      pitchfork: "\u22D4",
-      piv: "\u03D6",
-      planck: "\u210F",
-      planckh: "\u210E",
-      plankv: "\u210F",
-      plus: "+",
-      plusacir: "\u2A23",
-      plusb: "\u229E",
-      pluscir: "\u2A22",
-      plusdo: "\u2214",
-      plusdu: "\u2A25",
-      pluse: "\u2A72",
-      PlusMinus: "\xB1",
-      plusmn: "\xB1",
-      plussim: "\u2A26",
-      plustwo: "\u2A27",
-      pm: "\xB1",
-      Poincareplane: "\u210C",
-      pointint: "\u2A15",
-      popf: "\u{1D561}",
-      Popf: "\u2119",
-      pound: "\xA3",
-      pr: "\u227A",
-      Pr: "\u2ABB",
-      prap: "\u2AB7",
-      prcue: "\u227C",
-      pre: "\u2AAF",
-      prE: "\u2AB3",
-      prec: "\u227A",
-      precapprox: "\u2AB7",
-      preccurlyeq: "\u227C",
-      Precedes: "\u227A",
-      PrecedesEqual: "\u2AAF",
-      PrecedesSlantEqual: "\u227C",
-      PrecedesTilde: "\u227E",
-      preceq: "\u2AAF",
-      precnapprox: "\u2AB9",
-      precneqq: "\u2AB5",
-      precnsim: "\u22E8",
-      precsim: "\u227E",
-      prime: "\u2032",
-      Prime: "\u2033",
-      primes: "\u2119",
-      prnap: "\u2AB9",
-      prnE: "\u2AB5",
-      prnsim: "\u22E8",
-      prod: "\u220F",
-      Product: "\u220F",
-      profalar: "\u232E",
-      profline: "\u2312",
-      profsurf: "\u2313",
-      prop: "\u221D",
-      Proportion: "\u2237",
-      Proportional: "\u221D",
-      propto: "\u221D",
-      prsim: "\u227E",
-      prurel: "\u22B0",
-      pscr: "\u{1D4C5}",
-      Pscr: "\u{1D4AB}",
-      psi: "\u03C8",
-      Psi: "\u03A8",
-      puncsp: "\u2008",
-      qfr: "\u{1D52E}",
-      Qfr: "\u{1D514}",
-      qint: "\u2A0C",
-      qopf: "\u{1D562}",
-      Qopf: "\u211A",
-      qprime: "\u2057",
-      qscr: "\u{1D4C6}",
-      Qscr: "\u{1D4AC}",
-      quaternions: "\u210D",
-      quatint: "\u2A16",
-      quest: "?",
-      questeq: "\u225F",
-      quot: '"',
-      QUOT: '"',
-      rAarr: "\u21DB",
-      race: "\u223D\u0331",
-      racute: "\u0155",
-      Racute: "\u0154",
-      radic: "\u221A",
-      raemptyv: "\u29B3",
-      rang: "\u27E9",
-      Rang: "\u27EB",
-      rangd: "\u2992",
-      range: "\u29A5",
-      rangle: "\u27E9",
-      raquo: "\xBB",
-      rarr: "\u2192",
-      rArr: "\u21D2",
-      Rarr: "\u21A0",
-      rarrap: "\u2975",
-      rarrb: "\u21E5",
-      rarrbfs: "\u2920",
-      rarrc: "\u2933",
-      rarrfs: "\u291E",
-      rarrhk: "\u21AA",
-      rarrlp: "\u21AC",
-      rarrpl: "\u2945",
-      rarrsim: "\u2974",
-      rarrtl: "\u21A3",
-      Rarrtl: "\u2916",
-      rarrw: "\u219D",
-      ratail: "\u291A",
-      rAtail: "\u291C",
-      ratio: "\u2236",
-      rationals: "\u211A",
-      rbarr: "\u290D",
-      rBarr: "\u290F",
-      RBarr: "\u2910",
-      rbbrk: "\u2773",
-      rbrace: "}",
-      rbrack: "]",
-      rbrke: "\u298C",
-      rbrksld: "\u298E",
-      rbrkslu: "\u2990",
-      rcaron: "\u0159",
-      Rcaron: "\u0158",
-      rcedil: "\u0157",
-      Rcedil: "\u0156",
-      rceil: "\u2309",
-      rcub: "}",
-      rcy: "\u0440",
-      Rcy: "\u0420",
-      rdca: "\u2937",
-      rdldhar: "\u2969",
-      rdquo: "\u201D",
-      rdquor: "\u201D",
-      rdsh: "\u21B3",
-      Re: "\u211C",
-      real: "\u211C",
-      realine: "\u211B",
-      realpart: "\u211C",
-      reals: "\u211D",
-      rect: "\u25AD",
-      reg: "\xAE",
-      REG: "\xAE",
-      ReverseElement: "\u220B",
-      ReverseEquilibrium: "\u21CB",
-      ReverseUpEquilibrium: "\u296F",
-      rfisht: "\u297D",
-      rfloor: "\u230B",
-      rfr: "\u{1D52F}",
-      Rfr: "\u211C",
-      rHar: "\u2964",
-      rhard: "\u21C1",
-      rharu: "\u21C0",
-      rharul: "\u296C",
-      rho: "\u03C1",
-      Rho: "\u03A1",
-      rhov: "\u03F1",
-      RightAngleBracket: "\u27E9",
-      rightarrow: "\u2192",
-      Rightarrow: "\u21D2",
-      RightArrow: "\u2192",
-      RightArrowBar: "\u21E5",
-      RightArrowLeftArrow: "\u21C4",
-      rightarrowtail: "\u21A3",
-      RightCeiling: "\u2309",
-      RightDoubleBracket: "\u27E7",
-      RightDownTeeVector: "\u295D",
-      RightDownVector: "\u21C2",
-      RightDownVectorBar: "\u2955",
-      RightFloor: "\u230B",
-      rightharpoondown: "\u21C1",
-      rightharpoonup: "\u21C0",
-      rightleftarrows: "\u21C4",
-      rightleftharpoons: "\u21CC",
-      rightrightarrows: "\u21C9",
-      rightsquigarrow: "\u219D",
-      RightTee: "\u22A2",
-      RightTeeArrow: "\u21A6",
-      RightTeeVector: "\u295B",
-      rightthreetimes: "\u22CC",
-      RightTriangle: "\u22B3",
-      RightTriangleBar: "\u29D0",
-      RightTriangleEqual: "\u22B5",
-      RightUpDownVector: "\u294F",
-      RightUpTeeVector: "\u295C",
-      RightUpVector: "\u21BE",
-      RightUpVectorBar: "\u2954",
-      RightVector: "\u21C0",
-      RightVectorBar: "\u2953",
-      ring: "\u02DA",
-      risingdotseq: "\u2253",
-      rlarr: "\u21C4",
-      rlhar: "\u21CC",
-      rlm: "\u200F",
-      rmoust: "\u23B1",
-      rmoustache: "\u23B1",
-      rnmid: "\u2AEE",
-      roang: "\u27ED",
-      roarr: "\u21FE",
-      robrk: "\u27E7",
-      ropar: "\u2986",
-      ropf: "\u{1D563}",
-      Ropf: "\u211D",
-      roplus: "\u2A2E",
-      rotimes: "\u2A35",
-      RoundImplies: "\u2970",
-      rpar: ")",
-      rpargt: "\u2994",
-      rppolint: "\u2A12",
-      rrarr: "\u21C9",
-      Rrightarrow: "\u21DB",
-      rsaquo: "\u203A",
-      rscr: "\u{1D4C7}",
-      Rscr: "\u211B",
-      rsh: "\u21B1",
-      Rsh: "\u21B1",
-      rsqb: "]",
-      rsquo: "\u2019",
-      rsquor: "\u2019",
-      rthree: "\u22CC",
-      rtimes: "\u22CA",
-      rtri: "\u25B9",
-      rtrie: "\u22B5",
-      rtrif: "\u25B8",
-      rtriltri: "\u29CE",
-      RuleDelayed: "\u29F4",
-      ruluhar: "\u2968",
-      rx: "\u211E",
-      sacute: "\u015B",
-      Sacute: "\u015A",
-      sbquo: "\u201A",
-      sc: "\u227B",
-      Sc: "\u2ABC",
-      scap: "\u2AB8",
-      scaron: "\u0161",
-      Scaron: "\u0160",
-      sccue: "\u227D",
-      sce: "\u2AB0",
-      scE: "\u2AB4",
-      scedil: "\u015F",
-      Scedil: "\u015E",
-      scirc: "\u015D",
-      Scirc: "\u015C",
-      scnap: "\u2ABA",
-      scnE: "\u2AB6",
-      scnsim: "\u22E9",
-      scpolint: "\u2A13",
-      scsim: "\u227F",
-      scy: "\u0441",
-      Scy: "\u0421",
-      sdot: "\u22C5",
-      sdotb: "\u22A1",
-      sdote: "\u2A66",
-      searhk: "\u2925",
-      searr: "\u2198",
-      seArr: "\u21D8",
-      searrow: "\u2198",
-      sect: "\xA7",
-      semi: ";",
-      seswar: "\u2929",
-      setminus: "\u2216",
-      setmn: "\u2216",
-      sext: "\u2736",
-      sfr: "\u{1D530}",
-      Sfr: "\u{1D516}",
-      sfrown: "\u2322",
-      sharp: "\u266F",
-      shchcy: "\u0449",
-      SHCHcy: "\u0429",
-      shcy: "\u0448",
-      SHcy: "\u0428",
-      ShortDownArrow: "\u2193",
-      ShortLeftArrow: "\u2190",
-      shortmid: "\u2223",
-      shortparallel: "\u2225",
-      ShortRightArrow: "\u2192",
-      ShortUpArrow: "\u2191",
-      shy: "\xAD",
-      sigma: "\u03C3",
-      Sigma: "\u03A3",
-      sigmaf: "\u03C2",
-      sigmav: "\u03C2",
-      sim: "\u223C",
-      simdot: "\u2A6A",
-      sime: "\u2243",
-      simeq: "\u2243",
-      simg: "\u2A9E",
-      simgE: "\u2AA0",
-      siml: "\u2A9D",
-      simlE: "\u2A9F",
-      simne: "\u2246",
-      simplus: "\u2A24",
-      simrarr: "\u2972",
-      slarr: "\u2190",
-      SmallCircle: "\u2218",
-      smallsetminus: "\u2216",
-      smashp: "\u2A33",
-      smeparsl: "\u29E4",
-      smid: "\u2223",
-      smile: "\u2323",
-      smt: "\u2AAA",
-      smte: "\u2AAC",
-      smtes: "\u2AAC\uFE00",
-      softcy: "\u044C",
-      SOFTcy: "\u042C",
-      sol: "/",
-      solb: "\u29C4",
-      solbar: "\u233F",
-      sopf: "\u{1D564}",
-      Sopf: "\u{1D54A}",
-      spades: "\u2660",
-      spadesuit: "\u2660",
-      spar: "\u2225",
-      sqcap: "\u2293",
-      sqcaps: "\u2293\uFE00",
-      sqcup: "\u2294",
-      sqcups: "\u2294\uFE00",
-      Sqrt: "\u221A",
-      sqsub: "\u228F",
-      sqsube: "\u2291",
-      sqsubset: "\u228F",
-      sqsubseteq: "\u2291",
-      sqsup: "\u2290",
-      sqsupe: "\u2292",
-      sqsupset: "\u2290",
-      sqsupseteq: "\u2292",
-      squ: "\u25A1",
-      square: "\u25A1",
-      Square: "\u25A1",
-      SquareIntersection: "\u2293",
-      SquareSubset: "\u228F",
-      SquareSubsetEqual: "\u2291",
-      SquareSuperset: "\u2290",
-      SquareSupersetEqual: "\u2292",
-      SquareUnion: "\u2294",
-      squarf: "\u25AA",
-      squf: "\u25AA",
-      srarr: "\u2192",
-      sscr: "\u{1D4C8}",
-      Sscr: "\u{1D4AE}",
-      ssetmn: "\u2216",
-      ssmile: "\u2323",
-      sstarf: "\u22C6",
-      star: "\u2606",
-      Star: "\u22C6",
-      starf: "\u2605",
-      straightepsilon: "\u03F5",
-      straightphi: "\u03D5",
-      strns: "\xAF",
-      sub: "\u2282",
-      Sub: "\u22D0",
-      subdot: "\u2ABD",
-      sube: "\u2286",
-      subE: "\u2AC5",
-      subedot: "\u2AC3",
-      submult: "\u2AC1",
-      subne: "\u228A",
-      subnE: "\u2ACB",
-      subplus: "\u2ABF",
-      subrarr: "\u2979",
-      subset: "\u2282",
-      Subset: "\u22D0",
-      subseteq: "\u2286",
-      subseteqq: "\u2AC5",
-      SubsetEqual: "\u2286",
-      subsetneq: "\u228A",
-      subsetneqq: "\u2ACB",
-      subsim: "\u2AC7",
-      subsub: "\u2AD5",
-      subsup: "\u2AD3",
-      succ: "\u227B",
-      succapprox: "\u2AB8",
-      succcurlyeq: "\u227D",
-      Succeeds: "\u227B",
-      SucceedsEqual: "\u2AB0",
-      SucceedsSlantEqual: "\u227D",
-      SucceedsTilde: "\u227F",
-      succeq: "\u2AB0",
-      succnapprox: "\u2ABA",
-      succneqq: "\u2AB6",
-      succnsim: "\u22E9",
-      succsim: "\u227F",
-      SuchThat: "\u220B",
-      sum: "\u2211",
-      Sum: "\u2211",
-      sung: "\u266A",
-      sup: "\u2283",
-      Sup: "\u22D1",
-      sup1: "\xB9",
-      sup2: "\xB2",
-      sup3: "\xB3",
-      supdot: "\u2ABE",
-      supdsub: "\u2AD8",
-      supe: "\u2287",
-      supE: "\u2AC6",
-      supedot: "\u2AC4",
-      Superset: "\u2283",
-      SupersetEqual: "\u2287",
-      suphsol: "\u27C9",
-      suphsub: "\u2AD7",
-      suplarr: "\u297B",
-      supmult: "\u2AC2",
-      supne: "\u228B",
-      supnE: "\u2ACC",
-      supplus: "\u2AC0",
-      supset: "\u2283",
-      Supset: "\u22D1",
-      supseteq: "\u2287",
-      supseteqq: "\u2AC6",
-      supsetneq: "\u228B",
-      supsetneqq: "\u2ACC",
-      supsim: "\u2AC8",
-      supsub: "\u2AD4",
-      supsup: "\u2AD6",
-      swarhk: "\u2926",
-      swarr: "\u2199",
-      swArr: "\u21D9",
-      swarrow: "\u2199",
-      swnwar: "\u292A",
-      szlig: "\xDF",
-      Tab: "	",
-      target: "\u2316",
-      tau: "\u03C4",
-      Tau: "\u03A4",
-      tbrk: "\u23B4",
-      tcaron: "\u0165",
-      Tcaron: "\u0164",
-      tcedil: "\u0163",
-      Tcedil: "\u0162",
-      tcy: "\u0442",
-      Tcy: "\u0422",
-      tdot: "\u20DB",
-      telrec: "\u2315",
-      tfr: "\u{1D531}",
-      Tfr: "\u{1D517}",
-      there4: "\u2234",
-      therefore: "\u2234",
-      Therefore: "\u2234",
-      theta: "\u03B8",
-      Theta: "\u0398",
-      thetasym: "\u03D1",
-      thetav: "\u03D1",
-      thickapprox: "\u2248",
-      thicksim: "\u223C",
-      ThickSpace: "\u205F\u200A",
-      thinsp: "\u2009",
-      ThinSpace: "\u2009",
-      thkap: "\u2248",
-      thksim: "\u223C",
-      thorn: "\xFE",
-      THORN: "\xDE",
-      tilde: "\u02DC",
-      Tilde: "\u223C",
-      TildeEqual: "\u2243",
-      TildeFullEqual: "\u2245",
-      TildeTilde: "\u2248",
-      times: "\xD7",
-      timesb: "\u22A0",
-      timesbar: "\u2A31",
-      timesd: "\u2A30",
-      tint: "\u222D",
-      toea: "\u2928",
-      top: "\u22A4",
-      topbot: "\u2336",
-      topcir: "\u2AF1",
-      topf: "\u{1D565}",
-      Topf: "\u{1D54B}",
-      topfork: "\u2ADA",
-      tosa: "\u2929",
-      tprime: "\u2034",
-      trade: "\u2122",
-      TRADE: "\u2122",
-      triangle: "\u25B5",
-      triangledown: "\u25BF",
-      triangleleft: "\u25C3",
-      trianglelefteq: "\u22B4",
-      triangleq: "\u225C",
-      triangleright: "\u25B9",
-      trianglerighteq: "\u22B5",
-      tridot: "\u25EC",
-      trie: "\u225C",
-      triminus: "\u2A3A",
-      TripleDot: "\u20DB",
-      triplus: "\u2A39",
-      trisb: "\u29CD",
-      tritime: "\u2A3B",
-      trpezium: "\u23E2",
-      tscr: "\u{1D4C9}",
-      Tscr: "\u{1D4AF}",
-      tscy: "\u0446",
-      TScy: "\u0426",
-      tshcy: "\u045B",
-      TSHcy: "\u040B",
-      tstrok: "\u0167",
-      Tstrok: "\u0166",
-      twixt: "\u226C",
-      twoheadleftarrow: "\u219E",
-      twoheadrightarrow: "\u21A0",
-      uacute: "\xFA",
-      Uacute: "\xDA",
-      uarr: "\u2191",
-      uArr: "\u21D1",
-      Uarr: "\u219F",
-      Uarrocir: "\u2949",
-      ubrcy: "\u045E",
-      Ubrcy: "\u040E",
-      ubreve: "\u016D",
-      Ubreve: "\u016C",
-      ucirc: "\xFB",
-      Ucirc: "\xDB",
-      ucy: "\u0443",
-      Ucy: "\u0423",
-      udarr: "\u21C5",
-      udblac: "\u0171",
-      Udblac: "\u0170",
-      udhar: "\u296E",
-      ufisht: "\u297E",
-      ufr: "\u{1D532}",
-      Ufr: "\u{1D518}",
-      ugrave: "\xF9",
-      Ugrave: "\xD9",
-      uHar: "\u2963",
-      uharl: "\u21BF",
-      uharr: "\u21BE",
-      uhblk: "\u2580",
-      ulcorn: "\u231C",
-      ulcorner: "\u231C",
-      ulcrop: "\u230F",
-      ultri: "\u25F8",
-      umacr: "\u016B",
-      Umacr: "\u016A",
-      uml: "\xA8",
-      UnderBar: "_",
-      UnderBrace: "\u23DF",
-      UnderBracket: "\u23B5",
-      UnderParenthesis: "\u23DD",
-      Union: "\u22C3",
-      UnionPlus: "\u228E",
-      uogon: "\u0173",
-      Uogon: "\u0172",
-      uopf: "\u{1D566}",
-      Uopf: "\u{1D54C}",
-      uparrow: "\u2191",
-      Uparrow: "\u21D1",
-      UpArrow: "\u2191",
-      UpArrowBar: "\u2912",
-      UpArrowDownArrow: "\u21C5",
-      updownarrow: "\u2195",
-      Updownarrow: "\u21D5",
-      UpDownArrow: "\u2195",
-      UpEquilibrium: "\u296E",
-      upharpoonleft: "\u21BF",
-      upharpoonright: "\u21BE",
-      uplus: "\u228E",
-      UpperLeftArrow: "\u2196",
-      UpperRightArrow: "\u2197",
-      upsi: "\u03C5",
-      Upsi: "\u03D2",
-      upsih: "\u03D2",
-      upsilon: "\u03C5",
-      Upsilon: "\u03A5",
-      UpTee: "\u22A5",
-      UpTeeArrow: "\u21A5",
-      upuparrows: "\u21C8",
-      urcorn: "\u231D",
-      urcorner: "\u231D",
-      urcrop: "\u230E",
-      uring: "\u016F",
-      Uring: "\u016E",
-      urtri: "\u25F9",
-      uscr: "\u{1D4CA}",
-      Uscr: "\u{1D4B0}",
-      utdot: "\u22F0",
-      utilde: "\u0169",
-      Utilde: "\u0168",
-      utri: "\u25B5",
-      utrif: "\u25B4",
-      uuarr: "\u21C8",
-      uuml: "\xFC",
-      Uuml: "\xDC",
-      uwangle: "\u29A7",
-      vangrt: "\u299C",
-      varepsilon: "\u03F5",
-      varkappa: "\u03F0",
-      varnothing: "\u2205",
-      varphi: "\u03D5",
-      varpi: "\u03D6",
-      varpropto: "\u221D",
-      varr: "\u2195",
-      vArr: "\u21D5",
-      varrho: "\u03F1",
-      varsigma: "\u03C2",
-      varsubsetneq: "\u228A\uFE00",
-      varsubsetneqq: "\u2ACB\uFE00",
-      varsupsetneq: "\u228B\uFE00",
-      varsupsetneqq: "\u2ACC\uFE00",
-      vartheta: "\u03D1",
-      vartriangleleft: "\u22B2",
-      vartriangleright: "\u22B3",
-      vBar: "\u2AE8",
-      Vbar: "\u2AEB",
-      vBarv: "\u2AE9",
-      vcy: "\u0432",
-      Vcy: "\u0412",
-      vdash: "\u22A2",
-      vDash: "\u22A8",
-      Vdash: "\u22A9",
-      VDash: "\u22AB",
-      Vdashl: "\u2AE6",
-      vee: "\u2228",
-      Vee: "\u22C1",
-      veebar: "\u22BB",
-      veeeq: "\u225A",
-      vellip: "\u22EE",
-      verbar: "|",
-      Verbar: "\u2016",
-      vert: "|",
-      Vert: "\u2016",
-      VerticalBar: "\u2223",
-      VerticalLine: "|",
-      VerticalSeparator: "\u2758",
-      VerticalTilde: "\u2240",
-      VeryThinSpace: "\u200A",
-      vfr: "\u{1D533}",
-      Vfr: "\u{1D519}",
-      vltri: "\u22B2",
-      vnsub: "\u2282\u20D2",
-      vnsup: "\u2283\u20D2",
-      vopf: "\u{1D567}",
-      Vopf: "\u{1D54D}",
-      vprop: "\u221D",
-      vrtri: "\u22B3",
-      vscr: "\u{1D4CB}",
-      Vscr: "\u{1D4B1}",
-      vsubne: "\u228A\uFE00",
-      vsubnE: "\u2ACB\uFE00",
-      vsupne: "\u228B\uFE00",
-      vsupnE: "\u2ACC\uFE00",
-      Vvdash: "\u22AA",
-      vzigzag: "\u299A",
-      wcirc: "\u0175",
-      Wcirc: "\u0174",
-      wedbar: "\u2A5F",
-      wedge: "\u2227",
-      Wedge: "\u22C0",
-      wedgeq: "\u2259",
-      weierp: "\u2118",
-      wfr: "\u{1D534}",
-      Wfr: "\u{1D51A}",
-      wopf: "\u{1D568}",
-      Wopf: "\u{1D54E}",
-      wp: "\u2118",
-      wr: "\u2240",
-      wreath: "\u2240",
-      wscr: "\u{1D4CC}",
-      Wscr: "\u{1D4B2}",
-      xcap: "\u22C2",
-      xcirc: "\u25EF",
-      xcup: "\u22C3",
-      xdtri: "\u25BD",
-      xfr: "\u{1D535}",
-      Xfr: "\u{1D51B}",
-      xharr: "\u27F7",
-      xhArr: "\u27FA",
-      xi: "\u03BE",
-      Xi: "\u039E",
-      xlarr: "\u27F5",
-      xlArr: "\u27F8",
-      xmap: "\u27FC",
-      xnis: "\u22FB",
-      xodot: "\u2A00",
-      xopf: "\u{1D569}",
-      Xopf: "\u{1D54F}",
-      xoplus: "\u2A01",
-      xotime: "\u2A02",
-      xrarr: "\u27F6",
-      xrArr: "\u27F9",
-      xscr: "\u{1D4CD}",
-      Xscr: "\u{1D4B3}",
-      xsqcup: "\u2A06",
-      xuplus: "\u2A04",
-      xutri: "\u25B3",
-      xvee: "\u22C1",
-      xwedge: "\u22C0",
-      yacute: "\xFD",
-      Yacute: "\xDD",
-      yacy: "\u044F",
-      YAcy: "\u042F",
-      ycirc: "\u0177",
-      Ycirc: "\u0176",
-      ycy: "\u044B",
-      Ycy: "\u042B",
-      yen: "\xA5",
-      yfr: "\u{1D536}",
-      Yfr: "\u{1D51C}",
-      yicy: "\u0457",
-      YIcy: "\u0407",
-      yopf: "\u{1D56A}",
-      Yopf: "\u{1D550}",
-      yscr: "\u{1D4CE}",
-      Yscr: "\u{1D4B4}",
-      yucy: "\u044E",
-      YUcy: "\u042E",
-      yuml: "\xFF",
-      Yuml: "\u0178",
-      zacute: "\u017A",
-      Zacute: "\u0179",
-      zcaron: "\u017E",
-      Zcaron: "\u017D",
-      zcy: "\u0437",
-      Zcy: "\u0417",
-      zdot: "\u017C",
-      Zdot: "\u017B",
-      zeetrf: "\u2128",
-      ZeroWidthSpace: "\u200B",
-      zeta: "\u03B6",
-      Zeta: "\u0396",
-      zfr: "\u{1D537}",
-      Zfr: "\u2128",
-      zhcy: "\u0436",
-      ZHcy: "\u0416",
-      zigrarr: "\u21DD",
-      zopf: "\u{1D56B}",
-      Zopf: "\u2124",
-      zscr: "\u{1D4CF}",
-      Zscr: "\u{1D4B5}",
-      zwj: "\u200D",
-      zwnj: "\u200C"
-    };
-    var decodeMapLegacy = {
-      aacute: "\xE1",
-      Aacute: "\xC1",
-      acirc: "\xE2",
-      Acirc: "\xC2",
-      acute: "\xB4",
-      aelig: "\xE6",
-      AElig: "\xC6",
-      agrave: "\xE0",
-      Agrave: "\xC0",
-      amp: "&",
-      AMP: "&",
-      aring: "\xE5",
-      Aring: "\xC5",
-      atilde: "\xE3",
-      Atilde: "\xC3",
-      auml: "\xE4",
-      Auml: "\xC4",
-      brvbar: "\xA6",
-      ccedil: "\xE7",
-      Ccedil: "\xC7",
-      cedil: "\xB8",
-      cent: "\xA2",
-      copy: "\xA9",
-      COPY: "\xA9",
-      curren: "\xA4",
-      deg: "\xB0",
-      divide: "\xF7",
-      eacute: "\xE9",
-      Eacute: "\xC9",
-      ecirc: "\xEA",
-      Ecirc: "\xCA",
-      egrave: "\xE8",
-      Egrave: "\xC8",
-      eth: "\xF0",
-      ETH: "\xD0",
-      euml: "\xEB",
-      Euml: "\xCB",
-      frac12: "\xBD",
-      frac14: "\xBC",
-      frac34: "\xBE",
-      gt: ">",
-      GT: ">",
-      iacute: "\xED",
-      Iacute: "\xCD",
-      icirc: "\xEE",
-      Icirc: "\xCE",
-      iexcl: "\xA1",
-      igrave: "\xEC",
-      Igrave: "\xCC",
-      iquest: "\xBF",
-      iuml: "\xEF",
-      Iuml: "\xCF",
-      laquo: "\xAB",
-      lt: "<",
-      LT: "<",
-      macr: "\xAF",
-      micro: "\xB5",
-      middot: "\xB7",
-      nbsp: "\xA0",
-      not: "\xAC",
-      ntilde: "\xF1",
-      Ntilde: "\xD1",
-      oacute: "\xF3",
-      Oacute: "\xD3",
-      ocirc: "\xF4",
-      Ocirc: "\xD4",
-      ograve: "\xF2",
-      Ograve: "\xD2",
-      ordf: "\xAA",
-      ordm: "\xBA",
-      oslash: "\xF8",
-      Oslash: "\xD8",
-      otilde: "\xF5",
-      Otilde: "\xD5",
-      ouml: "\xF6",
-      Ouml: "\xD6",
-      para: "\xB6",
-      plusmn: "\xB1",
-      pound: "\xA3",
-      quot: '"',
-      QUOT: '"',
-      raquo: "\xBB",
-      reg: "\xAE",
-      REG: "\xAE",
-      sect: "\xA7",
-      shy: "\xAD",
-      sup1: "\xB9",
-      sup2: "\xB2",
-      sup3: "\xB3",
-      szlig: "\xDF",
-      thorn: "\xFE",
-      THORN: "\xDE",
-      times: "\xD7",
-      uacute: "\xFA",
-      Uacute: "\xDA",
-      ucirc: "\xFB",
-      Ucirc: "\xDB",
-      ugrave: "\xF9",
-      Ugrave: "\xD9",
-      uml: "\xA8",
-      uuml: "\xFC",
-      Uuml: "\xDC",
-      yacute: "\xFD",
-      Yacute: "\xDD",
-      yen: "\xA5",
-      yuml: "\xFF"
-    };
-    var decodeMapNumeric = {
-      0: "\uFFFD",
-      128: "\u20AC",
-      130: "\u201A",
-      131: "\u0192",
-      132: "\u201E",
-      133: "\u2026",
-      134: "\u2020",
-      135: "\u2021",
-      136: "\u02C6",
-      137: "\u2030",
-      138: "\u0160",
-      139: "\u2039",
-      140: "\u0152",
-      142: "\u017D",
-      145: "\u2018",
-      146: "\u2019",
-      147: "\u201C",
-      148: "\u201D",
-      149: "\u2022",
-      150: "\u2013",
-      151: "\u2014",
-      152: "\u02DC",
-      153: "\u2122",
-      154: "\u0161",
-      155: "\u203A",
-      156: "\u0153",
-      158: "\u017E",
-      159: "\u0178"
-    };
-    var invalidReferenceCodePoints = [
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8,
-      11,
-      13,
-      14,
-      15,
-      16,
-      17,
-      18,
-      19,
-      20,
-      21,
-      22,
-      23,
-      24,
-      25,
-      26,
-      27,
-      28,
-      29,
-      30,
-      31,
-      127,
-      128,
-      129,
-      130,
-      131,
-      132,
-      133,
-      134,
-      135,
-      136,
-      137,
-      138,
-      139,
-      140,
-      141,
-      142,
-      143,
-      144,
-      145,
-      146,
-      147,
-      148,
-      149,
-      150,
-      151,
-      152,
-      153,
-      154,
-      155,
-      156,
-      157,
-      158,
-      159,
-      64976,
-      64977,
-      64978,
-      64979,
-      64980,
-      64981,
-      64982,
-      64983,
-      64984,
-      64985,
-      64986,
-      64987,
-      64988,
-      64989,
-      64990,
-      64991,
-      64992,
-      64993,
-      64994,
-      64995,
-      64996,
-      64997,
-      64998,
-      64999,
-      65e3,
-      65001,
-      65002,
-      65003,
-      65004,
-      65005,
-      65006,
-      65007,
-      65534,
-      65535,
-      131070,
-      131071,
-      196606,
-      196607,
-      262142,
-      262143,
-      327678,
-      327679,
-      393214,
-      393215,
-      458750,
-      458751,
-      524286,
-      524287,
-      589822,
-      589823,
-      655358,
-      655359,
-      720894,
-      720895,
-      786430,
-      786431,
-      851966,
-      851967,
-      917502,
-      917503,
-      983038,
-      983039,
-      1048574,
-      1048575,
-      1114110,
-      1114111
-    ];
-    var stringFromCharCode = String.fromCharCode;
-    var contains = function(array, value) {
-      let index = -1;
-      const length = array.length;
-      while (++index < length) {
-        if (array[index] === value)
-          return true;
-      }
-      return false;
-    };
-    function merge(options, defaults) {
-      if (!options)
-        return defaults;
-      const result = {};
-      let key;
-      for (key in defaults) {
-        result[key] = hasOwn(options, key) ? options[key] : defaults[key];
-      }
-      return result;
-    }
-    var codePointToSymbol = function(codePoint, strict) {
-      let output = "";
-      if (codePoint >= 55296 && codePoint <= 57343 || codePoint > 1114111) {
-        if (strict)
-          parseError("character reference outside the permissible Unicode range");
-        return "\uFFFD";
-      }
-      if (hasOwn(decodeMapNumeric, codePoint)) {
-        if (strict)
-          parseError("disallowed character reference");
-        return decodeMapNumeric[codePoint];
-      }
-      if (strict && contains(invalidReferenceCodePoints, codePoint))
-        parseError("disallowed character reference");
-      if (codePoint > 65535) {
-        codePoint -= 65536;
-        output += stringFromCharCode(codePoint >>> 10 & 1023 | 55296);
-        codePoint = 56320 | codePoint & 1023;
-      }
-      output += stringFromCharCode(codePoint);
-      return output;
-    };
-    function parseError(message) {
-      throw new Error(`Parse error: ${message}`);
-    }
-    function decode(html2, options) {
-      options = merge(options, decode.options);
-      const strict = options.strict;
-      if (strict && regexInvalidEntity.test(html2))
-        parseError("malformed character reference");
-      return html2.replace(
-        regexDecode,
-        ($0, $1, $2, $3, $4, $5, $6, $7, _$8) => {
-          let codePoint;
-          let semicolon;
-          let decDigits;
-          let hexDigits;
-          let reference;
-          let next;
-          if ($1) {
-            reference = $1;
-            return decodeMap[reference];
-          }
-          if ($2) {
-            reference = $2;
-            next = $3;
-            if (next && options.isAttributeValue) {
-              if (strict && next === "=")
-                parseError("`&` did not start a character reference");
-              return $0;
-            } else {
-              if (strict) {
-                parseError(
-                  "named character reference was not terminated by a semicolon"
-                );
-              }
-              return decodeMapLegacy[reference] + (next || "");
-            }
-          }
-          if ($4) {
-            decDigits = $4;
-            semicolon = $5;
-            if (strict && !semicolon)
-              parseError("character reference was not terminated by a semicolon");
-            codePoint = Number.parseInt(decDigits, 10);
-            return codePointToSymbol(codePoint, strict);
-          }
-          if ($6) {
-            hexDigits = $6;
-            semicolon = $7;
-            if (strict && !semicolon)
-              parseError("character reference was not terminated by a semicolon");
-            codePoint = Number.parseInt(hexDigits, 16);
-            return codePointToSymbol(codePoint, strict);
-          }
-          if (strict) {
-            parseError(
-              "named character reference was not terminated by a semicolon"
-            );
-          }
-          return $0;
-        }
-      );
-    }
-    decode.options = {
-      isAttributeValue: false,
-      strict: false
-    };
-
-    // src/encoding.ts
-    function escapeHTML(text) {
-      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&apos;").replace(/"/g, "&quot;").replace(/\xA0/g, "&nbsp;").replace(/\xAD/g, "&shy;");
-    }
-    var unescapeHTML = (html2) => decode(html2);
-
     // src/h.ts
     function _h(context, tag, attrs, children) {
       if (typeof tag === "function") {
@@ -74282,104 +72219,10 @@ img.ProseMirror-separator {
       };
       return context.h;
     }
-
-    // src/html.ts
-    var SELF_CLOSING_TAGS = [
-      "area",
-      "base",
-      "br",
-      "col",
-      "embed",
-      "hr",
-      "img",
-      "input",
-      "keygen",
-      "link",
-      "meta",
-      "param",
-      "source",
-      "track",
-      "wbr",
-      "command"
-    ];
-    function markup(xmlMode, tag, attrs = {}, children) {
-      const hasChildren = !(typeof children === "string" && children === "" || Array.isArray(children) && (children.length === 0 || children.length === 1 && children[0] === "") || children == null);
-      const parts = [];
-      tag = tag.replace(/__/g, ":");
-      if (tag !== "noop" && tag !== "") {
-        if (tag !== "cdata")
-          parts.push(`<${tag}`);
-        else
-          parts.push("<![CDATA[");
-        for (let name in attrs) {
-          if (name && hasOwn(attrs, name)) {
-            const v = attrs[name];
-            if (name === "html")
-              continue;
-            if (name.toLowerCase() === "classname")
-              name = "class";
-            name = name.replace(/__/g, ":");
-            if (v === true) {
-              parts.push(` ${name}`);
-            } else if (name === "style" && typeof v === "object") {
-              parts.push(
-                ` ${name}="${Object.keys(v).filter((k) => v[k] != null).map((k) => {
-              let vv = v[k];
-              vv = typeof vv === "number" ? `${vv}px` : vv;
-              return `${k.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}:${vv}`;
-            }).join(";")}"`
-              );
-            } else if (v !== false && v != null) {
-              parts.push(` ${name}="${escapeHTML(v.toString())}"`);
-            }
-          }
-        }
-        if (tag !== "cdata") {
-          if (xmlMode && !hasChildren) {
-            parts.push(" />");
-            return parts.join("");
-          } else {
-            parts.push(">");
-          }
-        }
-        if (!xmlMode && SELF_CLOSING_TAGS.includes(tag))
-          return parts.join("");
-      }
-      if (hasChildren) {
-        if (typeof children === "string") {
-          parts.push(children);
-        } else if (children && children.length > 0) {
-          for (let child of children) {
-            if (child != null && child !== false) {
-              if (!Array.isArray(child))
-                child = [child];
-              for (const c of child) {
-                if (c.startsWith("<") && c.endsWith(">") || tag === "script" || tag === "style")
-                  parts.push(c);
-                else
-                  parts.push(escapeHTML(c.toString()));
-              }
-            }
-          }
-        }
-      }
-      if (attrs.html)
-        parts.push(attrs.html);
-      if (tag !== "noop" && tag !== "") {
-        if (tag !== "cdata")
-          parts.push(`</${tag}>`);
-        else
-          parts.push("]]>");
-      }
-      return parts.join("");
+    function escapeHTML(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&apos;").replace(/"/g, "&quot;").replace(/\xA0/g, "&nbsp;").replace(/\xAD/g, "&shy;");
     }
-    function html(itag, iattrs, ...ichildren) {
-      const { tag, attrs, children } = hArgumentParser(itag, iattrs, ichildren);
-      return markup(false, tag, attrs, children);
-    }
-    var htmlVDOM = markup.bind(null, false);
-    html.firstLine = "<!DOCTYPE html>";
-    html.html = true;
+    var unescapeHTML = (html2) => decodeHTML(html2);
     var cache = {};
     function parseSelector(selector) {
       let ast = cache[selector];
@@ -74465,7 +72308,7 @@ img.ProseMirror-separator {
       // 'tt': C
     };
     function toCamelCase(s) {
-      return s.toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, (_m, chr) => chr.toUpperCase());
+      return s.toLowerCase().replace(/[^a-z0-9]+(.)/gi, (_m, chr) => chr.toUpperCase());
     }
     var _VNode = class _VNode {
       constructor() {
@@ -74992,12 +72835,109 @@ img.ProseMirror-separator {
     function hasOwn(object2, propertyName) {
       return hasOwnProperty.call(object2, propertyName);
     }
-    /*! https://mths.be/he v1.2.0 by @mathias | MIT license */
+
+    // src/html.ts
+    var SELF_CLOSING_TAGS = [
+      "area",
+      "base",
+      "br",
+      "col",
+      "embed",
+      "hr",
+      "img",
+      "input",
+      "keygen",
+      "link",
+      "meta",
+      "param",
+      "source",
+      "track",
+      "wbr",
+      "command"
+    ];
+    function markup(xmlMode, tag, attrs = {}, children) {
+      const hasChildren = !(typeof children === "string" && children === "" || Array.isArray(children) && (children.length === 0 || children.length === 1 && children[0] === "") || children == null);
+      const parts = [];
+      tag = tag.replace(/__/g, ":");
+      if (tag !== "noop" && tag !== "") {
+        if (tag !== "cdata")
+          parts.push(`<${tag}`);
+        else
+          parts.push("<![CDATA[");
+        for (let name in attrs) {
+          if (name && hasOwn(attrs, name)) {
+            const v = attrs[name];
+            if (name === "html")
+              continue;
+            if (name.toLowerCase() === "classname")
+              name = "class";
+            name = name.replace(/__/g, ":");
+            if (v === true) {
+              parts.push(` ${name}`);
+            } else if (name === "style" && typeof v === "object") {
+              parts.push(
+                ` ${name}="${Object.keys(v).filter((k) => v[k] != null).map((k) => {
+              let vv = v[k];
+              vv = typeof vv === "number" ? `${vv}px` : vv;
+              return `${k.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}:${vv}`;
+            }).join(";")}"`
+              );
+            } else if (v !== false && v != null) {
+              parts.push(` ${name}="${escapeHTML(v.toString())}"`);
+            }
+          }
+        }
+        if (tag !== "cdata") {
+          if (xmlMode && !hasChildren) {
+            parts.push(" />");
+            return parts.join("");
+          } else {
+            parts.push(">");
+          }
+        }
+        if (!xmlMode && SELF_CLOSING_TAGS.includes(tag))
+          return parts.join("");
+      }
+      if (hasChildren) {
+        if (typeof children === "string") {
+          parts.push(children);
+        } else if (children && children.length > 0) {
+          for (let child of children) {
+            if (child != null && child !== false) {
+              if (!Array.isArray(child))
+                child = [child];
+              for (const c of child) {
+                if (c.startsWith("<") && c.endsWith(">") || tag === "script" || tag === "style")
+                  parts.push(c);
+                else
+                  parts.push(escapeHTML(c.toString()));
+              }
+            }
+          }
+        }
+      }
+      if (attrs.html)
+        parts.push(attrs.html);
+      if (tag !== "noop" && tag !== "") {
+        if (tag !== "cdata")
+          parts.push(`</${tag}>`);
+        else
+          parts.push("]]>");
+      }
+      return parts.join("");
+    }
+    function html(itag, iattrs, ...ichildren) {
+      const { tag, attrs, children } = hArgumentParser(itag, iattrs, ichildren);
+      return markup(false, tag, attrs, children);
+    }
+    var htmlVDOM = markup.bind(null, false);
+    html.firstLine = "<!DOCTYPE html>";
+    html.html = true;
 
     // src/htmlparser.ts
-    var attrRe = /([^=\s]+)(\s*=\s*(("([^"]*)")|('([^']*)')|[^>\s]+))?/gm;
+    var attrRe = /([^=\s]+)(\s*=\s*(("([^"]*)")|('([^']*)')|[^>\s]+))?/g;
     var endTagRe = /^<\/([^>\s]+)[^>]*>/m;
-    var startTagRe = /^<([^>\s\/]+)((\s+[^=>\s]+(\s*=\s*(("[^"]*")|('[^']*')|[^>\s]+))?)*)\s*\/?\s*>/m;
+    var startTagRe = /^<([^>\s/]+)((\s+[^=>\s]+(\s*=\s*(("[^"]*")|('[^']*')|[^>\s]+))?)*)\s*(?:\/\s*)?>/m;
     var selfCloseTagRe = /\s*\/\s*>\s*$/m;
     var HtmlParser = class {
       constructor(options = {}) {
@@ -75332,6 +73272,7 @@ img.ProseMirror-separator {
     exports.NodeViewWrapper = NodeViewWrapper;
     exports.PasteRule = PasteRule;
     exports.PureEditorContent = PureEditorContent;
+    exports.ReactNodeViewContext = ReactNodeViewContext;
     exports.ReactNodeViewRenderer = ReactNodeViewRenderer;
     exports.ReactRenderer = ReactRenderer;
     exports.Tracker = Tracker;
@@ -75345,7 +73286,7 @@ img.ProseMirror-separator {
     exports.deleteProps = deleteProps;
     exports.elementFromString = elementFromString;
     exports.escapeForRegEx = escapeForRegEx;
-    exports.extensions = extensions;
+    exports.extensions = index$1;
     exports.findChildren = findChildren;
     exports.findChildrenInRange = findChildrenInRange;
     exports.findDuplicates = findDuplicates;
@@ -75427,6 +73368,7 @@ img.ProseMirror-separator {
     exports.useCurrentEditor = useCurrentEditor;
     exports.useEditor = useEditor;
     exports.useJournalEditor = useJournalEditor;
+    exports.useReactNodeView = useReactNodeView;
     exports.wrappingInputRule = wrappingInputRule;
 
 }));
