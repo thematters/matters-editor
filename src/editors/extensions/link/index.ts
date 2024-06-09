@@ -41,6 +41,7 @@ export interface LinkOptions {
   /**
    * A list of HTML attributes to be rendered.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HTMLAttributes: Record<string, any>
   /**
    * A validation function that modifies link verification for the auto linker.

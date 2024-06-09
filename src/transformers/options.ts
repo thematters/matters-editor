@@ -29,7 +29,9 @@ const makeBrHandler =
   (state, node, parent) => {
     const isBrOnly =
       node.children.length > 0 &&
-      node.children.every((child: any) => child.tagName === 'br')
+      node.children.every(
+        (child) => 'tagName' in child && child.tagName === 'br',
+      )
     if (isBrOnly) {
       const result: Html = { type: 'html', value: toHtml(node) }
       state.patch(node, result)
@@ -69,7 +71,7 @@ export const rehypeStringifyOptions = {
 }
 
 export const rehypeRewriteOptions: RehypeRewriteOptions = {
-  rewrite: (node, index, parent) => {
+  rewrite: (node) => {
     if (
       node.type === 'element' &&
       node.tagName === 'a' &&

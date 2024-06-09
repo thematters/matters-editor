@@ -7,6 +7,7 @@ export interface BlockquoteOptions {
    * @default {}
    * @example { class: 'foo' }
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HTMLAttributes: Record<string, any>
 }
 
@@ -106,7 +107,7 @@ export const Blockquote = Node.create<BlockquoteOptions>({
     return [
       new Plugin({
         key: new PluginKey('restrictBlockquoteMarks'),
-        filterTransaction: (transaction, state) => {
+        filterTransaction: (transaction) => {
           // Nothing has changed, ignore it.
           if (!transaction.docChanged) {
             return true
