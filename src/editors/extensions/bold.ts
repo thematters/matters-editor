@@ -16,6 +16,7 @@ import {
  */
 
 export interface BoldOptions {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HTMLAttributes: Record<string, any>
 }
 

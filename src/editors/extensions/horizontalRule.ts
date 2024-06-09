@@ -1,6 +1,7 @@
 import { mergeAttributes, Node, nodeInputRule } from '@tiptap/core'
 
 export interface HorizontalRuleOptions {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HTMLAttributes: Record<string, any>
 }
 
