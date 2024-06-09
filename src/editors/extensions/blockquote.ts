@@ -116,7 +116,7 @@ export const Blockquote = Node.create<BlockquoteOptions>({
           // Skip if not in a blockquote
           const $anchor = transaction.selection.$anchor
           const $grandParent = $anchor.node($anchor.depth - 1)
-          const isInBlockquote = $grandParent.type.name === this.name
+          const isInBlockquote = $grandParent?.type.name === this.name
           if (!isInBlockquote) {
             return true
           }
