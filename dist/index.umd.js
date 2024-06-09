@@ -24280,7 +24280,7 @@ img.ProseMirror-separator {
                         // Skip if not in a blockquote
                         var $anchor = transaction.selection.$anchor;
                         var $grandParent = $anchor.node($anchor.depth - 1);
-                        var isInBlockquote = $grandParent.type.name === _this.name;
+                        var isInBlockquote = ($grandParent === null || $grandParent === void 0 ? void 0 : $grandParent.type.name) === _this.name;
                         if (!isInBlockquote) {
                             return true;
                         }
