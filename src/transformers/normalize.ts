@@ -56,7 +56,7 @@ export const truncateLinkText = (
       truncatedText = text.replace(/(^\w+:|^)\/\//, '')
     }
 
-    if (maxLength === 0) {
+    if (maxLength <= 0) {
       throw new Error('maxLength must be greater than 0')
     }
 
