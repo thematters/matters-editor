@@ -7,9 +7,9 @@ import {
 import { Plugin } from '@tiptap/pm/state'
 import { find, registerCustomProtocol, reset } from 'linkifyjs'
 
-import { autolink } from './helpers/autolink.js'
-import { clickHandler } from './helpers/clickHandler.js'
-import { pasteHandler } from './helpers/pasteHandler.js'
+import { autolink } from './helpers/autolink'
+import { clickHandler } from './helpers/clickHandler'
+import { pasteHandler } from './helpers/pasteHandler'
 
 /**
  * Link extension compitable with the Mention extension, forked from:
@@ -284,9 +284,10 @@ export const Link = Mark.create<LinkOptions>({
             if (links.length) {
               links.forEach((link) =>
                 foundLinks.push({
-                  text: link.value,
+                  // remove non-ASCII characters
+                  text: link.value.replace(/[^ -~]/g, ''),
                   data: {
-                    href: link.href,
+                    href: link.href.replace(/[^ -~]/g, ''),
                   },
                   index: link.start,
                 }),
