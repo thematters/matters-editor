@@ -1,6 +1,6 @@
 {
   "name": "@matters/matters-editor",
-  "version": "0.2.5-alpha.5",
+  "version": "0.2.5-alpha.6",
   "description": "Editor for matters.news",
   "author": "https://github.com/thematters",
   "homepage": "https://github.com/thematters/matters-editor",
@@ -74,6 +74,7 @@
     "remark-rehype": "^11.1.0",
     "remark-stringify": "^11.0.0",
     "unified": "^11.0.4",
+    "validator": "^13.12.0",
     "zeed-dom": "^0.13.3"
   },
   "devDependencies": {
@@ -91,6 +92,7 @@
     "@types/node": "^20.11.25",
     "@types/react": "^17.0.53",
     "@types/react-dom": "^17.0.19",
+    "@types/validator": "^13.11.10",
     "benny": "^3.7.1",
     "common-tags": "^1.8.2",
     "eslint": "^9.4.0",
