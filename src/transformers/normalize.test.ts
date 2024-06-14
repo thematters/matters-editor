@@ -1,15 +1,27 @@
 import { stripIndent } from 'common-tags'
 import { describe, expect, test } from 'vitest'
 
-import { normalizeArticleHTML, normalizeCommentHTML } from './normalize'
+import {
+  normalizeArticleHTML,
+  normalizeCommentHTML,
+  NormalizeOptions,
+} from './normalize'
 
-const expectNormalizeArticleHTML = (input: string, output: string) => {
-  const result = normalizeArticleHTML(input)
+const expectNormalizeArticleHTML = (
+  input: string,
+  output: string,
+  options?: NormalizeOptions,
+) => {
+  const result = normalizeArticleHTML(input, options)
   expect(result.trim()).toBe(output)
 }
 
-const expectNormalizeCommentHTML = (input: string, output: string) => {
-  const result = normalizeCommentHTML(input)
+const expectNormalizeCommentHTML = (
+  input: string,
+  output: string,
+  options?: NormalizeOptions,
+) => {
+  const result = normalizeCommentHTML(input, options)
   expect(result.trim()).toBe(output)
 }
 
@@ -318,6 +330,28 @@ describe('Normalization: Comment', () => {
       '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
       '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
     )
+
+    const longURL =
+      'https://medium.com/yihan-huang-studio/%E4%BA%BA%E6%A0%BC%E6%8A%BD%E9%9B%A2%E7%9A%84%E5%B9%BB%E8%A6%BA%E6%B0%A3%E5%91%B3-%E4%BB%A5%E9%B4%89%E7%89%87%E5%85%A5%E9%A6%99%E7%9A%84-boudicca-wode-630a5b253bb3'
+
+    expectNormalizeCommentHTML(
+      `<p><a target="_blank" rel="noopener noreferrer nofollow" href="${longURL}">${longURL}</a></p>`,
+      `<p><a target="_blank" rel="noopener noreferrer nofollow" href="${longURL}">medium.com/yihan-hua...</a></p>`,
+      { truncate: { maxLength: 20, keepProtocol: false } },
+    )
+
+    expectNormalizeCommentHTML(
+      `<p><a class="mention" rel="noopener noreferrer nofollow" href="${longURL}">${longURL}</a></p>`,
+      `<p><a class="mention" rel="noopener noreferrer nofollow" href="${longURL}">https://medium.com/y...</a></p>`,
+      { truncate: { maxLength: 20, keepProtocol: true } },
+    )
+
+    expect(() =>
+      normalizeCommentHTML(
+        `<p><a target="_blank" rel="noopener noreferrer nofollow" href="${longURL}">${longURL}</a></p>`,
+        { truncate: { maxLength: 0, keepProtocol: true } },
+      ),
+    ).toThrow('maxLength must be greater than 0')
   })
 
   test('bolds is not supported', () => {
