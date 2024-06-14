@@ -27530,7 +27530,7 @@ img.ProseMirror-separator {
                     'data-id': node.attrs.id,
                     'data-user-name': node.attrs.userName,
                     'data-display-name': node.attrs.displayName,
-                    ref: 'noopener noreferrer nofollow',
+                    rel: 'noopener noreferrer nofollow',
                 },
                 ['span', "@".concat((_b = node.attrs.displayName) !== null && _b !== void 0 ? _b : node.attrs.userName)],
             ];
@@ -73539,7 +73539,7 @@ img.ProseMirror-separator {
         var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
         var normalizedHtml = normalizer(html);
         if (options === null || options === void 0 ? void 0 : options.truncate) {
-            normalizedHtml = truncateLinkText(html, options.truncate);
+            normalizedHtml = truncateLinkText(normalizedHtml, options.truncate);
         }
         return normalizedHtml;
     };
@@ -73548,7 +73548,7 @@ img.ProseMirror-separator {
         var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
         var normalizedHtml = normalizer(html);
         if (options === null || options === void 0 ? void 0 : options.truncate) {
-            normalizedHtml = truncateLinkText(html, options.truncate);
+            normalizedHtml = truncateLinkText(normalizedHtml, options.truncate);
         }
         return normalizedHtml;
     };
@@ -73557,7 +73557,7 @@ img.ProseMirror-separator {
         var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
         var normalizedHtml = normalizer(html);
         if (options === null || options === void 0 ? void 0 : options.truncate) {
-            normalizedHtml = truncateLinkText(html, options.truncate);
+            normalizedHtml = truncateLinkText(normalizedHtml, options.truncate);
         }
         return normalizedHtml;
     };
