@@ -326,32 +326,37 @@ describe('Normalization: Comment', () => {
   })
 
   test('link', () => {
+    const longURL =
+      'https://medium.com/yihan-huang-studio/%E4%BA%BA%E6%A0%BC%E6%8A%BD%E9%9B%A2%E7%9A%84%E5%B9%BB%E8%A6%BA%E6%B0%A3%E5%91%B3-%E4%BB%A5%E9%B4%89%E7%89%87%E5%85%A5%E9%A6%99%E7%9A%84-boudicca-wode-630a5b253bb3'
+
+    // normal link
     expectNormalizeCommentHTML(
       '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
       '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
     )
 
-    const longURL =
-      'https://medium.com/yihan-huang-studio/%E4%BA%BA%E6%A0%BC%E6%8A%BD%E9%9B%A2%E7%9A%84%E5%B9%BB%E8%A6%BA%E6%B0%A3%E5%91%B3-%E4%BB%A5%E9%B4%89%E7%89%87%E5%85%A5%E9%A6%99%E7%9A%84-boudicca-wode-630a5b253bb3'
-
+    // long link
     expectNormalizeCommentHTML(
       `<p><a target="_blank" rel="noopener noreferrer nofollow" href="${longURL}">${longURL}</a></p>`,
       `<p><a target="_blank" rel="noopener noreferrer nofollow" href="${longURL}">medium.com/yihan-hua...</a></p>`,
       { truncate: { maxLength: 20, keepProtocol: false } },
     )
 
-    expectNormalizeCommentHTML(
-      `<p><a class="mention" rel="noopener noreferrer nofollow" href="${longURL}">${longURL}</a></p>`,
-      `<p><a class="mention" rel="noopener noreferrer nofollow" href="${longURL}">https://medium.com/y...</a></p>`,
-      { truncate: { maxLength: 20, keepProtocol: true } },
-    )
-
+    // long URL with protocol
     expect(() =>
       normalizeCommentHTML(
         `<p><a target="_blank" rel="noopener noreferrer nofollow" href="${longURL}">${longURL}</a></p>`,
         { truncate: { maxLength: 0, keepProtocol: true } },
       ),
     ).toThrow('maxLength must be greater than 0')
+
+    // mention
+    const longDisplayName = 'displayName'.repeat(10)
+    expectNormalizeCommentHTML(
+      `<p><a class="mention" data-id="id" data-display-name="${longDisplayName}" data-user-name="userName" rel="noopener noreferrer nofollow" href="${longURL}">@${longDisplayName}</a></p>`,
+      `<p><a class="mention" href="/@userName" data-id="id" data-user-name="userName" data-display-name="${longDisplayName}" rel="noopener noreferrer nofollow"><span>@${longDisplayName}</span></a></p>`,
+      { truncate: { maxLength: 20, keepProtocol: true } },
+    )
   })
 
   test('bolds is not supported', () => {

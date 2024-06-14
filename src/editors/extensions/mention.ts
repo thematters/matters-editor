@@ -116,7 +116,7 @@ export const Mention = Node.create<MentionOptions>({
         'data-id': node.attrs.id,
         'data-user-name': node.attrs.userName,
         'data-display-name': node.attrs.displayName,
-        ref: 'noopener noreferrer nofollow',
+        rel: 'noopener noreferrer nofollow',
       },
       ['span', `@${node.attrs.displayName ?? node.attrs.userName}`],
     ]
