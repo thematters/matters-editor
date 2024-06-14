@@ -1,8 +1,14 @@
-import { type MarkType } from '@tiptap/pm/model';
+import { MarkType } from '@tiptap/pm/model';
 import { Plugin } from '@tiptap/pm/state';
-interface AutolinkOptions {
+type AutolinkOptions = {
     type: MarkType;
-    validate?: (url: string) => boolean;
-}
+    defaultProtocol: string;
+    validate: (url: string) => boolean;
+};
+/**
+ * This plugin allows you to automatically add links to your editor.
+ * @param options The plugin options
+ * @returns The plugin instance
+ */
 export declare function autolink(options: AutolinkOptions): Plugin;
 export {};

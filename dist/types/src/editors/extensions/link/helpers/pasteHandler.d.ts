@@ -1,9 +1,10 @@
-import { type Editor } from '@tiptap/core';
-import { type MarkType } from '@tiptap/pm/model';
+import { Editor } from '@tiptap/core';
+import { MarkType } from '@tiptap/pm/model';
 import { Plugin } from '@tiptap/pm/state';
-interface PasteHandlerOptions {
+type PasteHandlerOptions = {
     editor: Editor;
+    defaultProtocol: string;
     type: MarkType;
-}
+};
 export declare function pasteHandler(options: PasteHandlerOptions): Plugin;
 export {};

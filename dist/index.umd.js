@@ -26850,79 +26850,67 @@ img.ProseMirror-separator {
     }
 
     /**
-     * Is the given string valid linkable text of some sort. Note that this does not
-     * trim the text for you.
+     * Check if the provided tokens form a valid link structure, which can either be a single link token
+     * or a link token surrounded by parentheses or square brackets.
      *
-     * Optionally pass in a second `type` param, which is the type of link to test
-     * for.
-     *
-     * For example,
-     *
-     *     linkify.test(str, 'email');
-     *
-     * Returns `true` if str is a valid email.
-     * @param {string} str string to test for links
-     * @param {string} [type] optional specific link type to look for
-     * @returns boolean true/false
+     * This ensures that only complete and valid text is hyperlinked, preventing cases where a valid
+     * top-level domain (TLD) is immediately followed by an invalid character, like a number. For
+     * example, with the `find` method from Linkify, entering `example.com1` would result in
+     * `example.com` being linked and the trailing `1` left as plain text. By using the `tokenize`
+     * method, we can perform more comprehensive validation on the input text.
      */
-    function test$1(str, type) {
-      if (type === void 0) {
-        type = null;
-      }
-      const tokens = tokenize(str);
-      return tokens.length === 1 && tokens[0].isLink && (!type || tokens[0].t === type);
+    function isValidLinkStructure(tokens) {
+        if (tokens.length === 1) {
+            return tokens[0].isLink;
+        }
+        if (tokens.length === 3 && tokens[1].isLink) {
+            return ['()', '[]'].includes(tokens[0].value + tokens[2].value);
+        }
+        return false;
     }
-
+    /**
+     * This plugin allows you to automatically add links to your editor.
+     * @param options The plugin options
+     * @returns The plugin instance
+     */
     function autolink$1(options) {
         return new Plugin({
             key: new PluginKey('autolink'),
             appendTransaction: function (transactions, oldState, newState) {
+                /**
+                 * Does the transaction change the document?
+                 */
                 var docChanges = transactions.some(function (transaction) { return transaction.docChanged; }) &&
                     !oldState.doc.eq(newState.doc);
+                /**
+                 * Prevent autolink if the transaction is not a document change or if the transaction has the meta `preventAutolink`.
+                 */
                 var preventAutolink = transactions.some(function (transaction) {
                     return transaction.getMeta('preventAutolink');
                 });
+                /**
+                 * Prevent autolink if the transaction is not a document change
+                 * or if the transaction has the meta `preventAutolink`.
+                 */
                 if (!docChanges || preventAutolink) {
                     return;
                 }
                 var tr = newState.tr;
                 var transform = combineTransactionSteps(oldState.doc, __spreadArray([], transactions, true));
-                var mapping = transform.mapping;
                 var changes = getChangedRanges(transform);
                 changes.forEach(function (_a) {
-                    var oldRange = _a.oldRange, newRange = _a.newRange;
-                    // at first we check if we have to remove links
-                    getMarksBetween(oldRange.from, oldRange.to, oldState.doc)
-                        .filter(function (item) { return item.mark.type === options.type; })
-                        .forEach(function (oldMark) {
-                        var newFrom = mapping.map(oldMark.from);
-                        var newTo = mapping.map(oldMark.to);
-                        var newMarks = getMarksBetween(newFrom, newTo, newState.doc).filter(function (item) { return item.mark.type === options.type; });
-                        if (newMarks.length === 0) {
-                            return;
-                        }
-                        var newMark = newMarks[0];
-                        var oldLinkText = oldState.doc.textBetween(oldMark.from, oldMark.to, undefined, ' ');
-                        var newLinkText = newState.doc.textBetween(newMark.from, newMark.to, undefined, ' ');
-                        var wasLink = test$1(oldLinkText);
-                        var isLink = test$1(newLinkText);
-                        // remove only the link, if it was a link before too
-                        // because we don’t want to remove links that were set manually
-                        if (wasLink && !isLink) {
-                            tr.removeMark(newMark.from, newMark.to, options.type);
-                        }
-                    });
-                    // now let’s see if we can add new links
+                    var newRange = _a.newRange;
+                    // Now let’s see if we can add new links.
                     var nodesInChangedRanges = findChildrenInRange(newState.doc, newRange, function (node) { return node.isTextblock; });
                     var textBlock;
                     var textBeforeWhitespace;
                     if (nodesInChangedRanges.length > 1) {
-                        // Grab the first node within the changed ranges (ex. the first of two paragraphs when hitting enter)
+                        // Grab the first node within the changed ranges (ex. the first of two paragraphs when hitting enter).
                         textBlock = nodesInChangedRanges[0];
                         textBeforeWhitespace = newState.doc.textBetween(textBlock.pos, textBlock.pos + textBlock.node.nodeSize, undefined, ' ');
                     }
-                    else if (nodesInChangedRanges.length > 0 &&
-                        // We want to make sure to include the block seperator argument to treat hard breaks like spaces
+                    else if (nodesInChangedRanges.length &&
+                        // We want to make sure to include the block seperator argument to treat hard breaks like spaces.
                         newState.doc
                             .textBetween(newRange.from, newRange.to, ' ', ' ')
                             .endsWith(' ')) {
@@ -26942,25 +26930,37 @@ img.ProseMirror-separator {
                         if (!lastWordBeforeSpace) {
                             return false;
                         }
-                        find$1(lastWordBeforeSpace)
+                        var linksBeforeSpace = tokenize(lastWordBeforeSpace).map(function (t) {
+                            return t.toObject(options.defaultProtocol);
+                        });
+                        if (!isValidLinkStructure(linksBeforeSpace)) {
+                            return false;
+                        }
+                        linksBeforeSpace
                             .filter(function (link) { return link.isLink; })
-                            .filter(function (link) {
-                            if (options.validate) {
-                                return options.validate(link.value);
-                            }
-                            return true;
-                        })
-                            // calculate link position
+                            // Calculate link position.
                             .map(function (link) { return (__assign$2(__assign$2({}, link), { from: lastWordAndBlockOffset_1 + link.start + 1, to: lastWordAndBlockOffset_1 + link.end + 1 })); })
-                            // add link mark
+                            // ignore link inside code mark
+                            .filter(function (link) {
+                            if (!newState.schema.marks.code) {
+                                return true;
+                            }
+                            return !newState.doc.rangeHasMark(link.from, link.to, newState.schema.marks.code);
+                        })
+                            // validate link
+                            .filter(function (link) { return options.validate(link.value); })
+                            // Add link mark.
                             .forEach(function (link) {
+                            if (getMarksBetween(link.from, link.to, newState.doc).some(function (item) { return item.mark.type === options.type; })) {
+                                return;
+                            }
                             tr.addMark(link.from, link.to, options.type.create({
                                 href: link.href,
                             }));
                         });
                     }
                 });
-                if (tr.steps.length === 0) {
+                if (!tr.steps.length) {
                     return;
                 }
                 return tr;
@@ -26973,14 +26973,23 @@ img.ProseMirror-separator {
             key: new PluginKey('handleClickLink'),
             props: {
                 handleClick: function (view, pos, event) {
-                    var _a, _b, _c;
-                    if (event.button !== 1) {
+                    var _a, _b;
+                    if (event.button !== 0) {
+                        return false;
+                    }
+                    var a = event.target;
+                    var els = [];
+                    while (a.nodeName !== 'DIV') {
+                        els.push(a);
+                        a = a.parentNode;
+                    }
+                    if (!els.find(function (value) { return value.nodeName === 'A'; })) {
                         return false;
                     }
                     var attrs = getAttributes(view.state, options.type.name);
-                    var link = (_a = event.target) === null || _a === void 0 ? void 0 : _a.closest('a');
-                    var href = (_b = link === null || link === void 0 ? void 0 : link.href) !== null && _b !== void 0 ? _b : attrs.href;
-                    var target = (_c = link === null || link === void 0 ? void 0 : link.target) !== null && _c !== void 0 ? _c : attrs.target;
+                    var link = event.target;
+                    var href = (_a = link === null || link === void 0 ? void 0 : link.href) !== null && _a !== void 0 ? _a : attrs.href;
+                    var target = (_b = link === null || link === void 0 ? void 0 : link.target) !== null && _b !== void 0 ? _b : attrs.target;
                     if (link && href) {
                         window.open(href, target);
                         return true;
@@ -27006,7 +27015,9 @@ img.ProseMirror-separator {
                     slice.content.forEach(function (node) {
                         textContent += node.textContent;
                     });
-                    var link = find$1(textContent).find(function (item) { return item.isLink && item.value === textContent; });
+                    var link = find$1(textContent, {
+                        defaultProtocol: options.defaultProtocol,
+                    }).find(function (item) { return item.isLink && item.value === textContent; });
                     if (!textContent || !link) {
                         return false;
                     }
@@ -27019,9 +27030,22 @@ img.ProseMirror-separator {
         });
     }
 
+    // From DOMPurify
+    // https://github.com/cure53/DOMPurify/blob/main/src/regexp.js
+    var ATTR_WHITESPACE = /[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g; // eslint-disable-line no-control-regex
+    var IS_ALLOWED_URI = /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i; // eslint-disable-line no-useless-escape
+    function isAllowedUri(uri) {
+        return !uri || uri.replace(ATTR_WHITESPACE, '').match(IS_ALLOWED_URI);
+    }
+    /**
+     * This extension allows you to create links.
+     * @see https://www.tiptap.dev/api/marks/link
+     */
     var Link = Mark.create({
         name: 'link',
+        priority: 1000,
         keepOnSplit: false,
+        exitable: true,
         onCreate: function () {
             this.options.protocols.forEach(function (protocol) {
                 if (typeof protocol === 'string') {
@@ -27043,11 +27067,13 @@ img.ProseMirror-separator {
                 linkOnPaste: true,
                 autolink: true,
                 protocols: [],
+                defaultProtocol: 'http',
                 HTMLAttributes: {
                     target: '_blank',
                     rel: 'noopener noreferrer nofollow',
+                    class: null,
                 },
-                validate: undefined,
+                validate: function (url) { return !!url; },
             };
         },
         addAttributes: function () {
@@ -27058,17 +27084,40 @@ img.ProseMirror-separator {
                 target: {
                     default: this.options.HTMLAttributes.target,
                 },
+                rel: {
+                    default: this.options.HTMLAttributes.rel,
+                },
+                class: {
+                    default: this.options.HTMLAttributes.class,
+                },
             };
         },
         parseHTML: function () {
             return [
                 {
-                    tag: 'a[href]:not([href *= "javascript:" i]):not([class="mention"])',
+                    tag: 'a[href]:not([class="mention"])',
+                    getAttrs: function (dom) {
+                        var href = dom.getAttribute('href');
+                        // prevent XSS attacks
+                        if (!href || !isAllowedUri(href)) {
+                            return false;
+                        }
+                        return { href: href };
+                    },
                 },
             ];
         },
         renderHTML: function (_a) {
             var HTMLAttributes = _a.HTMLAttributes;
+            // prevent XSS attacks
+            if (!isAllowedUri(HTMLAttributes.href)) {
+                // strip out the href
+                return [
+                    'a',
+                    mergeAttributes(this.options.HTMLAttributes, __assign$2(__assign$2({}, HTMLAttributes), { href: '' })),
+                    0,
+                ];
+            }
             return [
                 'a',
                 mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
@@ -27112,26 +27161,31 @@ img.ProseMirror-separator {
             return [
                 markPasteRule({
                     find: function (text) {
-                        return find$1(text)
-                            .filter(function (link) {
-                            if (_this.options.validate) {
-                                return _this.options.validate(link.value);
+                        var foundLinks = [];
+                        if (text) {
+                            var validate_1 = _this.options.validate;
+                            var links = find$1(text).filter(function (item) { return item.isLink && validate_1(item.value); });
+                            if (links.length) {
+                                links.forEach(function (link) {
+                                    return foundLinks.push({
+                                        // remove non-ASCII characters
+                                        text: link.value.replace(/[^ -~]/g, ''),
+                                        data: {
+                                            href: link.href.replace(/[^ -~]/g, ''),
+                                        },
+                                        index: link.start,
+                                    });
+                                });
                             }
-                            return true;
-                        })
-                            .filter(function (link) { return link.isLink; })
-                            .map(function (link) { return ({
-                            text: link.value,
-                            index: link.start,
-                            data: link,
-                        }); });
+                        }
+                        return foundLinks;
                     },
                     type: this.type,
                     getAttributes: function (match) {
                         var _a;
-                        return ({
+                        return {
                             href: (_a = match.data) === null || _a === void 0 ? void 0 : _a.href,
-                        });
+                        };
                     },
                 }),
             ];
@@ -27141,6 +27195,7 @@ img.ProseMirror-separator {
             if (this.options.autolink) {
                 plugins.push(autolink$1({
                     type: this.type,
+                    defaultProtocol: this.options.defaultProtocol,
                     validate: this.options.validate,
                 }));
             }
@@ -27152,6 +27207,7 @@ img.ProseMirror-separator {
             if (this.options.linkOnPaste) {
                 plugins.push(pasteHandler({
                     editor: this.editor,
+                    defaultProtocol: this.options.defaultProtocol,
                     type: this.type,
                 }));
             }
