@@ -78,7 +78,7 @@ export const normalizeArticleHTML = (
   let normalizedHtml = normalizer(html)
 
   if (options?.truncate) {
-    normalizedHtml = truncateLinkText(html, options.truncate)
+    normalizedHtml = truncateLinkText(normalizedHtml, options.truncate)
   }
 
   return normalizedHtml
@@ -94,7 +94,7 @@ export const normalizeCommentHTML = (
   let normalizedHtml = normalizer(html)
 
   if (options?.truncate) {
-    normalizedHtml = truncateLinkText(html, options.truncate)
+    normalizedHtml = truncateLinkText(normalizedHtml, options.truncate)
   }
 
   return normalizedHtml
@@ -110,7 +110,7 @@ export const normalizeJournalHTML = (
   let normalizedHtml = normalizer(html)
 
   if (options?.truncate) {
-    normalizedHtml = truncateLinkText(html, options.truncate)
+    normalizedHtml = truncateLinkText(normalizedHtml, options.truncate)
   }
 
   return normalizedHtml
