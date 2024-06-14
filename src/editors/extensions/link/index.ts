@@ -81,6 +81,7 @@ export interface LinkOptions {
    * @default {}
    * @example { class: 'foo' }
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HTMLAttributes: Record<string, any>
 
   /**
