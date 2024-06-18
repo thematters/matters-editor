@@ -64,6 +64,21 @@ describe('Normalization: Article', () => {
     )
   })
 
+  test('code is not supported', () => {
+    expectNormalizeArticleHTML('<p><code>abc</code></p>', '<p>abc</p>')
+  })
+
+  test('code block', () => {
+    expectNormalizeArticleHTML(
+      '<pre><code>abc</code></pre>',
+      '<pre><code>abc</code></pre>',
+    )
+    expectNormalizeArticleHTML(
+      '<pre><code>abc\ndef</code></pre>',
+      '<pre><code>abc\ndef</code></pre>',
+    )
+  })
+
   test('underline', () => {
     expectNormalizeArticleHTML(
       '<p><u>abc</u></p>',
@@ -378,6 +393,10 @@ describe('Normalization: Comment', () => {
 
   test('underline is not supported', () => {
     expectNormalizeCommentHTML('<p><u>abc</u></p>', '<p>abc</p>')
+  })
+
+  test('code is not supported', () => {
+    expectNormalizeCommentHTML('<p><code>abc</code></p>', '<p>abc</p>')
   })
 
   test('self-closed tags', () => {
