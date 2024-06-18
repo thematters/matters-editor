@@ -22393,7 +22393,7 @@ img.ProseMirror-separator {
     /**
      * Matches a bullet list to a dash or asterisk.
      */
-    const inputRegex$4 = /^\s*([-+*])\s$/;
+    const inputRegex$3 = /^\s*([-+*])\s$/;
     /**
      * This extension allows you to create bullet lists.
      * This requires the ListItem extension
@@ -22439,12 +22439,12 @@ img.ProseMirror-separator {
         },
         addInputRules() {
             let inputRule = wrappingInputRule({
-                find: inputRegex$4,
+                find: inputRegex$3,
                 type: this.type,
             });
             if (this.options.keepMarks || this.options.keepAttributes) {
                 inputRule = wrappingInputRule({
-                    find: inputRegex$4,
+                    find: inputRegex$3,
                     type: this.type,
                     keepMarks: this.options.keepMarks,
                     keepAttributes: this.options.keepAttributes,
@@ -22454,72 +22454,6 @@ img.ProseMirror-separator {
             }
             return [
                 inputRule,
-            ];
-        },
-    });
-
-    /**
-     * Matches inline code.
-     */
-    const inputRegex$3 = /(?:^|\s)(`(?!\s+`)((?:[^`]+))`(?!\s+`))$/;
-    /**
-     * Matches inline code while pasting.
-     */
-    const pasteRegex$1 = /(?:^|\s)(`(?!\s+`)((?:[^`]+))`(?!\s+`))/g;
-    /**
-     * This extension allows you to mark text as inline code.
-     * @see https://tiptap.dev/api/marks/code
-     */
-    const Code = Mark.create({
-        name: 'code',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        excludes: '_',
-        code: true,
-        exitable: true,
-        parseHTML() {
-            return [
-                { tag: 'code' },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['code', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                setCode: () => ({ commands }) => {
-                    return commands.setMark(this.name);
-                },
-                toggleCode: () => ({ commands }) => {
-                    return commands.toggleMark(this.name);
-                },
-                unsetCode: () => ({ commands }) => {
-                    return commands.unsetMark(this.name);
-                },
-            };
-        },
-        addKeyboardShortcuts() {
-            return {
-                'Mod-e': () => this.editor.commands.toggleCode(),
-            };
-        },
-        addInputRules() {
-            return [
-                markInputRule({
-                    find: inputRegex$3,
-                    type: this.type,
-                }),
-            ];
-        },
-        addPasteRules() {
-            return [
-                markPasteRule({
-                    find: pasteRegex$1,
-                    type: this.type,
-                }),
             ];
         },
     });
@@ -27589,7 +27523,6 @@ img.ProseMirror-separator {
         Gapcursor,
         Bold,
         Strike,
-        Code,
         CodeBlock,
         HorizontalRule,
         OrderedList,
