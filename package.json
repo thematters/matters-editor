@@ -1,6 +1,6 @@
 {
   "name": "@matters/matters-editor",
-  "version": "0.2.5-alpha.7",
+  "version": "0.2.5-alpha.8",
   "description": "Editor for matters.news",
   "author": "https://github.com/thematters",
   "homepage": "https://github.com/thematters/matters-editor",
@@ -37,7 +37,6 @@
     "@tiptap/core": "2.4.0",
     "@tiptap/extension-blockquote": "2.4.0",
     "@tiptap/extension-bullet-list": "2.4.0",
-    "@tiptap/extension-code": "2.4.0",
     "@tiptap/extension-code-block": "2.4.0",
     "@tiptap/extension-document": "2.4.0",
     "@tiptap/extension-gapcursor": "2.4.0",

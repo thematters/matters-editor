@@ -1,5 +1,4 @@
 import BulletList from '@tiptap/extension-bullet-list'
-import Code from '@tiptap/extension-code'
 import CodeBlock from '@tiptap/extension-code-block'
 import Document from '@tiptap/extension-document'
 import Gapcursor from '@tiptap/extension-gapcursor'
@@ -54,7 +53,6 @@ const baseArticleExtensions = (placeholder?: string) => [
   Gapcursor,
   Bold,
   Strike,
-  Code,
   CodeBlock,
   HorizontalRule,
   OrderedList,
