@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   normalizeArticleHTML,
+  normalizeCampaignHTML,
   normalizeCommentHTML,
   NormalizeOptions,
 } from './normalize'
@@ -22,6 +23,15 @@ const expectNormalizeCommentHTML = (
   options?: NormalizeOptions,
 ) => {
   const result = normalizeCommentHTML(input, options)
+  expect(result.trim()).toBe(output)
+}
+
+const expectNormalizeCampaignHTML = (
+  input: string,
+  output: string,
+  options?: NormalizeOptions,
+) => {
+  const result = normalizeCampaignHTML(input, options)
   expect(result.trim()).toBe(output)
 }
 
@@ -436,6 +446,46 @@ describe('Normalization: Comment', () => {
     expectNormalizeCommentHTML(
       '<figure class="embed embed-video" data-provider="youtube"><div class="iframe-container"><iframe src="https://www.youtube.com/embed/Zk7DppcfaMY?rel=0" loading="lazy" allowfullscreen frameborder="0"></iframe></div><figcaption></figcaption></figure>',
       '<p></p>',
+    )
+  })
+})
+
+describe('Normalization: Campaign', () => {
+  test('quote is not supported', () => {
+    expectNormalizeCampaignHTML(
+      stripIndent`
+        <blockquote>
+          <p>1</p>
+          <p>2</p>
+          <p>3</p>
+        </blockquote>
+      `,
+      '<p>1</p><p>2</p><p>3</p>',
+    )
+  })
+
+  test('bold is not supported', () => {
+    expectNormalizeCampaignHTML('<p><strong>abc</strong></p>', '<p>abc</p>')
+    expectNormalizeCampaignHTML('<p><b>abc</b></p>', '<p>abc</p>')
+  })
+
+  test('strikethrough is not supported', () => {
+    expectNormalizeCampaignHTML('<p><s>abc</s></p>', '<p>abc</p>')
+    expectNormalizeCampaignHTML('<p><del>abc</del></p>', '<p>abc</p>')
+    expectNormalizeCampaignHTML('<p><strike>abc</strike></p>', '<p>abc</p>')
+  })
+
+  test('link is supported', () => {
+    expectNormalizeCampaignHTML(
+      '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
+      '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
+    )
+  })
+
+  test('line break', () => {
+    expectNormalizeCampaignHTML(
+      '<p>hello,<br>world</p>',
+      '<p>hello,<br class="smart">world</p>',
     )
   })
 })

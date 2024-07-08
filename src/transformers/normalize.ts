@@ -6,8 +6,9 @@ import { createHTMLDocument, parseHTML, type VHTMLDocument } from 'zeed-dom'
 
 import {
   makeArticleEditorExtensions,
+  makeCampaignEditorExtensions,
   makeCommentEditorExtensions,
-  makeJournalEditorExtensions,
+  makeMomentEditorExtensions,
   Mention,
 } from '../editors/extensions'
 
@@ -100,12 +101,28 @@ export const normalizeCommentHTML = (
   return normalizedHtml
 }
 
-export const normalizeJournalHTML = (
+export const normalizeMomentHTML = (
   html: string,
   options?: NormalizeOptions,
 ): string => {
-  const extensions = makeJournalEditorExtensions({})
+  const extensions = makeMomentEditorExtensions({})
   const normalizer = makeNormalizer([...extensions, Mention])
+
+  let normalizedHtml = normalizer(html)
+
+  if (options?.truncate) {
+    normalizedHtml = truncateLinkText(normalizedHtml, options.truncate)
+  }
+
+  return normalizedHtml
+}
+
+export const normalizeCampaignHTML = (
+  html: string,
+  options?: NormalizeOptions,
+): string => {
+  const extensions = makeCampaignEditorExtensions({})
+  const normalizer = makeNormalizer(extensions)
 
   let normalizedHtml = normalizer(html)
 
