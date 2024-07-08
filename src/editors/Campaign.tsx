@@ -1,25 +1,24 @@
 import { type EditorOptions, useEditor } from '@tiptap/react'
 
 import {
-  makeJournalEditorExtensions,
-  type MakeJournalEditorExtensionsProps,
+  makeCampaignEditorExtensions,
+  type MakeCampaignEditorExtensionsProps,
 } from './extensions'
 
-type UseJournalEditorProps = {
+type UseCampaignEditorProps = {
   content: string
-} & MakeJournalEditorExtensionsProps &
+} & MakeCampaignEditorExtensionsProps &
   Partial<EditorOptions>
 
-export const useJournalEditor = ({
+export const useCampaignEditor = ({
   content,
   placeholder,
-  mentionSuggestion,
   ...editorProps
-}: UseJournalEditorProps) => {
+}: UseCampaignEditorProps) => {
   const { extensions, ...restProps } = editorProps
   const editor = useEditor({
     extensions: [
-      ...makeJournalEditorExtensions({ placeholder, mentionSuggestion }),
+      ...makeCampaignEditorExtensions({ placeholder }),
       ...(extensions ?? []),
     ],
     content,
