@@ -155,7 +155,5 @@ export const makeCampaignEditorExtensions = ({
         class: 'smart',
       },
     }),
-    // Custom Formats
-    Link,
   ]
 }

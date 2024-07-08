@@ -26,12 +26,8 @@ const expectNormalizeCommentHTML = (
   expect(result.trim()).toBe(output)
 }
 
-const expectNormalizeCampaignHTML = (
-  input: string,
-  output: string,
-  options?: NormalizeOptions,
-) => {
-  const result = normalizeCampaignHTML(input, options)
+const expectNormalizeCampaignHTML = (input: string, output: string) => {
+  const result = normalizeCampaignHTML(input)
   expect(result.trim()).toBe(output)
 }
 
@@ -475,10 +471,10 @@ describe('Normalization: Campaign', () => {
     expectNormalizeCampaignHTML('<p><strike>abc</strike></p>', '<p>abc</p>')
   })
 
-  test('link is supported', () => {
+  test('link is not supported', () => {
     expectNormalizeCampaignHTML(
       '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
-      '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">abc</a></p>',
+      '<p>abc</p>',
     )
   })
 

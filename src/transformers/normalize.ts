@@ -117,18 +117,9 @@ export const normalizeMomentHTML = (
   return normalizedHtml
 }
 
-export const normalizeCampaignHTML = (
-  html: string,
-  options?: NormalizeOptions,
-): string => {
+export const normalizeCampaignHTML = (html: string): string => {
   const extensions = makeCampaignEditorExtensions({})
   const normalizer = makeNormalizer(extensions)
 
-  let normalizedHtml = normalizer(html)
-
-  if (options?.truncate) {
-    normalizedHtml = truncateLinkText(normalizedHtml, options.truncate)
-  }
-
-  return normalizedHtml
+  return normalizer(html)
 }
