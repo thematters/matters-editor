@@ -1,4 +1,5 @@
 export * from './Article';
+export * from './Campaign';
 export * from './Comment';
-export * from './Journal';
+export * from './Moment';
 export * from '@tiptap/react';

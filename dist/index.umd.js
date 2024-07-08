@@ -27552,7 +27552,7 @@ img.ProseMirror-separator {
         }
         return extensions;
     };
-    var makeJournalEditorExtensions = function (_a) {
+    var makeMomentEditorExtensions = function (_a) {
         var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
         var extensions = __spreadArray([], baseExtensions(placeholder), true);
         if (mentionSuggestion) {
@@ -27560,11 +27560,36 @@ img.ProseMirror-separator {
         }
         return extensions;
     };
+    var makeCampaignEditorExtensions = function (_a) {
+        var placeholder = _a.placeholder;
+        return [
+            Document,
+            History,
+            Placeholder.configure({
+                placeholder: placeholder,
+            }),
+            // Basic Formats
+            Text$1,
+            Paragraph,
+            HardBreak.configure({
+                HTMLAttributes: {
+                    class: 'smart',
+                },
+            }),
+        ];
+    };
 
     var useArticleEdtor = function (_a) {
         var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
         var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
         var editor = useEditor(__assign$2({ extensions: __spreadArray(__spreadArray([], makeArticleEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions !== null && extensions !== void 0 ? extensions : []), true), content: content }, restProps));
+        return editor;
+    };
+
+    var useCampaignEditor = function (_a) {
+        var content = _a.content, placeholder = _a.placeholder, editorProps = __rest(_a, ["content", "placeholder"]);
+        var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
+        var editor = useEditor(__assign$2({ extensions: __spreadArray(__spreadArray([], makeCampaignEditorExtensions({ placeholder: placeholder }), true), (extensions !== null && extensions !== void 0 ? extensions : []), true), content: content }, restProps));
         return editor;
     };
 
@@ -27575,10 +27600,10 @@ img.ProseMirror-separator {
         return editor;
     };
 
-    var useJournalEditor = function (_a) {
+    var useMomentEditor = function (_a) {
         var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
         var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
-        var editor = useEditor(__assign$2({ extensions: __spreadArray(__spreadArray([], makeJournalEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions !== null && extensions !== void 0 ? extensions : []), true), content: content }, restProps));
+        var editor = useEditor(__assign$2({ extensions: __spreadArray(__spreadArray([], makeMomentEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions !== null && extensions !== void 0 ? extensions : []), true), content: content }, restProps));
         return editor;
     };
 
@@ -73485,14 +73510,19 @@ img.ProseMirror-separator {
         }
         return normalizedHtml;
     };
-    var normalizeJournalHTML = function (html, options) {
-        var extensions = makeJournalEditorExtensions({});
+    var normalizeMomentHTML = function (html, options) {
+        var extensions = makeMomentEditorExtensions({});
         var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
         var normalizedHtml = normalizer(html);
         if (options === null || options === void 0 ? void 0 : options.truncate) {
             normalizedHtml = truncateLinkText(normalizedHtml, options.truncate);
         }
         return normalizedHtml;
+    };
+    var normalizeCampaignHTML = function (html) {
+        var extensions = makeCampaignEditorExtensions({});
+        var normalizer = makeNormalizer(extensions);
+        return normalizer(html);
     };
 
     var isEmptyText = function (node) {
@@ -73736,8 +73766,9 @@ img.ProseMirror-separator {
     exports.nodeInputRule = nodeInputRule;
     exports.nodePasteRule = nodePasteRule;
     exports.normalizeArticleHTML = normalizeArticleHTML;
+    exports.normalizeCampaignHTML = normalizeCampaignHTML;
     exports.normalizeCommentHTML = normalizeCommentHTML;
-    exports.normalizeJournalHTML = normalizeJournalHTML;
+    exports.normalizeMomentHTML = normalizeMomentHTML;
     exports.objectIncludes = objectIncludes;
     exports.pasteRulesPlugin = pasteRulesPlugin;
     exports.posToDOMRect = posToDOMRect;
@@ -73751,10 +73782,11 @@ img.ProseMirror-separator {
     exports.textblockTypeInputRule = textblockTypeInputRule;
     exports.truncateLinkText = truncateLinkText;
     exports.useArticleEdtor = useArticleEdtor;
+    exports.useCampaignEditor = useCampaignEditor;
     exports.useCommentEditor = useCommentEditor;
     exports.useCurrentEditor = useCurrentEditor;
     exports.useEditor = useEditor;
-    exports.useJournalEditor = useJournalEditor;
+    exports.useMomentEditor = useMomentEditor;
     exports.useReactNodeView = useReactNodeView;
     exports.wrappingInputRule = wrappingInputRule;
 

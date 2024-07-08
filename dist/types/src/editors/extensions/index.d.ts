@@ -23,10 +23,17 @@ export interface MakeCommentEditorExtensionsProps {
 }
 export declare const makeCommentEditorExtensions: ({ placeholder, mentionSuggestion, }: MakeCommentEditorExtensionsProps) => (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Mark<import("./link").LinkOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];
 /**
- * Journal
+ * Moment
  */
-export interface MakeJournalEditorExtensionsProps {
+export interface MakeMomentEditorExtensionsProps {
     placeholder?: string;
     mentionSuggestion?: MentionSuggestion;
 }
-export declare const makeJournalEditorExtensions: ({ placeholder, mentionSuggestion, }: MakeJournalEditorExtensionsProps) => (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Mark<import("./link").LinkOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];
+export declare const makeMomentEditorExtensions: ({ placeholder, mentionSuggestion, }: MakeMomentEditorExtensionsProps) => (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Mark<import("./link").LinkOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];
+/**
+ * Campaign
+ */
+export interface MakeCampaignEditorExtensionsProps {
+    placeholder?: string;
+}
+export declare const makeCampaignEditorExtensions: ({ placeholder, }: MakeCampaignEditorExtensionsProps) => (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];

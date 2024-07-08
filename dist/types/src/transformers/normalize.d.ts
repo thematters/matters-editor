@@ -12,4 +12,5 @@ export declare const truncateLinkText: (html: string, { maxLength, keepProtocol 
 }) => string;
 export declare const normalizeArticleHTML: (html: string, options?: NormalizeOptions) => string;
 export declare const normalizeCommentHTML: (html: string, options?: NormalizeOptions) => string;
-export declare const normalizeJournalHTML: (html: string, options?: NormalizeOptions) => string;
+export declare const normalizeMomentHTML: (html: string, options?: NormalizeOptions) => string;
+export declare const normalizeCampaignHTML: (html: string) => string;
