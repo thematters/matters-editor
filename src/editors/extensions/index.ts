@@ -111,17 +111,17 @@ export const makeCommentEditorExtensions = ({
 }
 
 /**
- * Journal
+ * Moment
  */
-export interface MakeJournalEditorExtensionsProps {
+export interface MakeMomentEditorExtensionsProps {
   placeholder?: string
   mentionSuggestion?: MentionSuggestion
 }
 
-export const makeJournalEditorExtensions = ({
+export const makeMomentEditorExtensions = ({
   placeholder,
   mentionSuggestion,
-}: MakeJournalEditorExtensionsProps) => {
+}: MakeMomentEditorExtensionsProps) => {
   const extensions = [...baseExtensions(placeholder)]
 
   if (mentionSuggestion) {
@@ -129,4 +129,31 @@ export const makeJournalEditorExtensions = ({
   }
 
   return extensions
+}
+
+/**
+ * Campaign
+ */
+export interface MakeCampaignEditorExtensionsProps {
+  placeholder?: string
+}
+
+export const makeCampaignEditorExtensions = ({
+  placeholder,
+}: MakeCampaignEditorExtensionsProps) => {
+  return [
+    Document,
+    History,
+    Placeholder.configure({
+      placeholder,
+    }),
+    // Basic Formats
+    Text,
+    Paragraph,
+    HardBreak.configure({
+      HTMLAttributes: {
+        class: 'smart',
+      },
+    }),
+  ]
 }
