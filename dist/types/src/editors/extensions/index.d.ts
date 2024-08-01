@@ -1,4 +1,4 @@
-import { type MentionSuggestion } from './mention';
+export * from './blockquote';
 export * from './bold';
 export * from './figureAudio';
 export * from './figureEmbed';
@@ -6,34 +6,10 @@ export * from './figureImage';
 export * from './horizontalRule';
 export * from './link';
 export * from './mention';
-/**
- * Article
- */
-export interface MakeArticleEditorExtensionsProps {
-    placeholder?: string;
-    mentionSuggestion?: MentionSuggestion;
-}
-export declare const makeArticleEditorExtensions: ({ placeholder, mentionSuggestion, }: MakeArticleEditorExtensionsProps) => (import("@tiptap/core").Mark<import("./bold").BoldOptions, any> | import("@tiptap/core").Node<any, any> | import("@tiptap/core").Extension<any, any>)[];
-/**
- * Comment
- */
-export interface MakeCommentEditorExtensionsProps {
-    placeholder?: string;
-    mentionSuggestion?: MentionSuggestion;
-}
-export declare const makeCommentEditorExtensions: ({ placeholder, mentionSuggestion, }: MakeCommentEditorExtensionsProps) => (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Mark<import("./link").LinkOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];
-/**
- * Moment
- */
-export interface MakeMomentEditorExtensionsProps {
-    placeholder?: string;
-    mentionSuggestion?: MentionSuggestion;
-}
-export declare const makeMomentEditorExtensions: ({ placeholder, mentionSuggestion, }: MakeMomentEditorExtensionsProps) => (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Mark<import("./link").LinkOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];
-/**
- * Campaign
- */
-export interface MakeCampaignEditorExtensionsProps {
-    placeholder?: string;
-}
-export declare const makeCampaignEditorExtensions: ({ placeholder, }: MakeCampaignEditorExtensionsProps) => (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];
+export * from './pasteDropFile';
+export * from '@tiptap/extension-dropcursor';
+export * from '@tiptap/extension-placeholder';
+export declare const articleEditorExtensions: (import("@tiptap/core").Mark<import("./bold").BoldOptions, any> | import("@tiptap/core").Node<any, any> | import("@tiptap/core").Extension<any, any>)[];
+export declare const commentEditorExtensions: (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Mark<import("./link").LinkOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];
+export declare const momentEditorExtensions: (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Mark<import("./link").LinkOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];
+export declare const campaignEditorExtensions: (import("@tiptap/core").Node<any, any> | import("@tiptap/core").Extension<import("@tiptap/extension-history").HistoryOptions, any> | import("@tiptap/core").Extension<import("@tiptap/extension-placeholder").PlaceholderOptions, any>)[];

@@ -465,7 +465,7 @@
         /**
         Find the index and inner offset corresponding to a given relative
         position in this fragment. The result object will be reused
-        (overwritten) the next time the function is called. (Not public.)
+        (overwritten) the next time the function is called. @internal
         */
         findIndex(pos, round = -1) {
             if (pos == 0)
@@ -698,7 +698,9 @@
             let type = schema.marks[json.type];
             if (!type)
                 throw new RangeError(`There is no mark type ${json.type} in this schema`);
-            return type.create(json.attrs);
+            let mark = type.create(json.attrs);
+            type.checkAttrs(mark.attrs);
+            return mark;
         }
         /**
         Test whether two sets of marks are identical.
@@ -1256,17 +1258,29 @@
         @internal
         */
         static resolveCached(doc, pos) {
-            for (let i = 0; i < resolveCache.length; i++) {
-                let cached = resolveCache[i];
-                if (cached.pos == pos && cached.doc == doc)
-                    return cached;
+            let cache = resolveCache.get(doc);
+            if (cache) {
+                for (let i = 0; i < cache.elts.length; i++) {
+                    let elt = cache.elts[i];
+                    if (elt.pos == pos)
+                        return elt;
+                }
             }
-            let result = resolveCache[resolveCachePos] = ResolvedPos.resolve(doc, pos);
-            resolveCachePos = (resolveCachePos + 1) % resolveCacheSize;
+            else {
+                resolveCache.set(doc, cache = new ResolveCache);
+            }
+            let result = cache.elts[cache.i] = ResolvedPos.resolve(doc, pos);
+            cache.i = (cache.i + 1) % resolveCacheSize;
             return result;
         }
     }
-    let resolveCache = [], resolveCachePos = 0, resolveCacheSize = 12;
+    class ResolveCache {
+        constructor() {
+            this.elts = [];
+            this.i = 0;
+        }
+    }
+    const resolveCacheSize = 12, resolveCache = new WeakMap();
     /**
     Represents a flat range of content, i.e. one that starts and
     ends in the same node.
@@ -1666,13 +1680,17 @@
         }
         /**
         Check whether this node and its descendants conform to the
-        schema, and raise error when they do not.
+        schema, and raise an exception when they do not.
         */
         check() {
             this.type.checkContent(this.content);
+            this.type.checkAttrs(this.attrs);
             let copy = Mark$1.none;
-            for (let i = 0; i < this.marks.length; i++)
-                copy = this.marks[i].addToSet(copy);
+            for (let i = 0; i < this.marks.length; i++) {
+                let mark = this.marks[i];
+                mark.type.checkAttrs(mark.attrs);
+                copy = mark.addToSet(copy);
+            }
             if (!Mark$1.sameSet(copy, this.marks))
                 throw new RangeError(`Invalid collection of marks for node ${this.type.name}: ${this.marks.map(m => m.type.name)}`);
             this.content.forEach(node => node.check());
@@ -1698,7 +1716,7 @@
         static fromJSON(schema, json) {
             if (!json)
                 throw new RangeError("Invalid input for Node.fromJSON");
-            let marks = null;
+            let marks = undefined;
             if (json.marks) {
                 if (!Array.isArray(json.marks))
                     throw new RangeError("Invalid mark data for Node.fromJSON");
@@ -1710,7 +1728,9 @@
                 return schema.text(json.text, marks);
             }
             let content = Fragment.fromJSON(schema, json.content);
-            return schema.nodeType(json.type).create(json.attrs, content, marks);
+            let node = schema.nodeType(json.type).create(json.attrs, content, marks);
+            node.type.checkAttrs(node.attrs);
+            return node;
         }
     };
     Node$1.prototype.text = undefined;
@@ -2227,11 +2247,21 @@
         }
         return built;
     }
-    function initAttrs(attrs) {
+    function checkAttrs(attrs, values, type, name) {
+        for (let name in values)
+            if (!(name in attrs))
+                throw new RangeError(`Unsupported attribute ${name} for ${type} of type ${name}`);
+        for (let name in attrs) {
+            let attr = attrs[name];
+            if (attr.validate)
+                attr.validate(values[name]);
+        }
+    }
+    function initAttrs(typeName, attrs) {
         let result = Object.create(null);
         if (attrs)
             for (let name in attrs)
-                result[name] = new Attribute(attrs[name]);
+                result[name] = new Attribute(typeName, name, attrs[name]);
         return result;
     }
     /**
@@ -2266,7 +2296,7 @@
             */
             this.markSet = null;
             this.groups = spec.group ? spec.group.split(" ") : [];
-            this.attrs = initAttrs(spec.attrs);
+            this.attrs = initAttrs(name, spec.attrs);
             this.defaultAttrs = defaultAttrs(this.attrs);
             this.contentMatch = null;
             this.inlineContent = null;
@@ -2370,7 +2400,7 @@
         }
         /**
         Returns true if the given fragment is valid content for this node
-        type with the given attributes.
+        type.
         */
         validContent(content) {
             let result = this.contentMatch.matchFragment(content);
@@ -2389,6 +2419,12 @@
         checkContent(content) {
             if (!this.validContent(content))
                 throw new RangeError(`Invalid content for node ${this.name}: ${content.toString().slice(0, 50)}`);
+        }
+        /**
+        @internal
+        */
+        checkAttrs(attrs) {
+            checkAttrs(this.attrs, attrs, "node", this.name);
         }
         /**
         Check whether the given mark type is allowed in this node.
@@ -2441,11 +2477,20 @@
             return result;
         }
     };
+    function validateType(typeName, attrName, type) {
+        let types = type.split("|");
+        return (value) => {
+            let name = value === null ? "null" : typeof value;
+            if (types.indexOf(name) < 0)
+                throw new RangeError(`Expected value of type ${types} for attribute ${attrName} on type ${typeName}, got ${name}`);
+        };
+    }
     // Attribute descriptors
     class Attribute {
-        constructor(options) {
+        constructor(typeName, attrName, options) {
             this.hasDefault = Object.prototype.hasOwnProperty.call(options, "default");
             this.default = options.default;
+            this.validate = typeof options.validate == "string" ? validateType(typeName, attrName, options.validate) : options.validate;
         }
         get isRequired() {
             return !this.hasDefault;
@@ -2483,7 +2528,7 @@
             this.rank = rank;
             this.schema = schema;
             this.spec = spec;
-            this.attrs = initAttrs(spec.attrs);
+            this.attrs = initAttrs(name, spec.attrs);
             this.excluded = null;
             let defaults = defaultAttrs(this.attrs);
             this.instance = defaults ? new Mark$1(this, defaults) : null;
@@ -2527,6 +2572,12 @@
                     return set[i];
         }
         /**
+        @internal
+        */
+        checkAttrs(attrs) {
+            checkAttrs(this.attrs, attrs, "mark", this.name);
+        }
+        /**
         Queries whether a given mark type is
         [excluded](https://prosemirror.net/docs/ref/#model.MarkSpec.excludes) by this one.
         */
@@ -2549,6 +2600,12 @@
         */
         constructor(spec) {
             /**
+            The [linebreak
+            replacement](https://prosemirror.net/docs/ref/#model.NodeSpec.linebreakReplacement) node defined
+            in this schema, if any.
+            */
+            this.linebreakReplacement = null;
+            /**
             An object for storing whatever values modules may want to
             compute and cache per schema. (If you want to store something
             in it, try to use property names unlikely to clash.)
@@ -2569,6 +2626,13 @@
                 type.contentMatch = contentExprCache[contentExpr] ||
                     (contentExprCache[contentExpr] = ContentMatch.parse(contentExpr, this.nodes));
                 type.inlineContent = type.contentMatch.inlineContent;
+                if (type.spec.linebreakReplacement) {
+                    if (this.linebreakReplacement)
+                        throw new RangeError("Multiple linebreak nodes defined");
+                    if (!type.isInline || !type.isLeaf)
+                        throw new RangeError("Linebreak replacement nodes must be inline leaf nodes");
+                    this.linebreakReplacement = type;
+                }
                 type.markSet = markExpr == "_" ? null :
                     markExpr ? gatherMarks(this, markExpr.split(" ")) :
                         markExpr == "" || !type.inlineContent ? [] : null;
@@ -2657,6 +2721,8 @@
         return found;
     }
 
+    function isTagRule(rule) { return rule.tag != null; }
+    function isStyleRule(rule) { return rule.style != null; }
     /**
     A DOM parser represents a strategy for parsing DOM content into a
     ProseMirror document conforming to a given schema. Its behavior is
@@ -2687,11 +2753,17 @@
             @internal
             */
             this.styles = [];
+            let matchedStyles = this.matchedStyles = [];
             rules.forEach(rule => {
-                if (rule.tag)
+                if (isTagRule(rule)) {
                     this.tags.push(rule);
-                else if (rule.style)
+                }
+                else if (isStyleRule(rule)) {
+                    let prop = /[^=]*/.exec(rule.style)[0];
+                    if (matchedStyles.indexOf(prop) < 0)
+                        matchedStyles.push(prop);
                     this.styles.push(rule);
+                }
             });
             // Only normalize list elements when lists in the schema can't directly contain themselves
             this.normalizeLists = !this.tags.some(r => {
@@ -2941,10 +3013,10 @@
                 this.addElement(dom);
         }
         withStyleRules(dom, f) {
-            let style = dom.getAttribute("style");
-            if (!style)
+            let style = dom.style;
+            if (!style || !style.length)
                 return f();
-            let marks = this.readStyles(parseStyles(style));
+            let marks = this.readStyles(dom.style);
             if (!marks)
                 return; // A style with ignore: true
             let [addMarks, removeMarks] = marks, top = this.top;
@@ -3053,28 +3125,36 @@
         // had a rule with `ignore` set.
         readStyles(styles) {
             let add = Mark$1.none, remove = Mark$1.none;
-            for (let i = 0; i < styles.length; i += 2) {
-                for (let after = undefined;;) {
-                    let rule = this.parser.matchStyle(styles[i], styles[i + 1], this, after);
-                    if (!rule)
-                        break;
-                    if (rule.ignore)
-                        return null;
-                    if (rule.clearMark) {
-                        this.top.pendingMarks.concat(this.top.activeMarks).forEach(m => {
-                            if (rule.clearMark(m))
-                                remove = m.addToSet(remove);
-                        });
-                    }
-                    else {
-                        add = this.parser.schema.marks[rule.mark].create(rule.attrs).addToSet(add);
-                    }
-                    if (rule.consuming === false)
-                        after = rule;
-                    else
-                        break;
+            // Because many properties will only show up in 'normalized' form
+            // in `style.item` (i.e. text-decoration becomes
+            // text-decoration-line, text-decoration-color, etc), we directly
+            // query the styles mentioned in our rules instead of iterating
+            // over the items.
+            if (styles.length)
+                for (let i = 0; i < this.parser.matchedStyles.length; i++) {
+                    let name = this.parser.matchedStyles[i], value = styles.getPropertyValue(name);
+                    if (value)
+                        for (let after = undefined;;) {
+                            let rule = this.parser.matchStyle(name, value, this, after);
+                            if (!rule)
+                                break;
+                            if (rule.ignore)
+                                return null;
+                            if (rule.clearMark) {
+                                this.top.pendingMarks.concat(this.top.activeMarks).forEach(m => {
+                                    if (rule.clearMark(m))
+                                        remove = m.addToSet(remove);
+                                });
+                            }
+                            else {
+                                add = this.parser.schema.marks[rule.mark].create(rule.attrs).addToSet(add);
+                            }
+                            if (rule.consuming === false)
+                                after = rule;
+                            else
+                                break;
+                        }
                 }
-            }
             return [add, remove];
         }
         // Look up a handler for the given node. If none are found, return
@@ -3358,13 +3438,6 @@
     function matches(dom, selector) {
         return (dom.matches || dom.msMatchesSelector || dom.webkitMatchesSelector || dom.mozMatchesSelector).call(dom, selector);
     }
-    // Tokenize a style attribute into property/value pairs.
-    function parseStyles(style) {
-        let re = /\s*([\w-]+)\s*:\s*([^;]+)/g, m, result = [];
-        while (m = re.exec(style))
-            result.push(m[1], m[2].trim());
-        return result;
-    }
     function copy(obj) {
         let copy = {};
         for (let prop in obj)
@@ -3471,7 +3544,7 @@
         @internal
         */
         serializeNodeInner(node, options) {
-            let { dom, contentDOM } = DOMSerializer.renderSpec(doc$1(options), this.nodes[node.type.name](node));
+            let { dom, contentDOM } = renderSpec(doc$1(options), this.nodes[node.type.name](node), null, node.attrs);
             if (contentDOM) {
                 if (node.isLeaf)
                     throw new RangeError("Content hole not allowed in a leaf node spec");
@@ -3502,57 +3575,10 @@
         */
         serializeMark(mark, inline, options = {}) {
             let toDOM = this.marks[mark.type.name];
-            return toDOM && DOMSerializer.renderSpec(doc$1(options), toDOM(mark, inline));
+            return toDOM && renderSpec(doc$1(options), toDOM(mark, inline), null, mark.attrs);
         }
-        /**
-        Render an [output spec](https://prosemirror.net/docs/ref/#model.DOMOutputSpec) to a DOM node. If
-        the spec has a hole (zero) in it, `contentDOM` will point at the
-        node with the hole.
-        */
-        static renderSpec(doc, structure, xmlNS = null) {
-            if (typeof structure == "string")
-                return { dom: doc.createTextNode(structure) };
-            if (structure.nodeType != null)
-                return { dom: structure };
-            if (structure.dom && structure.dom.nodeType != null)
-                return structure;
-            let tagName = structure[0], space = tagName.indexOf(" ");
-            if (space > 0) {
-                xmlNS = tagName.slice(0, space);
-                tagName = tagName.slice(space + 1);
-            }
-            let contentDOM;
-            let dom = (xmlNS ? doc.createElementNS(xmlNS, tagName) : doc.createElement(tagName));
-            let attrs = structure[1], start = 1;
-            if (attrs && typeof attrs == "object" && attrs.nodeType == null && !Array.isArray(attrs)) {
-                start = 2;
-                for (let name in attrs)
-                    if (attrs[name] != null) {
-                        let space = name.indexOf(" ");
-                        if (space > 0)
-                            dom.setAttributeNS(name.slice(0, space), name.slice(space + 1), attrs[name]);
-                        else
-                            dom.setAttribute(name, attrs[name]);
-                    }
-            }
-            for (let i = start; i < structure.length; i++) {
-                let child = structure[i];
-                if (child === 0) {
-                    if (i < structure.length - 1 || i > start)
-                        throw new RangeError("Content hole must be the only child of its parent node");
-                    return { dom, contentDOM: dom };
-                }
-                else {
-                    let { dom: inner, contentDOM: innerContent } = DOMSerializer.renderSpec(doc, child, xmlNS);
-                    dom.appendChild(inner);
-                    if (innerContent) {
-                        if (contentDOM)
-                            throw new RangeError("Multiple content holes");
-                        contentDOM = innerContent;
-                    }
-                }
-            }
-            return { dom, contentDOM };
+        static renderSpec(doc, structure, xmlNS = null, blockArraysIn) {
+            return renderSpec(doc, structure, xmlNS, blockArraysIn);
         }
         /**
         Build a serializer using the [`toDOM`](https://prosemirror.net/docs/ref/#model.NodeSpec.toDOM)
@@ -3590,6 +3616,88 @@
     }
     function doc$1(options) {
         return options.document || window.document;
+    }
+    const suspiciousAttributeCache = new WeakMap();
+    function suspiciousAttributes(attrs) {
+        let value = suspiciousAttributeCache.get(attrs);
+        if (value === undefined)
+            suspiciousAttributeCache.set(attrs, value = suspiciousAttributesInner(attrs));
+        return value;
+    }
+    function suspiciousAttributesInner(attrs) {
+        let result = null;
+        function scan(value) {
+            if (value && typeof value == "object") {
+                if (Array.isArray(value)) {
+                    if (typeof value[0] == "string") {
+                        if (!result)
+                            result = [];
+                        result.push(value);
+                    }
+                    else {
+                        for (let i = 0; i < value.length; i++)
+                            scan(value[i]);
+                    }
+                }
+                else {
+                    for (let prop in value)
+                        scan(value[prop]);
+                }
+            }
+        }
+        scan(attrs);
+        return result;
+    }
+    function renderSpec(doc, structure, xmlNS, blockArraysIn) {
+        if (typeof structure == "string")
+            return { dom: doc.createTextNode(structure) };
+        if (structure.nodeType != null)
+            return { dom: structure };
+        if (structure.dom && structure.dom.nodeType != null)
+            return structure;
+        let tagName = structure[0], suspicious;
+        if (typeof tagName != "string")
+            throw new RangeError("Invalid array passed to renderSpec");
+        if (blockArraysIn && (suspicious = suspiciousAttributes(blockArraysIn)) &&
+            suspicious.indexOf(structure) > -1)
+            throw new RangeError("Using an array from an attribute object as a DOM spec. This may be an attempted cross site scripting attack.");
+        let space = tagName.indexOf(" ");
+        if (space > 0) {
+            xmlNS = tagName.slice(0, space);
+            tagName = tagName.slice(space + 1);
+        }
+        let contentDOM;
+        let dom = (xmlNS ? doc.createElementNS(xmlNS, tagName) : doc.createElement(tagName));
+        let attrs = structure[1], start = 1;
+        if (attrs && typeof attrs == "object" && attrs.nodeType == null && !Array.isArray(attrs)) {
+            start = 2;
+            for (let name in attrs)
+                if (attrs[name] != null) {
+                    let space = name.indexOf(" ");
+                    if (space > 0)
+                        dom.setAttributeNS(name.slice(0, space), name.slice(space + 1), attrs[name]);
+                    else
+                        dom.setAttribute(name, attrs[name]);
+                }
+        }
+        for (let i = start; i < structure.length; i++) {
+            let child = structure[i];
+            if (child === 0) {
+                if (i < structure.length - 1 || i > start)
+                    throw new RangeError("Content hole must be the only child of its parent node");
+                return { dom, contentDOM: dom };
+            }
+            else {
+                let { dom: inner, contentDOM: innerContent } = renderSpec(doc, child, xmlNS, blockArraysIn);
+                dom.appendChild(inner);
+                if (innerContent) {
+                    if (contentDOM)
+                        throw new RangeError("Multiple content holes");
+                    contentDOM = innerContent;
+                }
+            }
+        }
+        return { dom, contentDOM };
     }
 
     // Recovery values encode a range index and an offset. They are
@@ -4416,7 +4524,8 @@
         }
         map(mapping) {
             let from = mapping.mapResult(this.from, 1), to = mapping.mapResult(this.to, -1);
-            let gapFrom = mapping.map(this.gapFrom, -1), gapTo = mapping.map(this.gapTo, 1);
+            let gapFrom = this.from == this.gapFrom ? from.pos : mapping.map(this.gapFrom, -1);
+            let gapTo = this.to == this.gapTo ? to.pos : mapping.map(this.gapTo, 1);
             if ((from.deletedAcross && to.deletedAcross) || gapFrom < from.pos || gapTo > to.pos)
                 return null;
             return new ReplaceAroundStep(from.pos, to.pos, gapFrom, gapTo, this.slice, this.insert, this.structure);
@@ -4528,7 +4637,7 @@
         });
         matched.forEach(m => tr.step(new RemoveMarkStep(m.from, m.to, m.style)));
     }
-    function clearIncompatible(tr, pos, parentType, match = parentType.contentMatch) {
+    function clearIncompatible(tr, pos, parentType, match = parentType.contentMatch, clearNewlines = true) {
         let node = tr.doc.nodeAt(pos);
         let replSteps = [], cur = pos + 1;
         for (let i = 0; i < node.childCount; i++) {
@@ -4542,7 +4651,7 @@
                 for (let j = 0; j < child.marks.length; j++)
                     if (!parentType.allowsMarkType(child.marks[j].type))
                         tr.step(new RemoveMarkStep(cur, end, child.marks[j]));
-                if (child.isText && !parentType.spec.code) {
+                if (clearNewlines && child.isText && parentType.whitespace != "pre") {
                     let m, newline = /\r?\n|\r/g, slice;
                     while (m = newline.exec(child.text)) {
                         if (!slice)
@@ -4667,12 +4776,43 @@
         let mapFrom = tr.steps.length;
         tr.doc.nodesBetween(from, to, (node, pos) => {
             if (node.isTextblock && !node.hasMarkup(type, attrs) && canChangeType(tr.doc, tr.mapping.slice(mapFrom).map(pos), type)) {
+                let convertNewlines = null;
+                if (type.schema.linebreakReplacement) {
+                    let pre = type.whitespace == "pre", supportLinebreak = !!type.contentMatch.matchType(type.schema.linebreakReplacement);
+                    if (pre && !supportLinebreak)
+                        convertNewlines = false;
+                    else if (!pre && supportLinebreak)
+                        convertNewlines = true;
+                }
                 // Ensure all markup that isn't allowed in the new node type is cleared
-                tr.clearIncompatible(tr.mapping.slice(mapFrom).map(pos, 1), type);
+                if (convertNewlines === false)
+                    replaceLinebreaks(tr, node, pos, mapFrom);
+                clearIncompatible(tr, tr.mapping.slice(mapFrom).map(pos, 1), type, undefined, convertNewlines === null);
                 let mapping = tr.mapping.slice(mapFrom);
                 let startM = mapping.map(pos, 1), endM = mapping.map(pos + node.nodeSize, 1);
                 tr.step(new ReplaceAroundStep(startM, endM, startM + 1, endM - 1, new Slice(Fragment.from(type.create(attrs, null, node.marks)), 0, 0), 1, true));
+                if (convertNewlines === true)
+                    replaceNewlines$1(tr, node, pos, mapFrom);
                 return false;
+            }
+        });
+    }
+    function replaceNewlines$1(tr, node, pos, mapFrom) {
+        node.forEach((child, offset) => {
+            if (child.isText) {
+                let m, newline = /\r?\n|\r/g;
+                while (m = newline.exec(child.text)) {
+                    let start = tr.mapping.slice(mapFrom).map(pos + 1 + offset + m.index);
+                    tr.replaceWith(start, start + 1, node.type.schema.linebreakReplacement.create());
+                }
+            }
+        });
+    }
+    function replaceLinebreaks(tr, node, pos, mapFrom) {
+        node.forEach((child, offset) => {
+            if (child.type == child.type.schema.linebreakReplacement) {
+                let start = tr.mapping.slice(mapFrom).map(pos + 1 + offset);
+                tr.replaceWith(start, start + 1, node.type.schema.text("\n"));
             }
         });
     }
@@ -6684,6 +6824,9 @@
         range.setStart(node, from || 0);
         return range;
     };
+    const clearReusedRange = function () {
+        reusedRange = null;
+    };
     // Scans forward and backward through DOM positions equivalent to the
     // given one to see if the two are in the same place (i.e. after a
     // text node vs at the end of that text node)
@@ -6717,6 +6860,44 @@
     }
     function nodeSize(node) {
         return node.nodeType == 3 ? node.nodeValue.length : node.childNodes.length;
+    }
+    function textNodeBefore$1(node, offset) {
+        for (;;) {
+            if (node.nodeType == 3 && offset)
+                return node;
+            if (node.nodeType == 1 && offset > 0) {
+                if (node.contentEditable == "false")
+                    return null;
+                node = node.childNodes[offset - 1];
+                offset = nodeSize(node);
+            }
+            else if (node.parentNode && !hasBlockDesc(node)) {
+                offset = domIndex(node);
+                node = node.parentNode;
+            }
+            else {
+                return null;
+            }
+        }
+    }
+    function textNodeAfter$1(node, offset) {
+        for (;;) {
+            if (node.nodeType == 3 && offset < node.nodeValue.length)
+                return node;
+            if (node.nodeType == 1 && offset < node.childNodes.length) {
+                if (node.contentEditable == "false")
+                    return null;
+                node = node.childNodes[offset];
+                offset = 0;
+            }
+            else if (node.parentNode && !hasBlockDesc(node)) {
+                offset = domIndex(node) + 1;
+                node = node.parentNode;
+            }
+            else {
+                return null;
+            }
+        }
     }
     function isOnEdge(node, offset, parent) {
         for (let atStart = offset == 0, atEnd = offset == nodeSize(node); atStart || atEnd;) {
@@ -6794,6 +6975,12 @@
     const webkit_version = webkit ? +(/\bAppleWebKit\/(\d+)/.exec(navigator.userAgent) || [0, 0])[1] : 0;
 
     function windowRect(doc) {
+        let vp = doc.defaultView && doc.defaultView.visualViewport;
+        if (vp)
+            return {
+                left: 0, right: vp.width,
+                top: 0, bottom: vp.height
+            };
         return { left: 0, right: doc.documentElement.clientWidth,
             top: 0, bottom: doc.documentElement.clientHeight };
     }
@@ -7010,14 +7197,15 @@
             let desc = view.docView.nearestDesc(cur, true);
             if (!desc)
                 return null;
-            if (desc.dom.nodeType == 1 && (desc.node.isBlock && desc.parent && !sawBlock || !desc.contentDOM)) {
+            if (desc.dom.nodeType == 1 && (desc.node.isBlock && desc.parent || !desc.contentDOM)) {
                 let rect = desc.dom.getBoundingClientRect();
-                if (desc.node.isBlock && desc.parent && !sawBlock) {
-                    sawBlock = true;
-                    if (rect.left > coords.left || rect.top > coords.top)
+                if (desc.node.isBlock && desc.parent) {
+                    // Only apply the horizontal test to the innermost block. Vertical for any parent.
+                    if (!sawBlock && rect.left > coords.left || rect.top > coords.top)
                         outsideBlock = desc.posBefore;
-                    else if (rect.right < coords.left || rect.bottom < coords.top)
+                    else if (!sawBlock && rect.right < coords.left || rect.bottom < coords.top)
                         outsideBlock = desc.posAfter;
+                    sawBlock = true;
                 }
                 if (!desc.contentDOM && outsideBlock < 0 && !desc.node.isText) {
                     // If we are inside a leaf, return the side of the leaf closer to the coords
@@ -7729,6 +7917,7 @@
         }
         get domAtom() { return false; }
         get ignoreForCoords() { return false; }
+        isText(text) { return false; }
     }
     // A widget desc represents a widget decoration, which is a DOM node
     // drawn between the document nodes.
@@ -7807,7 +7996,7 @@
             let custom = view.nodeViews[mark.type.name];
             let spec = custom && custom(mark, view, inline);
             if (!spec || !spec.dom)
-                spec = DOMSerializer.renderSpec(document, mark.type.spec.toDOM(mark, inline));
+                spec = DOMSerializer.renderSpec(document, mark.type.spec.toDOM(mark, inline), null, mark.attrs);
             return new MarkViewDesc(parent, mark, spec.dom, spec.contentDOM || spec.dom);
         }
         parseRule() {
@@ -7879,7 +8068,8 @@
                     throw new RangeError("Text must be rendered as a DOM text node");
             }
             else if (!dom) {
-                ({ dom, contentDOM } = DOMSerializer.renderSpec(document, node.type.spec.toDOM(node)));
+                let spec = DOMSerializer.renderSpec(document, node.type.spec.toDOM(node), null, node.attrs);
+                ({ dom, contentDOM } = spec);
             }
             if (!contentDOM && !node.isText && dom.nodeName != "BR") { // Chrome gets confused by <br contenteditable=false>
                 if (!dom.hasAttribute("contenteditable"))
@@ -7991,8 +8181,7 @@
             let { from, to } = view.state.selection;
             if (!(view.state.selection instanceof TextSelection) || from < pos || to > pos + this.node.content.size)
                 return null;
-            let sel = view.domSelectionRange();
-            let textNode = nearbyTextNode(sel.focusNode, sel.focusOffset);
+            let textNode = view.input.compositionNode;
             if (!textNode || !this.dom.contains(textNode.parentNode))
                 return null;
             if (this.node.inlineContent) {
@@ -8066,10 +8255,11 @@
         }
         // Remove selected node marking from this node.
         deselectNode() {
-            if (this.nodeDOM.nodeType == 1)
+            if (this.nodeDOM.nodeType == 1) {
                 this.nodeDOM.classList.remove("ProseMirror-selectednode");
-            if (this.contentDOM || !this.node.type.spec.draggable)
-                this.dom.removeAttribute("draggable");
+                if (this.contentDOM || !this.node.type.spec.draggable)
+                    this.dom.removeAttribute("draggable");
+            }
         }
         get domAtom() { return this.node.isAtom; }
     }
@@ -8134,6 +8324,7 @@
                 this.dirty = NODE_DIRTY;
         }
         get domAtom() { return false; }
+        isText(text) { return this.node.text == text; }
     }
     // A dummy desc used to tag trailing BR or IMG nodes created to work
     // around contentEditable terribleness.
@@ -8701,25 +8892,6 @@
             dom.style.cssText = oldCSS + "; list-style: square !important";
             window.getComputedStyle(dom).listStyle;
             dom.style.cssText = oldCSS;
-        }
-    }
-    function nearbyTextNode(node, offset) {
-        for (;;) {
-            if (node.nodeType == 3)
-                return node;
-            if (node.nodeType == 1 && offset > 0) {
-                if (node.childNodes.length > offset && node.childNodes[offset].nodeType == 3)
-                    return node.childNodes[offset];
-                node = node.childNodes[offset - 1];
-                offset = nodeSize(node);
-            }
-            else if (node.nodeType == 1 && offset < node.childNodes.length) {
-                node = node.childNodes[offset];
-                offset = 0;
-            }
-            else {
-                return null;
-            }
         }
     }
     // Find a piece of text in an inline fragment, overlapping from-to
@@ -9385,7 +9557,7 @@
             firstChild.setAttribute("data-pm-slice", `${openStart} ${openEnd}${wrappers ? ` -${wrappers}` : ""} ${JSON.stringify(context)}`);
         let text = view.someProp("clipboardTextSerializer", f => f(slice, view)) ||
             slice.content.textBetween(0, slice.content.size, "\n\n");
-        return { dom: wrap, text };
+        return { dom: wrap, text, slice };
     }
     // Read a slice of content from the clipboard (or drop data).
     function parseFromClipboard(view, text, html, plainText, $context) {
@@ -9626,6 +9798,7 @@
             this.lastTouch = 0;
             this.lastAndroidDelete = 0;
             this.composing = false;
+            this.compositionNode = null;
             this.composingTimeout = -1;
             this.compositionNodes = [];
             this.compositionEndedAt = -2e8;
@@ -9901,7 +10074,7 @@
             }
             const target = flushed ? null : event.target;
             const targetDesc = target ? view.docView.nearestDesc(target, true) : null;
-            this.target = targetDesc ? targetDesc.dom : null;
+            this.target = targetDesc && targetDesc.dom.nodeType == 1 ? targetDesc.dom : null;
             let { selection } = view.state;
             if (event.button == 0 &&
                 targetNode.type.spec.draggable && targetNode.type.spec.selectable !== false ||
@@ -10062,6 +10235,7 @@
             view.input.composing = false;
             view.input.compositionEndedAt = event.timeStamp;
             view.input.compositionPendingChanges = view.domObserver.pendingRecords().length ? view.input.compositionID : 0;
+            view.input.compositionNode = null;
             if (view.input.compositionPendingChanges)
                 Promise.resolve().then(() => view.domObserver.flush());
             view.input.compositionID++;
@@ -10080,6 +10254,27 @@
         }
         while (view.input.compositionNodes.length > 0)
             view.input.compositionNodes.pop().markParentsDirty();
+    }
+    function findCompositionNode(view) {
+        let sel = view.domSelectionRange();
+        if (!sel.focusNode)
+            return null;
+        let textBefore = textNodeBefore$1(sel.focusNode, sel.focusOffset);
+        let textAfter = textNodeAfter$1(sel.focusNode, sel.focusOffset);
+        if (textBefore && textAfter && textBefore != textAfter) {
+            let descAfter = textAfter.pmViewDesc, lastChanged = view.domObserver.lastChangedTextNode;
+            if (textBefore == lastChanged || textAfter == lastChanged)
+                return lastChanged;
+            if (!descAfter || !descAfter.isText(textAfter.nodeValue)) {
+                return textAfter;
+            }
+            else if (view.input.compositionNode == textAfter) {
+                let descBefore = textBefore.pmViewDesc;
+                if (!(!descBefore || !descBefore.isText(textBefore.nodeValue)))
+                    return textAfter;
+            }
+        }
+        return textBefore || textAfter;
     }
     function timestampFromCustomEvent() {
         let event = document.createEvent("Event");
@@ -10236,8 +10431,11 @@
             if (desc && desc.node.type.spec.draggable && desc != view.docView)
                 node = NodeSelection.create(view.state.doc, desc.posBefore);
         }
-        let slice = (node || view.state.selection).content(), { dom, text } = serializeForClipboard(view, slice);
-        event.dataTransfer.clearData();
+        let draggedSlice = (node || view.state.selection).content();
+        let { dom, text, slice } = serializeForClipboard(view, draggedSlice);
+        // Pre-120 Chrome versions clear files when calling `clearData` (#1472)
+        if (!event.dataTransfer.files.length || !chrome || chrome_version > 120)
+            event.dataTransfer.clearData();
         event.dataTransfer.setData(brokenClipboardAPI ? "Text" : "text/html", dom.innerHTML);
         // See https://github.com/ProseMirror/prosemirror/issues/1156
         event.dataTransfer.effectAllowed = "copyMove";
@@ -11080,6 +11278,7 @@
             this.currentSelection = new SelectionState;
             this.onCharData = null;
             this.suppressingSelectionUpdates = false;
+            this.lastChangedTextNode = null;
             this.observer = window.MutationObserver &&
                 new window.MutationObserver(mutations => {
                     for (let i = 0; i < mutations.length; i++)
@@ -11212,14 +11411,22 @@
                     }
                 }
             }
-            if (gecko && added.length > 1) {
+            if (gecko && added.length) {
                 let brs = added.filter(n => n.nodeName == "BR");
                 if (brs.length == 2) {
-                    let a = brs[0], b = brs[1];
+                    let [a, b] = brs;
                     if (a.parentNode && a.parentNode.parentNode == b.parentNode)
                         b.remove();
                     else
                         a.remove();
+                }
+                else {
+                    let { focusNode } = this.currentSelection;
+                    for (let br of brs) {
+                        let parent = br.parentNode;
+                        if (parent && parent.nodeName == "LI" && (!focusNode || blockParent(view, focusNode) != parent))
+                            br.remove();
+                    }
                 }
             }
             let readSel = null;
@@ -11261,8 +11468,12 @@
             if (!desc || desc.ignoreMutation(mut))
                 return null;
             if (mut.type == "childList") {
-                for (let i = 0; i < mut.addedNodes.length; i++)
-                    added.push(mut.addedNodes[i]);
+                for (let i = 0; i < mut.addedNodes.length; i++) {
+                    let node = mut.addedNodes[i];
+                    added.push(node);
+                    if (node.nodeType == 3)
+                        this.lastChangedTextNode = node;
+                }
                 if (desc.contentDOM && desc.contentDOM != desc.dom && !desc.contentDOM.contains(mut.target))
                     return { from: desc.posBefore, to: desc.posAfter };
                 let prev = mut.previousSibling, next = mut.nextSibling;
@@ -11289,6 +11500,7 @@
                 return { from: desc.posAtStart - desc.border, to: desc.posAtEnd + desc.border };
             }
             else { // "characterData"
+                this.lastChangedTextNode = mut.target;
                 return {
                     from: desc.posAtStart,
                     to: desc.posAtEnd,
@@ -11315,9 +11527,25 @@
             cssCheckWarned = true;
         }
     }
+    function rangeToSelectionRange(view, range) {
+        let anchorNode = range.startContainer, anchorOffset = range.startOffset;
+        let focusNode = range.endContainer, focusOffset = range.endOffset;
+        let currentAnchor = view.domAtPos(view.state.selection.anchor);
+        // Since such a range doesn't distinguish between anchor and head,
+        // use a heuristic that flips it around if its end matches the
+        // current anchor.
+        if (isEquivalentPosition(currentAnchor.node, currentAnchor.offset, focusNode, focusOffset))
+            [anchorNode, anchorOffset, focusNode, focusOffset] = [focusNode, focusOffset, anchorNode, anchorOffset];
+        return { anchorNode, anchorOffset, focusNode, focusOffset };
+    }
     // Used to work around a Safari Selection/shadow DOM bug
     // Based on https://github.com/codemirror/dev/issues/414 fix
-    function safariShadowSelectionRange(view) {
+    function safariShadowSelectionRange(view, selection) {
+        if (selection.getComposedRanges) {
+            let range = selection.getComposedRanges(view.root)[0];
+            if (range)
+                return rangeToSelectionRange(view, range);
+        }
         let found;
         function read(event) {
             event.preventDefault();
@@ -11332,15 +11560,15 @@
         view.dom.addEventListener("beforeinput", read, true);
         document.execCommand("indent");
         view.dom.removeEventListener("beforeinput", read, true);
-        let anchorNode = found.startContainer, anchorOffset = found.startOffset;
-        let focusNode = found.endContainer, focusOffset = found.endOffset;
-        let currentAnchor = view.domAtPos(view.state.selection.anchor);
-        // Since such a range doesn't distinguish between anchor and head,
-        // use a heuristic that flips it around if its end matches the
-        // current anchor.
-        if (isEquivalentPosition(currentAnchor.node, currentAnchor.offset, focusNode, focusOffset))
-            [anchorNode, anchorOffset, focusNode, focusOffset] = [focusNode, focusOffset, anchorNode, anchorOffset];
-        return { anchorNode, anchorOffset, focusNode, focusOffset };
+        return found ? rangeToSelectionRange(view, found) : null;
+    }
+    function blockParent(view, node) {
+        for (let p = node.parentNode; p && p != view.dom; p = p.parentNode) {
+            let desc = view.docView.nearestDesc(p, true);
+            if (desc && desc.node.isBlock)
+                return p;
+        }
+        return null;
     }
 
     // Note that all referencing and parsing is done with the
@@ -11483,13 +11711,6 @@
                 return;
             }
         }
-        // Chrome sometimes leaves the cursor before the inserted text when
-        // composing after a cursor wrapper. This moves it forward.
-        if (chrome && view.cursorWrapper && parse.sel && parse.sel.anchor == view.cursorWrapper.deco.from &&
-            parse.sel.head == parse.sel.anchor) {
-            let size = change.endB - change.start;
-            parse.sel = { anchor: parse.sel.anchor + size, head: parse.sel.anchor + size };
-        }
         view.input.domChangeCount++;
         // Handle the case where overwriting a selection by typing matches
         // the start or end of the selected content, creating a change
@@ -11535,7 +11756,7 @@
         }
         // Same for backspace
         if (view.state.selection.anchor > change.start &&
-            looksLikeJoin(doc, change.start, change.endA, $from, $to) &&
+            looksLikeBackspace(doc, change.start, change.endA, $from, $to) &&
             view.someProp("handleKeyDown", f => f(view, keyEvent(8, "Backspace")))) {
             if (android && chrome)
                 view.domObserver.suppressSelectionUpdates(); // #820
@@ -11647,14 +11868,18 @@
         if (Fragment.from(updated).eq(cur))
             return { mark, type };
     }
-    function looksLikeJoin(old, start, end, $newStart, $newEnd) {
-        if (!$newStart.parent.isTextblock ||
-            // The content must have shrunk
-            end - start <= $newEnd.pos - $newStart.pos ||
+    function looksLikeBackspace(old, start, end, $newStart, $newEnd) {
+        if ( // The content must have shrunk
+        end - start <= $newEnd.pos - $newStart.pos ||
             // newEnd must point directly at or after the end of the block that newStart points into
             skipClosingAndOpening($newStart, true, false) < $newEnd.pos)
             return false;
         let $start = old.resolve(start);
+        // Handle the case where, rather than joining blocks, the change just removed an entire block
+        if (!$newStart.parent.isTextblock) {
+            let after = $start.nodeAfter;
+            return after != null && end == start + after.nodeSize;
+        }
         // Start must be at the end of a block
         if ($start.parentOffset < $start.parent.content.size || !$start.parent.isTextblock)
             return false;
@@ -11892,8 +12117,10 @@
                     // tracks that and forces a selection reset when our update
                     // did write to the node.
                     let chromeKludge = chrome ? (this.trackWrites = this.domSelectionRange().focusNode) : null;
+                    if (this.composing)
+                        this.input.compositionNode = findCompositionNode(this);
                     if (redraw || !this.docView.update(state.doc, outerDeco, innerDeco, this)) {
-                        this.docView.updateOuterDeco([]);
+                        this.docView.updateOuterDeco(outerDeco);
                         this.docView.destroy();
                         this.docView = docViewDesc(state.doc, outerDeco, innerDeco, this.dom, this);
                     }
@@ -12170,6 +12397,7 @@
             }
             this.docView.destroy();
             this.docView = null;
+            clearReusedRange();
         }
         /**
         This is true when the view has been
@@ -12205,8 +12433,9 @@
         @internal
         */
         domSelectionRange() {
-            return safari && this.root.nodeType === 11 && deepActiveElement(this.dom.ownerDocument) == this.dom
-                ? safariShadowSelectionRange(this) : this.domSelection();
+            let sel = this.domSelection();
+            return safari && this.root.nodeType === 11 &&
+                deepActiveElement(this.dom.ownerDocument) == this.dom && safariShadowSelectionRange(this, sel) || sel;
         }
         /**
         @internal
@@ -13441,12 +13670,12 @@
                 name: extension.name,
                 options: extension.options,
                 storage: extension.storage,
+                extensions: nodeAndMarkExtensions,
             };
             const addGlobalAttributes = getExtensionField(extension, 'addGlobalAttributes', context);
             if (!addGlobalAttributes) {
                 return;
             }
-            // TODO: remove `as GlobalAttributes`
             const globalAttributes = addGlobalAttributes();
             globalAttributes.forEach(globalAttribute => {
                 globalAttribute.types.forEach(type => {
@@ -13600,12 +13829,12 @@
      * @param extensionAttributes List of attributes to inject
      */
     function injectExtensionAttributesToParseRule(parseRule, extensionAttributes) {
-        if (parseRule.style) {
+        if ('style' in parseRule) {
             return parseRule;
         }
         return {
             ...parseRule,
-            getAttrs: node => {
+            getAttrs: (node) => {
                 const oldAttributes = parseRule.getAttrs ? parseRule.getAttrs(node) : parseRule.attrs;
                 if (oldAttributes === false) {
                     return false;
@@ -13613,7 +13842,7 @@
                 const newAttributes = extensionAttributes.reduce((items, item) => {
                     const value = item.attribute.parseHTML
                         ? item.attribute.parseHTML(node)
-                        : fromString(node.getAttribute(item.name));
+                        : fromString((node).getAttribute(item.name));
                     if (value === null || value === undefined) {
                         return items;
                     }
@@ -13673,6 +13902,7 @@
                 selectable: callOrReturn(getExtensionField(extension, 'selectable', context)),
                 draggable: callOrReturn(getExtensionField(extension, 'draggable', context)),
                 code: callOrReturn(getExtensionField(extension, 'code', context)),
+                whitespace: callOrReturn(getExtensionField(extension, 'whitespace', context)),
                 defining: callOrReturn(getExtensionField(extension, 'defining', context)),
                 isolating: callOrReturn(getExtensionField(extension, 'isolating', context)),
                 attrs: Object.fromEntries(extensionAttributes.map(extensionAttribute => {
@@ -13785,7 +14015,7 @@
             }))
                 || node.textContent
                 || '%leaf%';
-            textBefore += chunk.slice(0, Math.max(0, sliceEndPos - pos));
+            textBefore += node.isAtom && !node.isText ? chunk : chunk.slice(0, Math.max(0, sliceEndPos - pos));
         });
         return textBefore;
     };
@@ -14290,7 +14520,7 @@
                 const addKeyboardShortcuts = getExtensionField(extension, 'addKeyboardShortcuts', context);
                 let defaultBindings = {};
                 // bind exit handling
-                if (extension.type === 'mark' && extension.config.exitable) {
+                if (extension.type === 'mark' && getExtensionField(extension, 'exitable', context)) {
                     defaultBindings.ArrowRight = () => Mark.handleExit({ editor, mark: extension });
                 }
                 if (addKeyboardShortcuts) {
@@ -14445,16 +14675,11 @@
         const output = { ...target };
         if (isPlainObject$2(target) && isPlainObject$2(source)) {
             Object.keys(source).forEach(key => {
-                if (isPlainObject$2(source[key])) {
-                    if (!(key in target)) {
-                        Object.assign(output, { [key]: source[key] });
-                    }
-                    else {
-                        output[key] = mergeDeep(target[key], source[key]);
-                    }
+                if (isPlainObject$2(source[key]) && isPlainObject$2(target[key])) {
+                    output[key] = mergeDeep(target[key], source[key]);
                 }
                 else {
-                    Object.assign(output, { [key]: source[key] });
+                    output[key] = source[key];
                 }
             });
         }
@@ -14501,13 +14726,16 @@
         configure(options = {}) {
             // return a new instance so we can use the same extension
             // with different calls of `configure`
-            const extension = this.extend();
+            const extension = this.extend({
+                ...this.config,
+                addOptions: () => {
+                    return mergeDeep(this.options, options);
+                },
+            });
+            // Always preserve the current name
+            extension.name = this.name;
+            // Set the parent to be our parent
             extension.parent = this.parent;
-            extension.options = mergeDeep(this.options, options);
-            extension.storage = callOrReturn(getExtensionField(extension, 'addStorage', {
-                name: extension.name,
-                options: extension.options,
-            }));
             return extension;
         }
         extend(extendedConfig = {}) {
@@ -14515,7 +14743,7 @@
             extension.parent = this;
             this.child = extension;
             extension.name = extendedConfig.name ? extendedConfig.name : extension.parent.name;
-            if (extendedConfig.defaultOptions) {
+            if (extendedConfig.defaultOptions && Object.keys(extendedConfig.defaultOptions).length > 0) {
                 console.warn(`[tiptap warn]: BREAKING CHANGE: "defaultOptions" is deprecated. Please use "addOptions" instead. Found in extension: "${extension.name}".`);
             }
             extension.options = callOrReturn(getExtensionField(extension, 'addOptions', {
@@ -14979,15 +15207,58 @@
                 return schema.nodeFromJSON(content);
             }
             catch (error) {
+                if (options.errorOnInvalidContent) {
+                    throw new Error('[tiptap error]: Invalid JSON content', { cause: error });
+                }
                 console.warn('[tiptap warn]: Invalid content.', 'Passed value:', content, 'Error:', error);
                 return createNodeFromContent('', schema, options);
             }
         }
         if (isTextContent) {
+            // Check for invalid content
+            if (options.errorOnInvalidContent) {
+                let hasInvalidContent = false;
+                let invalidContent = '';
+                // A copy of the current schema with a catch-all node at the end
+                const contentCheckSchema = new Schema$1({
+                    topNode: schema.spec.topNode,
+                    marks: schema.spec.marks,
+                    // Prosemirror's schemas are executed such that: the last to execute, matches last
+                    // This means that we can add a catch-all node at the end of the schema to catch any content that we don't know how to handle
+                    nodes: schema.spec.nodes.append({
+                        __tiptap__private__unknown__catch__all__node: {
+                            content: 'inline*',
+                            group: 'block',
+                            parseDOM: [
+                                {
+                                    tag: '*',
+                                    getAttrs: e => {
+                                        // If this is ever called, we know that the content has something that we don't know how to handle in the schema
+                                        hasInvalidContent = true;
+                                        // Try to stringify the element for a more helpful error message
+                                        invalidContent = typeof e === 'string' ? e : e.outerHTML;
+                                        return null;
+                                    },
+                                },
+                            ],
+                        },
+                    }),
+                });
+                if (options.slice) {
+                    DOMParser.fromSchema(contentCheckSchema).parseSlice(elementFromString(content), options.parseOptions);
+                }
+                else {
+                    DOMParser.fromSchema(contentCheckSchema).parse(elementFromString(content), options.parseOptions);
+                }
+                if (options.errorOnInvalidContent && hasInvalidContent) {
+                    throw new Error('[tiptap error]: Invalid HTML content', { cause: new Error(`Invalid element found: ${invalidContent}`) });
+                }
+            }
             const parser = DOMParser.fromSchema(schema);
-            return options.slice
-                ? parser.parseSlice(elementFromString(content), options.parseOptions).content
-                : parser.parse(elementFromString(content), options.parseOptions);
+            if (options.slice) {
+                return parser.parseSlice(elementFromString(content), options.parseOptions).content;
+            }
+            return parser.parse(elementFromString(content), options.parseOptions);
         }
         return createNodeFromContent('', schema, options);
     }
@@ -15013,9 +15284,10 @@
     }
 
     const isFragment = (nodeOrFragment) => {
-        return nodeOrFragment.toString().startsWith('<');
+        return !('type' in nodeOrFragment);
     };
     const insertContentAt = (position, value, options) => ({ tr, dispatch, editor }) => {
+        var _a;
         if (dispatch) {
             options = {
                 parseOptions: {},
@@ -15024,15 +15296,25 @@
                 applyPasteRules: false,
                 ...options,
             };
-            const content = createNodeFromContent(value, editor.schema, {
-                parseOptions: {
-                    preserveWhitespace: 'full',
-                    ...options.parseOptions,
-                },
-            });
-            // don’t dispatch an empty fragment because this can lead to strange errors
-            if (content.toString() === '<>') {
-                return true;
+            let content;
+            try {
+                content = createNodeFromContent(value, editor.schema, {
+                    parseOptions: {
+                        preserveWhitespace: 'full',
+                        ...options.parseOptions,
+                    },
+                    errorOnInvalidContent: (_a = options.errorOnInvalidContent) !== null && _a !== void 0 ? _a : editor.options.enableContentCheck,
+                });
+            }
+            catch (e) {
+                editor.emit('contentError', {
+                    editor,
+                    error: e,
+                    disableCollaboration: () => {
+                        console.error('[tiptap error]: Unable to disable collaboration at this point in time');
+                    },
+                });
+                return false;
             }
             let { from, to } = typeof position === 'number' ? { from: position, to: position } : { from: position.from, to: position.to };
             let isOnlyTextContent = true;
@@ -15105,7 +15387,7 @@
         return joinForward$1(state, dispatch);
     };
 
-    const joinItemBackward = () => ({ tr, state, dispatch, }) => {
+    const joinItemBackward = () => ({ state, dispatch, tr, }) => {
         try {
             const point = joinPoint(state.doc, state.selection.$from.pos, -1);
             if (point === null || point === undefined) {
@@ -15117,7 +15399,7 @@
             }
             return true;
         }
-        catch {
+        catch (e) {
             return false;
         }
     };
@@ -15377,11 +15659,13 @@
     };
 
     // @ts-ignore
+    // TODO: add types to @types/prosemirror-commands
     const selectTextblockEnd = () => ({ state, dispatch }) => {
         return selectTextblockEnd$1(state, dispatch);
     };
 
     // @ts-ignore
+    // TODO: add types to @types/prosemirror-commands
     const selectTextblockStart = () => ({ state, dispatch }) => {
         return selectTextblockStart$1(state, dispatch);
     };
@@ -15393,17 +15677,35 @@
      * @param parseOptions Options for the parser
      * @returns The created Prosemirror document node
      */
-    function createDocument$1(content, schema, parseOptions = {}) {
-        return createNodeFromContent(content, schema, { slice: false, parseOptions });
+    function createDocument$1(content, schema, parseOptions = {}, options = {}) {
+        return createNodeFromContent(content, schema, {
+            slice: false,
+            parseOptions,
+            errorOnInvalidContent: options.errorOnInvalidContent,
+        });
     }
 
-    const setContent$1 = (content, emitUpdate = false, parseOptions = {}) => ({ tr, editor, dispatch }) => {
+    const setContent$1 = (content, emitUpdate = false, parseOptions = {}, options = {}) => ({ editor, tr, dispatch, commands, }) => {
+        var _a, _b;
         const { doc } = tr;
-        const document = createDocument$1(content, editor.schema, parseOptions);
-        if (dispatch) {
-            tr.replaceWith(0, doc.content.size, document).setMeta('preventUpdate', !emitUpdate);
+        // This is to keep backward compatibility with the previous behavior
+        // TODO remove this in the next major version
+        if (parseOptions.preserveWhitespace !== 'full') {
+            const document = createDocument$1(content, editor.schema, parseOptions, {
+                errorOnInvalidContent: (_a = options.errorOnInvalidContent) !== null && _a !== void 0 ? _a : editor.options.enableContentCheck,
+            });
+            if (dispatch) {
+                tr.replaceWith(0, doc.content.size, document).setMeta('preventUpdate', !emitUpdate);
+            }
+            return true;
         }
-        return true;
+        if (dispatch) {
+            tr.setMeta('preventUpdate', !emitUpdate);
+        }
+        return commands.insertContentAt({ from: 0, to: doc.content.size }, content, {
+            parseOptions,
+            errorOnInvalidContent: (_b = options.errorOnInvalidContent) !== null && _b !== void 0 ? _b : editor.options.enableContentCheck,
+        });
     };
 
     function getMarkAttributes(state, typeOrName) {
@@ -15962,11 +16264,34 @@
         return group.split(' ').includes('list');
     }
 
-    function isNodeEmpty(node) {
-        var _a;
-        const defaultContent = (_a = node.type.createAndFill()) === null || _a === void 0 ? void 0 : _a.toJSON();
-        const content = node.toJSON();
-        return JSON.stringify(defaultContent) === JSON.stringify(content);
+    /**
+     * Returns true if the given node is empty.
+     * When `checkChildren` is true (default), it will also check if all children are empty.
+     */
+    function isNodeEmpty(node, { checkChildren } = { checkChildren: true }) {
+        if (node.isText) {
+            return !node.text;
+        }
+        if (node.content.childCount === 0) {
+            return true;
+        }
+        if (node.isLeaf) {
+            return false;
+        }
+        if (checkChildren) {
+            let hasSameContent = true;
+            node.content.forEach(childNode => {
+                if (hasSameContent === false) {
+                    // Exit early for perf
+                    return;
+                }
+                if (!isNodeEmpty(childNode)) {
+                    hasSameContent = false;
+                }
+            });
+            return hasSameContent;
+        }
+        return false;
     }
 
     function isNodeSelection(value) {
@@ -16164,15 +16489,24 @@
         if (!$from.parent.isBlock) {
             return false;
         }
-        if (dispatch) {
-            const atEnd = $to.parentOffset === $to.parent.content.size;
-            if (selection instanceof TextSelection) {
-                tr.deleteSelection();
-            }
-            const deflt = $from.depth === 0
-                ? undefined
-                : defaultBlockAt($from.node(-1).contentMatchAt($from.indexAfter(-1)));
-            let types = atEnd && deflt
+        const atEnd = $to.parentOffset === $to.parent.content.size;
+        const deflt = $from.depth === 0
+            ? undefined
+            : defaultBlockAt($from.node(-1).contentMatchAt($from.indexAfter(-1)));
+        let types = atEnd && deflt
+            ? [
+                {
+                    type: deflt,
+                    attrs: newAttributes,
+                },
+            ]
+            : undefined;
+        let can = canSplit(tr.doc, tr.mapping.map($from.pos), 1, types);
+        if (!types
+            && !can
+            && canSplit(tr.doc, tr.mapping.map($from.pos), 1, deflt ? [{ type: deflt }] : undefined)) {
+            can = true;
+            types = deflt
                 ? [
                     {
                         type: deflt,
@@ -16180,21 +16514,12 @@
                     },
                 ]
                 : undefined;
-            let can = canSplit(tr.doc, tr.mapping.map($from.pos), 1, types);
-            if (!types
-                && !can
-                && canSplit(tr.doc, tr.mapping.map($from.pos), 1, deflt ? [{ type: deflt }] : undefined)) {
-                can = true;
-                types = deflt
-                    ? [
-                        {
-                            type: deflt,
-                            attrs: newAttributes,
-                        },
-                    ]
-                    : undefined;
-            }
+        }
+        if (dispatch) {
             if (can) {
+                if (selection instanceof TextSelection) {
+                    tr.deleteSelection();
+                }
                 tr.split(tr.mapping.map($from.pos), 1, types);
                 if (deflt && !atEnd && !$from.parentOffset && $from.parent.type !== deflt) {
                     const first = tr.mapping.map($from.before());
@@ -16209,7 +16534,7 @@
             }
             tr.scrollIntoView();
         }
-        return true;
+        return can;
     };
 
     const splitListItem = typeOrName => ({ tr, state, dispatch, editor, }) => {
@@ -16564,14 +16889,14 @@
       forEach: forEach,
       insertContent: insertContent,
       insertContentAt: insertContentAt,
-      joinUp: joinUp,
-      joinDown: joinDown,
       joinBackward: joinBackward,
+      joinDown: joinDown,
       joinForward: joinForward,
       joinItemBackward: joinItemBackward,
       joinItemForward: joinItemForward,
       joinTextblockBackward: joinTextblockBackward,
       joinTextblockForward: joinTextblockForward,
+      joinUp: joinUp,
       keyboardShortcut: keyboardShortcut,
       lift: lift,
       liftEmptyBlock: liftEmptyBlock,
@@ -16785,7 +17110,7 @@
                 new Plugin({
                     key: new PluginKey('tabindex'),
                     props: {
-                        attributes: this.editor.isEditable ? { tabindex: '0' } : {},
+                        attributes: () => (this.editor.isEditable ? { tabindex: '0' } : {}),
                     },
                 }),
             ];
@@ -16803,6 +17128,9 @@
     });
 
     class NodePos {
+        get name() {
+            return this.node.type.name;
+        }
         constructor(pos, editor, isBlock = false, node = null) {
             this.currentNode = null;
             this.actualDepth = null;
@@ -16810,9 +17138,6 @@
             this.resolvedPos = pos;
             this.editor = editor;
             this.currentNode = node;
-        }
-        get name() {
-            return this.node.type.name;
         }
         get node() {
             return this.currentNode || this.resolvedPos.node();
@@ -17088,6 +17413,7 @@ img.ProseMirror-separator {
                 enableInputRules: true,
                 enablePasteRules: true,
                 enableCoreExtensions: true,
+                enableContentCheck: false,
                 onBeforeCreate: () => null,
                 onCreate: () => null,
                 onUpdate: () => null,
@@ -17096,6 +17422,7 @@ img.ProseMirror-separator {
                 onFocus: () => null,
                 onBlur: () => null,
                 onDestroy: () => null,
+                onContentError: ({ error }) => { throw error; },
             };
             this.isCapturingTransaction = false;
             this.capturedTransaction = null;
@@ -17105,6 +17432,7 @@ img.ProseMirror-separator {
             this.createSchema();
             this.on('beforeCreate', this.options.onBeforeCreate);
             this.emit('beforeCreate', { editor: this });
+            this.on('contentError', this.options.onContentError);
             this.createView();
             this.injectCSS();
             this.on('create', this.options.onCreate);
@@ -17264,7 +17592,28 @@ img.ProseMirror-separator {
          * Creates a ProseMirror view.
          */
         createView() {
-            const doc = createDocument$1(this.options.content, this.schema, this.options.parseOptions);
+            let doc;
+            try {
+                doc = createDocument$1(this.options.content, this.schema, this.options.parseOptions, { errorOnInvalidContent: this.options.enableContentCheck });
+            }
+            catch (e) {
+                if (!(e instanceof Error) || !['[tiptap error]: Invalid JSON content', '[tiptap error]: Invalid HTML content'].includes(e.message)) {
+                    // Not the content error we were expecting
+                    throw e;
+                }
+                this.emit('contentError', {
+                    editor: this,
+                    error: e,
+                    disableCollaboration: () => {
+                        // To avoid syncing back invalid content, reinitialize the extensions without the collaboration extension
+                        this.options.extensions = this.options.extensions.filter(extension => extension.name !== 'collaboration');
+                        // Restart the initialization process by recreating the extension manager with the new set of extensions
+                        this.createExtensionManager();
+                    },
+                });
+                // Content is invalid, but attempt to create it anyway, stripping out the invalid parts
+                doc = createDocument$1(this.options.content, this.schema, this.options.parseOptions, { errorOnInvalidContent: false });
+            }
             const selection = resolveFocusPosition(doc, this.options.autofocus);
             this.view = new EditorView(this.options.element, {
                 ...this.options.editorProps,
@@ -17284,6 +17633,7 @@ img.ProseMirror-separator {
             this.prependClass();
             // Let’s store the editor instance in the DOM element.
             // So we’ll have access to it for tests.
+            // @ts-ignore
             const dom = this.view.dom;
             dom.editor = this;
         }
@@ -17291,6 +17641,9 @@ img.ProseMirror-separator {
          * Creates all node views.
          */
         createNodeViews() {
+            if (this.view.isDestroyed) {
+                return;
+            }
             this.view.setProps({
                 nodeViews: this.extensionManager.nodeViews,
             });
@@ -17330,6 +17683,11 @@ img.ProseMirror-separator {
             }
             const state = this.state.apply(transaction);
             const selectionHasChanged = !this.state.selection.eq(state.selection);
+            this.emit('beforeTransaction', {
+                editor: this,
+                transaction,
+                nextState: state,
+            });
             this.view.updateState(state);
             this.emit('transaction', {
                 editor: this,
@@ -17525,7 +17883,8 @@ img.ProseMirror-separator {
                     tr.replaceWith(matchStart, end, newNode);
                 }
                 else if (match[0]) {
-                    tr.insert(start - 1, config.type.create(attributes)).delete(tr.mapping.map(start), tr.mapping.map(end));
+                    const insertionStart = config.type.isInline ? start : start - 1;
+                    tr.insert(insertionStart, config.type.create(attributes)).delete(tr.mapping.map(start), tr.mapping.map(end));
                 }
                 tr.scrollIntoView();
             },
@@ -17675,20 +18034,24 @@ img.ProseMirror-separator {
         configure(options = {}) {
             // return a new instance so we can use the same extension
             // with different calls of `configure`
-            const extension = this.extend();
-            extension.options = mergeDeep(this.options, options);
-            extension.storage = callOrReturn(getExtensionField(extension, 'addStorage', {
-                name: extension.name,
-                options: extension.options,
-            }));
+            const extension = this.extend({
+                ...this.config,
+                addOptions: () => {
+                    return mergeDeep(this.options, options);
+                },
+            });
+            // Always preserve the current name
+            extension.name = this.name;
+            // Set the parent to be our parent
+            extension.parent = this.parent;
             return extension;
         }
         extend(extendedConfig = {}) {
-            const extension = new Mark({ ...this.config, ...extendedConfig });
+            const extension = new Mark(extendedConfig);
             extension.parent = this;
             this.child = extension;
             extension.name = extendedConfig.name ? extendedConfig.name : extension.parent.name;
-            if (extendedConfig.defaultOptions) {
+            if (extendedConfig.defaultOptions && Object.keys(extendedConfig.defaultOptions).length > 0) {
                 console.warn(`[tiptap warn]: BREAKING CHANGE: "defaultOptions" is deprecated. Please use "addOptions" instead. Found in extension: "${extension.name}".`);
             }
             extension.options = callOrReturn(getExtensionField(extension, 'addOptions', {
@@ -17762,20 +18125,24 @@ img.ProseMirror-separator {
         configure(options = {}) {
             // return a new instance so we can use the same extension
             // with different calls of `configure`
-            const extension = this.extend();
-            extension.options = mergeDeep(this.options, options);
-            extension.storage = callOrReturn(getExtensionField(extension, 'addStorage', {
-                name: extension.name,
-                options: extension.options,
-            }));
+            const extension = this.extend({
+                ...this.config,
+                addOptions: () => {
+                    return mergeDeep(this.options, options);
+                },
+            });
+            // Always preserve the current name
+            extension.name = this.name;
+            // Set the parent to be our parent
+            extension.parent = this.parent;
             return extension;
         }
         extend(extendedConfig = {}) {
-            const extension = new Node({ ...this.config, ...extendedConfig });
+            const extension = new Node(extendedConfig);
             extension.parent = this;
             this.child = extension;
             extension.name = extendedConfig.name ? extendedConfig.name : extension.parent.name;
-            if (extendedConfig.defaultOptions) {
+            if (extendedConfig.defaultOptions && Object.keys(extendedConfig.defaultOptions).length > 0) {
                 console.warn(`[tiptap warn]: BREAKING CHANGE: "defaultOptions" is deprecated. Please use "addOptions" instead. Found in extension: "${extension.name}".`);
             }
             extension.options = callOrReturn(getExtensionField(extension, 'addOptions', {
@@ -18110,6 +18477,5426 @@ img.ProseMirror-separator {
             };
         }
     }
+
+    /**
+     * Matches a blockquote to a `>` as input.
+     */
+    var inputRegex$3 = /^\s*>\s$/;
+    /**
+     * This extension allows you to create blockquotes,
+     * contains only plain text paragraph and soft break (<br>).
+     *
+     * Forked from:
+     * @see https://tiptap.dev/api/nodes/blockquote
+     */
+    var Blockquote = Node.create({
+        name: 'blockquote',
+        addOptions: function () {
+            return {
+                HTMLAttributes: {},
+            };
+        },
+        group: 'block',
+        content: 'paragraph+',
+        defining: true,
+        parseHTML: function () {
+            return [{ tag: 'blockquote' }];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            return [
+                'blockquote',
+                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+                0,
+            ];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setBlockquote: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.wrapIn(_this.name);
+                    };
+                },
+                toggleBlockquote: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.toggleWrap(_this.name);
+                    };
+                },
+                unsetBlockquote: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.lift(_this.name);
+                    };
+                },
+            };
+        },
+        addKeyboardShortcuts: function () {
+            var _this = this;
+            return {
+                'Mod-Shift-b': function () { return _this.editor.commands.toggleBlockquote(); },
+            };
+        },
+        addInputRules: function () {
+            return [
+                wrappingInputRule({
+                    find: inputRegex$3,
+                    type: this.type,
+                }),
+            ];
+        },
+        addProseMirrorPlugins: function () {
+            var _this = this;
+            return [
+                new Plugin({
+                    key: new PluginKey('restrictBlockquoteMarks'),
+                    filterTransaction: function (transaction) {
+                        // Nothing has changed, ignore it.
+                        if (!transaction.docChanged) {
+                            return true;
+                        }
+                        // Skip if not in a blockquote
+                        var $anchor = transaction.selection.$anchor;
+                        var $grandParent = $anchor.node($anchor.depth - 1);
+                        var isInBlockquote = ($grandParent === null || $grandParent === void 0 ? void 0 : $grandParent.type.name) === _this.name;
+                        if (!isInBlockquote) {
+                            return true;
+                        }
+                        // Prevent adding marks (except <br>) to blockquote
+                        var $start = $anchor.start($anchor.depth - 1);
+                        var $end = $anchor.end($anchor.depth - 1);
+                        transaction.removeMark($start, $end);
+                        return true;
+                    },
+                }),
+            ];
+        },
+    });
+
+    var italicStarInputRegex = /(?:^|\s)((?:\*)((?:[^*]+))(?:\*))$/;
+    var italicStarPasteRegex = /(?:^|\s)((?:\*)((?:[^*]+))(?:\*))/g;
+    var italicUnderscoreInputRegex = /(?:^|\s)((?:_)((?:[^_]+))(?:_))$/;
+    var italicUnderscorePasteRegex = /(?:^|\s)((?:_)((?:[^_]+))(?:_))/g;
+    var boldStarInputRegex = /(?:^|\s)((?:\*\*)((?:[^*]+))(?:\*\*))$/;
+    var boldStarPasteRegex = /(?:^|\s)((?:\*\*)((?:[^*]+))(?:\*\*))/g;
+    var boldUnderscoreInputRegex = /(?:^|\s)((?:__)((?:[^__]+))(?:__))$/;
+    var boldUnderscorePasteRegex = /(?:^|\s)((?:__)((?:[^__]+))(?:__))/g;
+    var Bold = Mark.create({
+        name: 'bold',
+        addOptions: function () {
+            return {
+                HTMLAttributes: {},
+            };
+        },
+        parseHTML: function () {
+            return [
+                // bold
+                {
+                    tag: 'strong',
+                },
+                {
+                    tag: 'b',
+                    getAttrs: function (node) {
+                        return node.style.fontWeight !== 'normal' && null;
+                    },
+                },
+                {
+                    style: 'font-weight',
+                    getAttrs: function (value) {
+                        return /^(bold(er)?|[5-9]\d{2,})$/.test(value) && null;
+                    },
+                },
+                // italic
+                {
+                    tag: 'em',
+                },
+                {
+                    tag: 'i',
+                    getAttrs: function (node) {
+                        return node.style.fontStyle !== 'normal' && null;
+                    },
+                },
+                {
+                    style: 'font-style=italic',
+                },
+                // underline
+                {
+                    tag: 'u',
+                },
+                {
+                    style: 'text-decoration',
+                    consuming: false,
+                    getAttrs: function (style) {
+                        return style.includes('underline') ? {} : false;
+                    },
+                },
+            ];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            return [
+                'strong',
+                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+                0,
+            ];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setBold: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.setMark(_this.name);
+                    };
+                },
+                toggleBold: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.toggleMark(_this.name);
+                    };
+                },
+                unsetBold: function () {
+                    return function (_a) {
+                        var commands = _a.commands;
+                        return commands.unsetMark(_this.name);
+                    };
+                },
+            };
+        },
+        addKeyboardShortcuts: function () {
+            var _this = this;
+            return {
+                // bold
+                'Mod-b': function () { return _this.editor.commands.toggleBold(); },
+                'Mod-B': function () { return _this.editor.commands.toggleBold(); },
+                // italic
+                'Mod-i': function () { return _this.editor.commands.toggleBold(); },
+                'Mod-I': function () { return _this.editor.commands.toggleBold(); },
+                // underline
+                'Mod-u': function () { return _this.editor.commands.toggleBold(); },
+                'Mod-U': function () { return _this.editor.commands.toggleBold(); },
+            };
+        },
+        addInputRules: function () {
+            return [
+                // bold
+                markInputRule({
+                    find: boldStarInputRegex,
+                    type: this.type,
+                }),
+                markInputRule({
+                    find: boldUnderscoreInputRegex,
+                    type: this.type,
+                }),
+                // italic
+                markInputRule({
+                    find: italicStarInputRegex,
+                    type: this.type,
+                }),
+                markInputRule({
+                    find: italicUnderscoreInputRegex,
+                    type: this.type,
+                }),
+                // underline
+            ];
+        },
+        addPasteRules: function () {
+            return [
+                // bold
+                markPasteRule({
+                    find: boldStarPasteRegex,
+                    type: this.type,
+                }),
+                markPasteRule({
+                    find: boldUnderscorePasteRegex,
+                    type: this.type,
+                }),
+                // italic
+                markPasteRule({
+                    find: italicStarPasteRegex,
+                    type: this.type,
+                }),
+                markPasteRule({
+                    find: italicUnderscorePasteRegex,
+                    type: this.type,
+                }),
+                // underline
+            ];
+        },
+    });
+
+    var pluginName$3 = 'figureAudio';
+    var FigureAudio = Node.create({
+        name: pluginName$3,
+        group: 'block',
+        content: 'text*',
+        draggable: true,
+        isolating: true,
+        // disallows all marks for figcaption
+        marks: '',
+        addAttributes: function () {
+            return {
+                src: {
+                    default: null,
+                    parseHTML: function (element) { var _a; return (_a = element.querySelector('source')) === null || _a === void 0 ? void 0 : _a.getAttribute('src'); },
+                },
+                title: {
+                    default: '',
+                    parseHTML: function (element) { var _a; return (_a = element.querySelector('.title')) === null || _a === void 0 ? void 0 : _a.textContent; },
+                },
+            };
+        },
+        parseHTML: function () {
+            return [
+                {
+                    tag: 'figure[class="audio"]',
+                    contentElement: 'figcaption',
+                },
+            ];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            return [
+                'figure',
+                { class: 'audio' },
+                [
+                    'audio',
+                    {
+                        controls: true,
+                        // for backward compatibility
+                        // can be removed when fully switch to new editor
+                        'data-file-name': HTMLAttributes.title,
+                    },
+                    [
+                        'source',
+                        {
+                            src: HTMLAttributes.src,
+                            type: 'audio/mp3',
+                            draggable: false,
+                            contenteditable: false,
+                        },
+                    ],
+                ],
+                [
+                    'div',
+                    { class: 'player' },
+                    [
+                        'header',
+                        [
+                            'div',
+                            { class: 'meta' },
+                            ['h4', { class: 'title' }, HTMLAttributes.title],
+                            [
+                                'div',
+                                { class: 'time' },
+                                ['span', { class: 'current', 'data-time': '00:00' }],
+                                ['span', { class: 'duration', 'data-time': '--:--' }],
+                            ],
+                        ],
+                        ['span', { class: 'play' }],
+                    ],
+                    ['footer', ['div', { class: 'progress-bar' }, ['span', {}]]],
+                ],
+                ['figcaption', 0],
+            ];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setFigureAudio: function (_a) {
+                    var caption = _a.caption, position = _a.position, attrs = __rest(_a, ["caption", "position"]);
+                    return function (_a) {
+                        var chain = _a.chain;
+                        var insertContent = [
+                            {
+                                type: _this.name,
+                                attrs: attrs,
+                                content: caption ? [{ type: 'text', text: caption }] : [],
+                            },
+                            {
+                                type: 'paragraph',
+                            },
+                        ];
+                        if (!position) {
+                            return chain().insertContent(insertContent).focus().run();
+                        }
+                        return chain().insertContentAt(position, insertContent).focus().run();
+                    };
+                },
+            };
+        },
+        addProseMirrorPlugins: function () {
+            return [
+                new Plugin({
+                    key: new PluginKey('removePastedFigureAudio'),
+                    props: {
+                        handleKeyDown: function (view, event) {
+                            var _a, _b;
+                            var isBackSpace = event.key.toLowerCase() === 'backspace';
+                            var isEnter = event.key.toLowerCase() === 'enter';
+                            if (!isBackSpace && !isEnter) {
+                                return;
+                            }
+                            var anchorParent = view.state.selection.$anchor.parent;
+                            var isCurrentPlugin = anchorParent.type.name === pluginName$3;
+                            var isEmptyFigcaption = anchorParent.content.size <= 0;
+                            if (!isCurrentPlugin) {
+                                return;
+                            }
+                            // @ts-expect-error
+                            var editor = view.dom.editor;
+                            // backSpace to remove if the figcaption is empty
+                            if (isBackSpace && isEmptyFigcaption) {
+                                // FIXME: setTimeOut to avoid repetitive deletion
+                                setTimeout(function () {
+                                    editor.commands.deleteNode(pluginName$3);
+                                });
+                                return;
+                            }
+                            // insert a new paragraph
+                            if (isEnter) {
+                                var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
+                                var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                                // skip if figcaption text is selected
+                                // or has text after current selection
+                                if ($from !== $to_1 || isTextAfter) {
+                                    return;
+                                }
+                                // FIXME: setTimeOut to avoid repetitive paragraph insertion
+                                setTimeout(function () {
+                                    editor.commands.insertContentAt($to_1.pos + 1, {
+                                        type: 'paragraph',
+                                    });
+                                });
+                            }
+                        },
+                        transformPastedHTML: function (html) {
+                            // remove
+                            html = html
+                                .replace(/\n/g, '')
+                                .replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '');
+                            return html;
+                        },
+                    },
+                }),
+            ];
+        },
+    });
+
+    var Provider;
+    (function (Provider) {
+        Provider["YouTube"] = "youtube";
+        Provider["Vimeo"] = "vimeo";
+        Provider["Bilibili"] = "bilibili";
+        // Twitter = 'twitter',
+        Provider["Instagram"] = "instagram";
+        Provider["JSFiddle"] = "jsfiddle";
+        Provider["CodePen"] = "codepen";
+    })(Provider || (Provider = {}));
+    var normalizeEmbedURL = function (url) {
+        var _a;
+        var fallbackReturn = {
+            url: '',
+            allowfullscreen: false,
+            sandbox: [],
+        };
+        var inputUrl;
+        try {
+            inputUrl = new URL(url);
+        }
+        catch (e) {
+            return fallbackReturn;
+        }
+        var hostname = inputUrl.hostname, pathname = inputUrl.pathname, searchParams = inputUrl.searchParams;
+        // if (!hostname) {
+        //   throw
+        // }
+        /**
+         * YouTube
+         *
+         * URL:
+         *   - https://www.youtube.com/watch?v=ARJ8cAGm6JE
+         *   - https://www.youtube.com/embed/ARJ8cAGm6JE
+         *   - https://youtu.be/ARJ8cAGm6JE
+         *
+         * Params:
+         *   - t=123 for start time
+         *   - v=ARJ8cAGm6JE for video id
+         */
+        var isYouTube = [
+            'youtube.com',
+            'youtu.be',
+            'www.youtu.be',
+            'www.youtube.com',
+        ].includes(hostname);
+        if (isYouTube) {
+            var v = searchParams.get('v');
+            var t = (_a = searchParams.get('t')) !== null && _a !== void 0 ? _a : searchParams.get('start');
+            var qs = new URLSearchParams(__assign$2({ rel: '0' }, (t ? { start: t } : {}))).toString();
+            var id = '';
+            if (v) {
+                id = v;
+            }
+            else if (pathname.match('/embed/')) {
+                id = pathname.split('/embed/')[1];
+            }
+            else if (hostname.includes('youtu.be')) {
+                id = pathname.split('/')[1];
+            }
+            return {
+                url: "https://www.youtube.com/embed/".concat(id) + (qs ? "?".concat(qs) : ''),
+                provider: Provider.YouTube,
+                allowfullscreen: true,
+                sandbox: [],
+            };
+        }
+        /**
+         * Vimeo
+         *
+         * URL:
+         *   - https://vimeo.com/332732612
+         *   - https://player.vimeo.com/video/332732612
+         */
+        var isVimeo = ['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'].includes(hostname);
+        if (isVimeo) {
+            var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
+            return {
+                url: "https://player.vimeo.com/video/".concat(id),
+                provider: Provider.Vimeo,
+                allowfullscreen: true,
+                sandbox: [],
+            };
+        }
+        /**
+         * bilibili
+         *
+         * URL:
+         *   - https://www.bilibili.com/video/BV1bW411n7fY/
+         *   - https://www.bilibili.com/BV1bW411n7fY/
+         *   - https://player.bilibili.com/player.html?bvid=BV1bW411n7fY
+         *
+         * Params:
+         *   - bvid=BV1bW411n7fY for video id
+         */
+        var isBilibili = [
+            'bilibili.com',
+            'player.bilibili.com',
+            'www.bilibili.com',
+        ].includes(hostname);
+        if (isBilibili) {
+            var bvid = searchParams.get('bvid');
+            var id = '';
+            if (bvid) {
+                id = bvid;
+            }
+            else {
+                id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
+            }
+            return {
+                url: "https://player.bilibili.com/player.html?bvid=".concat(id, "&autoplay=0"),
+                // url: `https://player.bilibili.com/player.html?bvid=${id}`,
+                provider: Provider.Bilibili,
+                allowfullscreen: true,
+                sandbox: [],
+            };
+        }
+        // Twitter
+        /**
+         * Instagram
+         *
+         * URL:
+         *   - https://www.instagram.com/p/CkszmehL4hF/
+         */
+        var isInstagram = ['instagram.com', 'www.instagram.com'].includes(hostname);
+        if (isInstagram) {
+            var id = pathname
+                .replace('/embed', '')
+                .replace(/\/$/, '')
+                .split('/')
+                .slice(-1)[0];
+            return {
+                url: "https://www.instagram.com/p/".concat(id, "/embed"),
+                provider: Provider.Instagram,
+                allowfullscreen: false,
+                sandbox: [],
+            };
+        }
+        /**
+         * JSFiddle
+         *
+         * URL:
+         *   - https://jsfiddle.net/zfUyN/
+         *   - https://jsfiddle.net/kizu/zfUyN/
+         *   - https://jsfiddle.net/kizu/zfUyN/embedded/
+         *   - https://jsfiddle.net/kizu/zfUyN/embedded/result/
+         *   - https://jsfiddle.net/kizu/zfUyN/embed/js,result/
+         */
+        var isJSFiddle = ['jsfiddle.net', 'www.jsfiddle.net'].includes(hostname);
+        if (isJSFiddle) {
+            var parts = pathname
+                .replace('/embedded', '')
+                .replace(/\/$/, '')
+                .split('/')
+                .filter(Boolean);
+            var id = parts.length === 1 ? parts[0] : parts[1];
+            return {
+                url: "https://jsfiddle.net/".concat(id, "/embedded/"),
+                provider: Provider.JSFiddle,
+                allowfullscreen: false,
+                sandbox: [],
+            };
+        }
+        /**
+         * CodePen
+         *
+         * URL:
+         *   - https://codepen.io/ykadosh/pen/jOwjmJe
+         *   - https://codepen.io/ykadosh/embed/jOwjmJe
+         *   - https://codepen.io/ykadosh/embed/preview/jOwjmJe
+         */
+        var isCodePen = ['codepen.io', 'www.codepen.io'].includes(hostname);
+        if (isCodePen) {
+            var author = pathname.split('/')[1];
+            var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
+            return {
+                url: "https://codepen.io/".concat(author, "/embed/preview/").concat(id),
+                provider: Provider.CodePen,
+                allowfullscreen: false,
+                sandbox: [],
+            };
+        }
+        return fallbackReturn;
+    };
+    var pluginName$2 = 'figureEmbed';
+    var FigureEmbed = Node.create({
+        name: pluginName$2,
+        group: 'block',
+        content: 'text*',
+        draggable: true,
+        isolating: true,
+        // disallows all marks for figcaption
+        marks: '',
+        addAttributes: function () {
+            return {
+                class: {
+                    default: null,
+                    parseHTML: function (element) { return element.getAttribute('class'); },
+                },
+                src: {
+                    default: null,
+                    parseHTML: function (element) { var _a; return (_a = element.querySelector('iframe')) === null || _a === void 0 ? void 0 : _a.getAttribute('src'); },
+                },
+            };
+        },
+        parseHTML: function () {
+            return [
+                {
+                    // match "embed", "embed-video", "embed-code" for backward compatibility
+                    tag: 'figure[class^="embed"]',
+                    contentElement: 'figcaption',
+                },
+            ];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            var _b = normalizeEmbedURL(HTMLAttributes.src), url = _b.url, provider = _b.provider, allowfullscreen = _b.allowfullscreen, sandbox = _b.sandbox;
+            // for backward compatibility
+            // can be removed when fully switch to new editor
+            var isVideo = [
+                Provider.YouTube,
+                Provider.Vimeo,
+                Provider.Bilibili,
+            ].includes(provider);
+            var isCode = [Provider.JSFiddle, Provider.CodePen].includes(provider);
+            var className = __spreadArray(__spreadArray([
+                'embed'
+            ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
+            return [
+                'figure',
+                __assign$2({ class: className }, (provider ? { 'data-provider': provider } : {})),
+                [
+                    'div',
+                    { class: 'iframe-container' },
+                    [
+                        'iframe',
+                        __assign$2(__assign$2(__assign$2({ src: url, loading: 'lazy' }, (sandbox && sandbox.length > 0
+                            ? { sandbox: sandbox.join(' ') }
+                            : {})), (allowfullscreen ? { allowfullscreen: true } : {})), { frameborder: '0', draggable: false, contenteditable: false }),
+                    ],
+                ],
+                ['figcaption', 0],
+            ];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setFigureEmbed: function (_a) {
+                    var caption = _a.caption, position = _a.position, attrs = __rest(_a, ["caption", "position"]);
+                    return function (_a) {
+                        var chain = _a.chain;
+                        var insertContent = [
+                            {
+                                type: _this.name,
+                                attrs: attrs,
+                                content: caption ? [{ type: 'text', text: caption }] : [],
+                            },
+                            {
+                                type: 'paragraph',
+                            },
+                        ];
+                        if (!position) {
+                            return chain().insertContent(insertContent).focus().run();
+                        }
+                        return chain().insertContentAt(position, insertContent).focus().run();
+                    };
+                },
+            };
+        },
+        addProseMirrorPlugins: function () {
+            return [
+                new Plugin({
+                    key: new PluginKey('removePastedFigureEmbed'),
+                    props: {
+                        handleKeyDown: function (view, event) {
+                            var _a, _b;
+                            var isBackSpace = event.key.toLowerCase() === 'backspace';
+                            var isEnter = event.key.toLowerCase() === 'enter';
+                            if (!isBackSpace && !isEnter) {
+                                return;
+                            }
+                            var anchorParent = view.state.selection.$anchor.parent;
+                            var isCurrentPlugin = anchorParent.type.name === pluginName$2;
+                            var isEmptyFigcaption = anchorParent.content.size <= 0;
+                            if (!isCurrentPlugin) {
+                                return;
+                            }
+                            // @ts-expect-error
+                            var editor = view.dom.editor;
+                            // backSpace to remove if the figcaption is empty
+                            if (isBackSpace && isEmptyFigcaption) {
+                                // FIXME: setTimeOut to avoid repetitive deletion
+                                setTimeout(function () {
+                                    editor.commands.deleteNode(pluginName$2);
+                                });
+                                return;
+                            }
+                            // insert a new paragraph
+                            if (isEnter) {
+                                var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
+                                var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                                // skip if figcaption text is selected
+                                // or has text after current selection
+                                if ($from !== $to_1 || isTextAfter) {
+                                    return;
+                                }
+                                // FIXME: setTimeOut to avoid repetitive paragraph insertion
+                                setTimeout(function () {
+                                    editor.commands.insertContentAt($to_1.pos + 1, {
+                                        type: 'paragraph',
+                                    });
+                                });
+                            }
+                        },
+                        transformPastedHTML: function (html) {
+                            // remove
+                            html = html
+                                .replace(/\n/g, '')
+                                .replace(/<figure.*class=.embed.*[\n]*.*?<\/figure>/g, '');
+                            return html;
+                        },
+                    },
+                }),
+            ];
+        },
+    });
+
+    var pluginName$1 = 'figureImage';
+    var FigureImage = Node.create({
+        name: pluginName$1,
+        group: 'block',
+        content: 'text*',
+        draggable: true,
+        isolating: true,
+        // disallows all marks for figcaption
+        marks: '',
+        addAttributes: function () {
+            return {
+                class: {
+                    default: null,
+                    parseHTML: function (element) { return element.getAttribute('class'); },
+                },
+                src: {
+                    default: null,
+                    parseHTML: function (element) { var _a; return (_a = element.querySelector('img')) === null || _a === void 0 ? void 0 : _a.getAttribute('src'); },
+                },
+            };
+        },
+        parseHTML: function () {
+            return [
+                {
+                    tag: 'figure[class="image"]',
+                    contentElement: 'figcaption',
+                },
+            ];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            return [
+                'figure',
+                { class: 'image' },
+                [
+                    'img',
+                    {
+                        src: HTMLAttributes.src,
+                        draggable: false,
+                        contenteditable: false,
+                    },
+                ],
+                ['figcaption', 0],
+            ];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setFigureImage: function (_a) {
+                    var caption = _a.caption, position = _a.position, attrs = __rest(_a, ["caption", "position"]);
+                    return function (_a) {
+                        var chain = _a.chain;
+                        var insertContent = [
+                            {
+                                type: _this.name,
+                                attrs: attrs,
+                                content: caption ? [{ type: 'text', text: caption }] : [],
+                            },
+                            {
+                                type: 'paragraph',
+                            },
+                        ];
+                        if (!position) {
+                            return chain().insertContent(insertContent).focus().run();
+                        }
+                        return chain().insertContentAt(position, insertContent).focus().run();
+                    };
+                },
+            };
+        },
+        addProseMirrorPlugins: function () {
+            return [
+                new Plugin({
+                    key: new PluginKey('removePastedFigureImage'),
+                    props: {
+                        handleKeyDown: function (view, event) {
+                            var _a, _b;
+                            var isBackSpace = event.key.toLowerCase() === 'backspace';
+                            var isEnter = event.key.toLowerCase() === 'enter';
+                            if (!isBackSpace && !isEnter) {
+                                return;
+                            }
+                            var anchorParent = view.state.selection.$anchor.parent;
+                            var isCurrentPlugin = anchorParent.type.name === pluginName$1;
+                            var isEmptyFigcaption = anchorParent.content.size <= 0;
+                            if (!isCurrentPlugin) {
+                                return;
+                            }
+                            // @ts-expect-error
+                            var editor = view.dom.editor;
+                            // backSpace to remove if the figcaption is empty
+                            if (isBackSpace && isEmptyFigcaption) {
+                                // FIXME: setTimeOut to avoid repetitive deletion
+                                setTimeout(function () {
+                                    editor.commands.deleteNode(pluginName$1);
+                                });
+                                return;
+                            }
+                            // insert a new paragraph
+                            if (isEnter) {
+                                var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
+                                var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                                // skip if figcaption text is selected
+                                // or has text after current selection
+                                if ($from !== $to_1 || isTextAfter) {
+                                    return;
+                                }
+                                // FIXME: setTimeOut to avoid repetitive paragraph insertion
+                                setTimeout(function () {
+                                    editor.commands.insertContentAt($to_1.pos + 1, {
+                                        type: 'paragraph',
+                                    });
+                                });
+                            }
+                        },
+                        transformPastedHTML: function (html) {
+                            // remove
+                            html = html
+                                .replace(/\n/g, '')
+                                .replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '');
+                            return html;
+                        },
+                    },
+                }),
+            ];
+        },
+    });
+
+    var HorizontalRule = Node.create({
+        name: 'horizontalRule',
+        addOptions: function () {
+            return {
+                HTMLAttributes: {},
+            };
+        },
+        group: 'block',
+        parseHTML: function () {
+            return [{ tag: 'hr' }];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            return ['hr', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes)];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setHorizontalRule: function () {
+                    return function (_a) {
+                        var chain = _a.chain;
+                        return chain()
+                            .insertContent([
+                            { type: _this.name },
+                            {
+                                type: 'paragraph',
+                            },
+                        ])
+                            .run();
+                    };
+                },
+            };
+        },
+        addInputRules: function () {
+            return [
+                nodeInputRule({
+                    find: /^(?:---|—-|___\s|\*\*\*\s)$/,
+                    type: this.type,
+                }),
+            ];
+        },
+    });
+
+    // THIS FILE IS AUTOMATICALLY GENERATED DO NOT EDIT DIRECTLY
+    // See update-tlds.js for encoding/decoding format
+    // https://data.iana.org/TLD/tlds-alpha-by-domain.txt
+    const encodedTlds = 'aaa1rp3bb0ott3vie4c1le2ogado5udhabi7c0ademy5centure6ountant0s9o1tor4d0s1ult4e0g1ro2tna4f0l1rica5g0akhan5ency5i0g1rbus3force5tel5kdn3l0ibaba4pay4lfinanz6state5y2sace3tom5m0azon4ericanexpress7family11x2fam3ica3sterdam8nalytics7droid5quan4z2o0l2partments8p0le4q0uarelle8r0ab1mco4chi3my2pa2t0e3s0da2ia2sociates9t0hleta5torney7u0ction5di0ble3o3spost5thor3o0s4vianca6w0s2x0a2z0ure5ba0by2idu3namex3narepublic11d1k2r0celona5laycard4s5efoot5gains6seball5ketball8uhaus5yern5b0c1t1va3cg1n2d1e0ats2uty4er2ntley5rlin4st0buy5t2f1g1h0arti5i0ble3d1ke2ng0o3o1z2j1lack0friday9ockbuster8g1omberg7ue3m0s1w2n0pparibas9o0ats3ehringer8fa2m1nd2o0k0ing5sch2tik2on4t1utique6x2r0adesco6idgestone9oadway5ker3ther5ussels7s1t1uild0ers6siness6y1zz3v1w1y1z0h3ca0b1fe2l0l1vinklein9m0era3p2non3petown5ital0one8r0avan4ds2e0er0s4s2sa1e1h1ino4t0ering5holic7ba1n1re3c1d1enter4o1rn3f0a1d2g1h0anel2nel4rity4se2t2eap3intai5ristmas6ome4urch5i0priani6rcle4sco3tadel4i0c2y3k1l0aims4eaning6ick2nic1que6othing5ud3ub0med6m1n1o0ach3des3ffee4llege4ogne5m0cast4mbank4unity6pany2re3uter5sec4ndos3struction8ulting7tact3ractors9oking4l1p2rsica5untry4pon0s4rses6pa2r0edit0card4union9icket5own3s1uise0s6u0isinella9v1w1x1y0mru3ou3z2dabur3d1nce3ta1e1ing3sun4y2clk3ds2e0al0er2s3gree4livery5l1oitte5ta3mocrat6ntal2ist5si0gn4v2hl2iamonds6et2gital5rect0ory7scount3ver5h2y2j1k1m1np2o0cs1tor4g1mains5t1wnload7rive4tv2ubai3nlop4pont4rban5vag2r2z2earth3t2c0o2deka3u0cation8e1g1mail3erck5nergy4gineer0ing9terprises10pson4quipment8r0icsson6ni3s0q1tate5t1u0rovision8s2vents5xchange6pert3osed4ress5traspace10fage2il1rwinds6th3mily4n0s2rm0ers5shion4t3edex3edback6rrari3ero6i0delity5o2lm2nal1nce1ial7re0stone6mdale6sh0ing5t0ness6j1k1lickr3ghts4r2orist4wers5y2m1o0o0d1tball6rd1ex2sale4um3undation8x2r0ee1senius7l1ogans4ntier7tr2ujitsu5n0d2rniture7tbol5yi3ga0l0lery3o1up4me0s3p1rden4y2b0iz3d0n2e0a1nt0ing5orge5f1g0ee3h1i0ft0s3ves2ing5l0ass3e1obal2o4m0ail3bh2o1x2n1odaddy5ld0point6f2o0dyear5g0le4p1t1v2p1q1r0ainger5phics5tis4een3ipe3ocery4up4s1t1u0ardian6cci3ge2ide2tars5ru3w1y2hair2mburg5ngout5us3bo2dfc0bank7ealth0care8lp1sinki6re1mes5iphop4samitsu7tachi5v2k0t2m1n1ockey4ldings5iday5medepot5goods5s0ense7nda3rse3spital5t0ing5t0els3mail5use3w2r1sbc3t1u0ghes5yatt3undai7ibm2cbc2e1u2d1e0ee3fm2kano4l1m0amat4db2mo0bilien9n0c1dustries8finiti5o2g1k1stitute6urance4e4t0ernational10uit4vestments10o1piranga7q1r0ish4s0maili5t0anbul7t0au2v3jaguar4va3cb2e0ep2tzt3welry6io2ll2m0p2nj2o0bs1urg4t1y2p0morgan6rs3uegos4niper7kaufen5ddi3e0rryhotels6logistics9properties14fh2g1h1i0a1ds2m1ndle4tchen5wi3m1n1oeln3matsu5sher5p0mg2n2r0d1ed3uokgroup8w1y0oto4z2la0caixa5mborghini8er3ncaster6d0rover6xess5salle5t0ino3robe5w0yer5b1c1ds2ease3clerc5frak4gal2o2xus4gbt3i0dl2fe0insurance9style7ghting6ke2lly3mited4o2ncoln4k2psy3ve1ing5k1lc1p2oan0s3cker3us3l1ndon4tte1o3ve3pl0financial11r1s1t0d0a3u0ndbeck6xe1ury5v1y2ma0drid4if1son4keup4n0agement7go3p1rket0ing3s4riott5shalls7ttel5ba2c0kinsey7d1e0d0ia3et2lbourne7me1orial6n0u2rckmsd7g1h1iami3crosoft7l1ni1t2t0subishi9k1l0b1s2m0a2n1o0bi0le4da2e1i1m1nash3ey2ster5rmon3tgage6scow4to0rcycles9v0ie4p1q1r1s0d2t0n1r2u0seum3ic4v1w1x1y1z2na0b1goya4me2tura4vy3ba2c1e0c1t0bank4flix4work5ustar5w0s2xt0direct7us4f0l2g0o2hk2i0co2ke1on3nja3ssan1y5l1o0kia3rton4w0ruz3tv4p1r0a1w2tt2u1yc2z2obi1server7ffice5kinawa6layan0group9dnavy5lo3m0ega4ne1g1l0ine5oo2pen3racle3nge4g0anic5igins6saka4tsuka4t2vh3pa0ge2nasonic7ris2s1tners4s1y3y2ccw3e0t2f0izer5g1h0armacy6d1ilips5one2to0graphy6s4ysio5ics1tet2ures6d1n0g1k2oneer5zza4k1l0ace2y0station9umbing5s3m1n0c2ohl2ker3litie5rn2st3r0america6xi3ess3ime3o0d0uctions8f1gressive8mo2perties3y5tection8u0dential9s1t1ub2w0c2y2qa1pon3uebec3st5racing4dio4e0ad1lestate6tor2y4cipes5d0stone5umbrella9hab3ise0n3t2liance6n0t0als5pair3ort3ublican8st0aurant8view0s5xroth6ich0ardli6oh3l1o1p2o0cks3deo3gers4om3s0vp3u0gby3hr2n2w0e2yukyu6sa0arland6fe0ty4kura4le1on3msclub4ung5ndvik0coromant12ofi4p1rl2s1ve2xo3b0i1s2c0a1b1haeffler7midt4olarships8ol3ule3warz5ience5ot3d1e0arch3t2cure1ity6ek2lect4ner3rvices6ven3w1x0y3fr2g1h0angrila6rp2w2ell3ia1ksha5oes2p0ping5uji3w3i0lk2na1gles5te3j1k0i0n2y0pe4l0ing4m0art3ile4n0cf3o0ccer3ial4ftbank4ware6hu2lar2utions7ng1y2y2pa0ce3ort2t3r0l2s1t0ada2ples4r1tebank4farm7c0group6ockholm6rage3e3ream4udio2y3yle4u0cks3pplies3y2ort5rf1gery5zuki5v1watch4iss4x1y0dney4stems6z2tab1ipei4lk2obao4rget4tamotors6r2too4x0i3c0i2d0k2eam2ch0nology8l1masek5nnis4va3f1g1h0d1eater2re6iaa2ckets5enda4ps2res2ol4j0maxx4x2k0maxx5l1m0all4n1o0day3kyo3ols3p1ray3shiba5tal3urs3wn2yota3s3r0ade1ing4ining5vel0ers0insurance16ust3v2t1ube2i1nes3shu4v0s2w1z2ua1bank3s2g1k1nicom3versity8o2ol2ps2s1y1z2va0cations7na1guard7c1e0gas3ntures6risign5mögensberater2ung14sicherung10t2g1i0ajes4deo3g1king4llas4n1p1rgin4sa1ion4va1o3laanderen9n1odka3lvo3te1ing3o2yage5u2wales2mart4ter4ng0gou5tch0es6eather0channel12bcam3er2site5d0ding5ibo2r3f1hoswho6ien2ki2lliamhill9n0dows4e1ners6me2olterskluwer11odside6rk0s2ld3w2s1tc1f3xbox3erox4finity6ihuan4n2xx2yz3yachts4hoo3maxun5ndex5e1odobashi7ga2kohama6u0tube6t1un3za0ppos4ra3ero3ip2m1one3uerich6w2';
+    // Internationalized domain names containing non-ASCII
+    const encodedUtlds = 'ελ1υ2бг1ел3дети4ею2католик6ом3мкд2он1сква6онлайн5рг3рус2ф2сайт3рб3укр3қаз3հայ3ישראל5קום3ابوظبي5رامكو5لاردن4بحرين5جزائر5سعودية6عليان5مغرب5مارات5یران5بارت2زار4يتك3ھارت5تونس4سودان3رية5شبكة4عراق2ب2مان4فلسطين6قطر3كاثوليك6وم3مصر2ليسيا5وريتانيا7قع4همراه5پاکستان7ڀارت4कॉम3नेट3भारत0म्3ोत5संगठन5বাংলা5ভারত2ৰত4ਭਾਰਤ4ભારત4ଭାରତ4இந்தியா6லங்கை6சிங்கப்பூர்11భారత్5ಭಾರತ4ഭാരതം5ලංකා4คอม3ไทย3ລາວ3გე2みんな3アマゾン4クラウド4グーグル4コム2ストア3セール3ファッション6ポイント4世界2中信1国1國1文网3亚马逊3企业2佛山2信息2健康2八卦2公司1益2台湾1灣2商城1店1标2嘉里0大酒店5在线2大拿2天主教3娱乐2家電2广东2微博2慈善2我爱你3手机2招聘2政务1府2新加坡2闻2时尚2書籍2机构2淡马锡3游戏2澳門2点看2移动2组织机构4网址1店1站1络2联通2谷歌2购物2通販2集团2電訊盈科4飞利浦3食品2餐厅2香格里拉3港2닷넷1컴2삼성2한국2';
+
+    /**
+     * @template A
+     * @template B
+     * @param {A} target
+     * @param {B} properties
+     * @return {A & B}
+     */
+    const assign = (target, properties) => {
+      for (const key in properties) {
+        target[key] = properties[key];
+      }
+      return target;
+    };
+
+    /**
+     * Finite State Machine generation utilities
+     */
+
+    /**
+     * @template T
+     * @typedef {{ [group: string]: T[] }} Collections
+     */
+
+    /**
+     * @typedef {{ [group: string]: true }} Flags
+     */
+
+    // Keys in scanner Collections instances
+    const numeric = 'numeric';
+    const ascii = 'ascii';
+    const alpha = 'alpha';
+    const asciinumeric = 'asciinumeric';
+    const alphanumeric = 'alphanumeric';
+    const domain = 'domain';
+    const emoji = 'emoji';
+    const scheme = 'scheme';
+    const slashscheme = 'slashscheme';
+    const whitespace$2 = 'whitespace';
+
+    /**
+     * @template T
+     * @param {string} name
+     * @param {Collections<T>} groups to register in
+     * @returns {T[]} Current list of tokens in the given collection
+     */
+    function registerGroup(name, groups) {
+      if (!(name in groups)) {
+        groups[name] = [];
+      }
+      return groups[name];
+    }
+
+    /**
+     * @template T
+     * @param {T} t token to add
+     * @param {Collections<T>} groups
+     * @param {Flags} flags
+     */
+    function addToGroups(t, flags, groups) {
+      if (flags[numeric]) {
+        flags[asciinumeric] = true;
+        flags[alphanumeric] = true;
+      }
+      if (flags[ascii]) {
+        flags[asciinumeric] = true;
+        flags[alpha] = true;
+      }
+      if (flags[asciinumeric]) {
+        flags[alphanumeric] = true;
+      }
+      if (flags[alpha]) {
+        flags[alphanumeric] = true;
+      }
+      if (flags[alphanumeric]) {
+        flags[domain] = true;
+      }
+      if (flags[emoji]) {
+        flags[domain] = true;
+      }
+      for (const k in flags) {
+        const group = registerGroup(k, groups);
+        if (group.indexOf(t) < 0) {
+          group.push(t);
+        }
+      }
+    }
+
+    /**
+     * @template T
+     * @param {T} t token to check
+     * @param {Collections<T>} groups
+     * @returns {Flags} group flags that contain this token
+     */
+    function flagsForToken(t, groups) {
+      const result = {};
+      for (const c in groups) {
+        if (groups[c].indexOf(t) >= 0) {
+          result[c] = true;
+        }
+      }
+      return result;
+    }
+
+    /**
+     * @template T
+     * @typedef {null | T } Transition
+     */
+
+    /**
+     * Define a basic state machine state. j is the list of character transitions,
+     * jr is the list of regex-match transitions, jd is the default state to
+     * transition to t is the accepting token type, if any. If this is the terminal
+     * state, then it does not emit a token.
+     *
+     * The template type T represents the type of the token this state accepts. This
+     * should be a string (such as of the token exports in `text.js`) or a
+     * MultiToken subclass (from `multi.js`)
+     *
+     * @template T
+     * @param {T} [token] Token that this state emits
+     */
+    function State$1(token) {
+      if (token === void 0) {
+        token = null;
+      }
+      // this.n = null; // DEBUG: State name
+      /** @type {{ [input: string]: State<T> }} j */
+      this.j = {}; // IMPLEMENTATION 1
+      // this.j = []; // IMPLEMENTATION 2
+      /** @type {[RegExp, State<T>][]} jr */
+      this.jr = [];
+      /** @type {?State<T>} jd */
+      this.jd = null;
+      /** @type {?T} t */
+      this.t = token;
+    }
+
+    /**
+     * Scanner token groups
+     * @type Collections<string>
+     */
+    State$1.groups = {};
+    State$1.prototype = {
+      accepts() {
+        return !!this.t;
+      },
+      /**
+       * Follow an existing transition from the given input to the next state.
+       * Does not mutate.
+       * @param {string} input character or token type to transition on
+       * @returns {?State<T>} the next state, if any
+       */
+      go(input) {
+        const state = this;
+        const nextState = state.j[input];
+        if (nextState) {
+          return nextState;
+        }
+        for (let i = 0; i < state.jr.length; i++) {
+          const regex = state.jr[i][0];
+          const nextState = state.jr[i][1]; // note: might be empty to prevent default jump
+          if (nextState && regex.test(input)) {
+            return nextState;
+          }
+        }
+        // Nowhere left to jump! Return default, if any
+        return state.jd;
+      },
+      /**
+       * Whether the state has a transition for the given input. Set the second
+       * argument to true to only look for an exact match (and not a default or
+       * regular-expression-based transition)
+       * @param {string} input
+       * @param {boolean} exactOnly
+       */
+      has(input, exactOnly) {
+        if (exactOnly === void 0) {
+          exactOnly = false;
+        }
+        return exactOnly ? input in this.j : !!this.go(input);
+      },
+      /**
+       * Short for "transition all"; create a transition from the array of items
+       * in the given list to the same final resulting state.
+       * @param {string | string[]} inputs Group of inputs to transition on
+       * @param {Transition<T> | State<T>} [next] Transition options
+       * @param {Flags} [flags] Collections flags to add token to
+       * @param {Collections<T>} [groups] Master list of token groups
+       */
+      ta(inputs, next, flags, groups) {
+        for (let i = 0; i < inputs.length; i++) {
+          this.tt(inputs[i], next, flags, groups);
+        }
+      },
+      /**
+       * Short for "take regexp transition"; defines a transition for this state
+       * when it encounters a token which matches the given regular expression
+       * @param {RegExp} regexp Regular expression transition (populate first)
+       * @param {T | State<T>} [next] Transition options
+       * @param {Flags} [flags] Collections flags to add token to
+       * @param {Collections<T>} [groups] Master list of token groups
+       * @returns {State<T>} taken after the given input
+       */
+      tr(regexp, next, flags, groups) {
+        groups = groups || State$1.groups;
+        let nextState;
+        if (next && next.j) {
+          nextState = next;
+        } else {
+          // Token with maybe token groups
+          nextState = new State$1(next);
+          if (flags && groups) {
+            addToGroups(next, flags, groups);
+          }
+        }
+        this.jr.push([regexp, nextState]);
+        return nextState;
+      },
+      /**
+       * Short for "take transitions", will take as many sequential transitions as
+       * the length of the given input and returns the
+       * resulting final state.
+       * @param {string | string[]} input
+       * @param {T | State<T>} [next] Transition options
+       * @param {Flags} [flags] Collections flags to add token to
+       * @param {Collections<T>} [groups] Master list of token groups
+       * @returns {State<T>} taken after the given input
+       */
+      ts(input, next, flags, groups) {
+        let state = this;
+        const len = input.length;
+        if (!len) {
+          return state;
+        }
+        for (let i = 0; i < len - 1; i++) {
+          state = state.tt(input[i]);
+        }
+        return state.tt(input[len - 1], next, flags, groups);
+      },
+      /**
+       * Short for "take transition", this is a method for building/working with
+       * state machines.
+       *
+       * If a state already exists for the given input, returns it.
+       *
+       * If a token is specified, that state will emit that token when reached by
+       * the linkify engine.
+       *
+       * If no state exists, it will be initialized with some default transitions
+       * that resemble existing default transitions.
+       *
+       * If a state is given for the second argument, that state will be
+       * transitioned to on the given input regardless of what that input
+       * previously did.
+       *
+       * Specify a token group flags to define groups that this token belongs to.
+       * The token will be added to corresponding entires in the given groups
+       * object.
+       *
+       * @param {string} input character, token type to transition on
+       * @param {T | State<T>} [next] Transition options
+       * @param {Flags} [flags] Collections flags to add token to
+       * @param {Collections<T>} [groups] Master list of groups
+       * @returns {State<T>} taken after the given input
+       */
+      tt(input, next, flags, groups) {
+        groups = groups || State$1.groups;
+        const state = this;
+
+        // Check if existing state given, just a basic transition
+        if (next && next.j) {
+          state.j[input] = next;
+          return next;
+        }
+        const t = next;
+
+        // Take the transition with the usual default mechanisms and use that as
+        // a template for creating the next state
+        let nextState,
+          templateState = state.go(input);
+        if (templateState) {
+          nextState = new State$1();
+          assign(nextState.j, templateState.j);
+          nextState.jr.push.apply(nextState.jr, templateState.jr);
+          nextState.jd = templateState.jd;
+          nextState.t = templateState.t;
+        } else {
+          nextState = new State$1();
+        }
+        if (t) {
+          // Ensure newly token is in the same groups as the old token
+          if (groups) {
+            if (nextState.t && typeof nextState.t === 'string') {
+              const allFlags = assign(flagsForToken(nextState.t, groups), flags);
+              addToGroups(t, allFlags, groups);
+            } else if (flags) {
+              addToGroups(t, flags, groups);
+            }
+          }
+          nextState.t = t; // overwrite anything that was previously there
+        }
+
+        state.j[input] = nextState;
+        return nextState;
+      }
+    };
+
+    // Helper functions to improve minification (not exported outside linkifyjs module)
+
+    /**
+     * @template T
+     * @param {State<T>} state
+     * @param {string | string[]} input
+     * @param {Flags} [flags]
+     * @param {Collections<T>} [groups]
+     */
+    const ta = (state, input, next, flags, groups) => state.ta(input, next, flags, groups);
+
+    /**
+     * @template T
+     * @param {State<T>} state
+     * @param {RegExp} regexp
+     * @param {T | State<T>} [next]
+     * @param {Flags} [flags]
+     * @param {Collections<T>} [groups]
+     */
+    const tr$1 = (state, regexp, next, flags, groups) => state.tr(regexp, next, flags, groups);
+
+    /**
+     * @template T
+     * @param {State<T>} state
+     * @param {string | string[]} input
+     * @param {T | State<T>} [next]
+     * @param {Flags} [flags]
+     * @param {Collections<T>} [groups]
+     */
+    const ts = (state, input, next, flags, groups) => state.ts(input, next, flags, groups);
+
+    /**
+     * @template T
+     * @param {State<T>} state
+     * @param {string} input
+     * @param {T | State<T>} [next]
+     * @param {Collections<T>} [groups]
+     * @param {Flags} [flags]
+     */
+    const tt = (state, input, next, flags, groups) => state.tt(input, next, flags, groups);
+
+    /******************************************************************************
+    Text Tokens
+    Identifiers for token outputs from the regexp scanner
+    ******************************************************************************/
+
+    // A valid web domain token
+    const WORD = 'WORD'; // only contains a-z
+    const UWORD = 'UWORD'; // contains letters other than a-z, used for IDN
+
+    // Special case of word
+    const LOCALHOST = 'LOCALHOST';
+
+    // Valid top-level domain, special case of WORD (see tlds.js)
+    const TLD = 'TLD';
+
+    // Valid IDN TLD, special case of UWORD (see tlds.js)
+    const UTLD = 'UTLD';
+
+    // The scheme portion of a web URI protocol. Supported types include: `mailto`,
+    // `file`, and user-defined custom protocols. Limited to schemes that contain
+    // only letters
+    const SCHEME = 'SCHEME';
+
+    // Similar to SCHEME, except makes distinction for schemes that must always be
+    // followed by `://`, not just `:`. Supported types include `http`, `https`,
+    // `ftp`, `ftps`
+    const SLASH_SCHEME = 'SLASH_SCHEME';
+
+    // Any sequence of digits 0-9
+    const NUM = 'NUM';
+
+    // Any number of consecutive whitespace characters that are not newline
+    const WS = 'WS';
+
+    // New line (unix style)
+    const NL$1 = 'NL'; // \n
+
+    // Opening/closing bracket classes
+    // TODO: Rename OPEN -> LEFT and CLOSE -> RIGHT in v5 to fit with Unicode names
+    // Also rename angle brackes to LESSTHAN and GREATER THAN
+    const OPENBRACE = 'OPENBRACE'; // {
+    const CLOSEBRACE = 'CLOSEBRACE'; // }
+    const OPENBRACKET = 'OPENBRACKET'; // [
+    const CLOSEBRACKET = 'CLOSEBRACKET'; // ]
+    const OPENPAREN = 'OPENPAREN'; // (
+    const CLOSEPAREN = 'CLOSEPAREN'; // )
+    const OPENANGLEBRACKET = 'OPENANGLEBRACKET'; // <
+    const CLOSEANGLEBRACKET = 'CLOSEANGLEBRACKET'; // >
+    const FULLWIDTHLEFTPAREN = 'FULLWIDTHLEFTPAREN'; // （
+    const FULLWIDTHRIGHTPAREN = 'FULLWIDTHRIGHTPAREN'; // ）
+    const LEFTCORNERBRACKET = 'LEFTCORNERBRACKET'; // 「
+    const RIGHTCORNERBRACKET = 'RIGHTCORNERBRACKET'; // 」
+    const LEFTWHITECORNERBRACKET = 'LEFTWHITECORNERBRACKET'; // 『
+    const RIGHTWHITECORNERBRACKET = 'RIGHTWHITECORNERBRACKET'; // 』
+    const FULLWIDTHLESSTHAN = 'FULLWIDTHLESSTHAN'; // ＜
+    const FULLWIDTHGREATERTHAN = 'FULLWIDTHGREATERTHAN'; // ＞
+
+    // Various symbols
+    const AMPERSAND = 'AMPERSAND'; // &
+    const APOSTROPHE = 'APOSTROPHE'; // '
+    const ASTERISK = 'ASTERISK'; // *
+    const AT = 'AT'; // @
+    const BACKSLASH = 'BACKSLASH'; // \
+    const BACKTICK = 'BACKTICK'; // `
+    const CARET = 'CARET'; // ^
+    const COLON = 'COLON'; // :
+    const COMMA = 'COMMA'; // ,
+    const DOLLAR = 'DOLLAR'; // $
+    const DOT = 'DOT'; // .
+    const EQUALS = 'EQUALS'; // =
+    const EXCLAMATION = 'EXCLAMATION'; // !
+    const HYPHEN = 'HYPHEN'; // -
+    const PERCENT = 'PERCENT'; // %
+    const PIPE = 'PIPE'; // |
+    const PLUS = 'PLUS'; // +
+    const POUND = 'POUND'; // #
+    const QUERY = 'QUERY'; // ?
+    const QUOTE = 'QUOTE'; // "
+
+    const SEMI = 'SEMI'; // ;
+    const SLASH = 'SLASH'; // /
+    const TILDE = 'TILDE'; // ~
+    const UNDERSCORE = 'UNDERSCORE'; // _
+
+    // Emoji symbol
+    const EMOJI$1 = 'EMOJI';
+
+    // Default token - anything that is not one of the above
+    const SYM = 'SYM';
+
+    var tk = /*#__PURE__*/Object.freeze({
+    	__proto__: null,
+    	WORD: WORD,
+    	UWORD: UWORD,
+    	LOCALHOST: LOCALHOST,
+    	TLD: TLD,
+    	UTLD: UTLD,
+    	SCHEME: SCHEME,
+    	SLASH_SCHEME: SLASH_SCHEME,
+    	NUM: NUM,
+    	WS: WS,
+    	NL: NL$1,
+    	OPENBRACE: OPENBRACE,
+    	CLOSEBRACE: CLOSEBRACE,
+    	OPENBRACKET: OPENBRACKET,
+    	CLOSEBRACKET: CLOSEBRACKET,
+    	OPENPAREN: OPENPAREN,
+    	CLOSEPAREN: CLOSEPAREN,
+    	OPENANGLEBRACKET: OPENANGLEBRACKET,
+    	CLOSEANGLEBRACKET: CLOSEANGLEBRACKET,
+    	FULLWIDTHLEFTPAREN: FULLWIDTHLEFTPAREN,
+    	FULLWIDTHRIGHTPAREN: FULLWIDTHRIGHTPAREN,
+    	LEFTCORNERBRACKET: LEFTCORNERBRACKET,
+    	RIGHTCORNERBRACKET: RIGHTCORNERBRACKET,
+    	LEFTWHITECORNERBRACKET: LEFTWHITECORNERBRACKET,
+    	RIGHTWHITECORNERBRACKET: RIGHTWHITECORNERBRACKET,
+    	FULLWIDTHLESSTHAN: FULLWIDTHLESSTHAN,
+    	FULLWIDTHGREATERTHAN: FULLWIDTHGREATERTHAN,
+    	AMPERSAND: AMPERSAND,
+    	APOSTROPHE: APOSTROPHE,
+    	ASTERISK: ASTERISK,
+    	AT: AT,
+    	BACKSLASH: BACKSLASH,
+    	BACKTICK: BACKTICK,
+    	CARET: CARET,
+    	COLON: COLON,
+    	COMMA: COMMA,
+    	DOLLAR: DOLLAR,
+    	DOT: DOT,
+    	EQUALS: EQUALS,
+    	EXCLAMATION: EXCLAMATION,
+    	HYPHEN: HYPHEN,
+    	PERCENT: PERCENT,
+    	PIPE: PIPE,
+    	PLUS: PLUS,
+    	POUND: POUND,
+    	QUERY: QUERY,
+    	QUOTE: QUOTE,
+    	SEMI: SEMI,
+    	SLASH: SLASH,
+    	TILDE: TILDE,
+    	UNDERSCORE: UNDERSCORE,
+    	EMOJI: EMOJI$1,
+    	SYM: SYM
+    });
+
+    // Note that these two Unicode ones expand into a really big one with Babel
+    const ASCII_LETTER = /[a-z]/;
+    const LETTER = /\p{L}/u; // Any Unicode character with letter data type
+    const EMOJI = /\p{Emoji}/u; // Any Unicode emoji character
+    const DIGIT = /\d/;
+    const SPACE = /\s/;
+
+    /**
+    	The scanner provides an interface that takes a string of text as input, and
+    	outputs an array of tokens instances that can be used for easy URL parsing.
+    */
+    const NL = '\n'; // New line character
+    const EMOJI_VARIATION = '\ufe0f'; // Variation selector, follows heart and others
+    const EMOJI_JOINER = '\u200d'; // zero-width joiner
+
+    let tlds = null,
+      utlds = null; // don't change so only have to be computed once
+
+    /**
+     * Scanner output token:
+     * - `t` is the token name (e.g., 'NUM', 'EMOJI', 'TLD')
+     * - `v` is the value of the token (e.g., '123', '❤️', 'com')
+     * - `s` is the start index of the token in the original string
+     * - `e` is the end index of the token in the original string
+     * @typedef {{t: string, v: string, s: number, e: number}} Token
+     */
+
+    /**
+     * @template T
+     * @typedef {{ [collection: string]: T[] }} Collections
+     */
+
+    /**
+     * Initialize the scanner character-based state machine for the given start
+     * state
+     * @param {[string, boolean][]} customSchemes List of custom schemes, where each
+     * item is a length-2 tuple with the first element set to the string scheme, and
+     * the second element set to `true` if the `://` after the scheme is optional
+     */
+    function init$2(customSchemes) {
+      if (customSchemes === void 0) {
+        customSchemes = [];
+      }
+      // Frequently used states (name argument removed during minification)
+      /** @type Collections<string> */
+      const groups = {}; // of tokens
+      State$1.groups = groups;
+      /** @type State<string> */
+      const Start = new State$1();
+      if (tlds == null) {
+        tlds = decodeTlds(encodedTlds);
+      }
+      if (utlds == null) {
+        utlds = decodeTlds(encodedUtlds);
+      }
+
+      // States for special URL symbols that accept immediately after start
+      tt(Start, "'", APOSTROPHE);
+      tt(Start, '{', OPENBRACE);
+      tt(Start, '}', CLOSEBRACE);
+      tt(Start, '[', OPENBRACKET);
+      tt(Start, ']', CLOSEBRACKET);
+      tt(Start, '(', OPENPAREN);
+      tt(Start, ')', CLOSEPAREN);
+      tt(Start, '<', OPENANGLEBRACKET);
+      tt(Start, '>', CLOSEANGLEBRACKET);
+      tt(Start, '（', FULLWIDTHLEFTPAREN);
+      tt(Start, '）', FULLWIDTHRIGHTPAREN);
+      tt(Start, '「', LEFTCORNERBRACKET);
+      tt(Start, '」', RIGHTCORNERBRACKET);
+      tt(Start, '『', LEFTWHITECORNERBRACKET);
+      tt(Start, '』', RIGHTWHITECORNERBRACKET);
+      tt(Start, '＜', FULLWIDTHLESSTHAN);
+      tt(Start, '＞', FULLWIDTHGREATERTHAN);
+      tt(Start, '&', AMPERSAND);
+      tt(Start, '*', ASTERISK);
+      tt(Start, '@', AT);
+      tt(Start, '`', BACKTICK);
+      tt(Start, '^', CARET);
+      tt(Start, ':', COLON);
+      tt(Start, ',', COMMA);
+      tt(Start, '$', DOLLAR);
+      tt(Start, '.', DOT);
+      tt(Start, '=', EQUALS);
+      tt(Start, '!', EXCLAMATION);
+      tt(Start, '-', HYPHEN);
+      tt(Start, '%', PERCENT);
+      tt(Start, '|', PIPE);
+      tt(Start, '+', PLUS);
+      tt(Start, '#', POUND);
+      tt(Start, '?', QUERY);
+      tt(Start, '"', QUOTE);
+      tt(Start, '/', SLASH);
+      tt(Start, ';', SEMI);
+      tt(Start, '~', TILDE);
+      tt(Start, '_', UNDERSCORE);
+      tt(Start, '\\', BACKSLASH);
+      const Num = tr$1(Start, DIGIT, NUM, {
+        [numeric]: true
+      });
+      tr$1(Num, DIGIT, Num);
+
+      // State which emits a word token
+      const Word = tr$1(Start, ASCII_LETTER, WORD, {
+        [ascii]: true
+      });
+      tr$1(Word, ASCII_LETTER, Word);
+
+      // Same as previous, but specific to non-fsm.ascii alphabet words
+      const UWord = tr$1(Start, LETTER, UWORD, {
+        [alpha]: true
+      });
+      tr$1(UWord, ASCII_LETTER); // Non-accepting
+      tr$1(UWord, LETTER, UWord);
+
+      // Whitespace jumps
+      // Tokens of only non-newline whitespace are arbitrarily long
+      // If any whitespace except newline, more whitespace!
+      const Ws = tr$1(Start, SPACE, WS, {
+        [whitespace$2]: true
+      });
+      tt(Start, NL, NL$1, {
+        [whitespace$2]: true
+      });
+      tt(Ws, NL); // non-accepting state to avoid mixing whitespaces
+      tr$1(Ws, SPACE, Ws);
+
+      // Emoji tokens. They are not grouped by the scanner except in cases where a
+      // zero-width joiner is present
+      const Emoji = tr$1(Start, EMOJI, EMOJI$1, {
+        [emoji]: true
+      });
+      tr$1(Emoji, EMOJI, Emoji);
+      tt(Emoji, EMOJI_VARIATION, Emoji);
+      // tt(Start, EMOJI_VARIATION, Emoji); // This one is sketchy
+
+      const EmojiJoiner = tt(Emoji, EMOJI_JOINER);
+      tr$1(EmojiJoiner, EMOJI, Emoji);
+      // tt(EmojiJoiner, EMOJI_VARIATION, Emoji); // also sketchy
+
+      // Generates states for top-level domains
+      // Note that this is most accurate when tlds are in alphabetical order
+      const wordjr = [[ASCII_LETTER, Word]];
+      const uwordjr = [[ASCII_LETTER, null], [LETTER, UWord]];
+      for (let i = 0; i < tlds.length; i++) {
+        fastts(Start, tlds[i], TLD, WORD, wordjr);
+      }
+      for (let i = 0; i < utlds.length; i++) {
+        fastts(Start, utlds[i], UTLD, UWORD, uwordjr);
+      }
+      addToGroups(TLD, {
+        tld: true,
+        ascii: true
+      }, groups);
+      addToGroups(UTLD, {
+        utld: true,
+        alpha: true
+      }, groups);
+
+      // Collect the states generated by different protocols. NOTE: If any new TLDs
+      // get added that are also protocols, set the token to be the same as the
+      // protocol to ensure parsing works as expected.
+      fastts(Start, 'file', SCHEME, WORD, wordjr);
+      fastts(Start, 'mailto', SCHEME, WORD, wordjr);
+      fastts(Start, 'http', SLASH_SCHEME, WORD, wordjr);
+      fastts(Start, 'https', SLASH_SCHEME, WORD, wordjr);
+      fastts(Start, 'ftp', SLASH_SCHEME, WORD, wordjr);
+      fastts(Start, 'ftps', SLASH_SCHEME, WORD, wordjr);
+      addToGroups(SCHEME, {
+        scheme: true,
+        ascii: true
+      }, groups);
+      addToGroups(SLASH_SCHEME, {
+        slashscheme: true,
+        ascii: true
+      }, groups);
+
+      // Register custom schemes. Assumes each scheme is asciinumeric with hyphens
+      customSchemes = customSchemes.sort((a, b) => a[0] > b[0] ? 1 : -1);
+      for (let i = 0; i < customSchemes.length; i++) {
+        const sch = customSchemes[i][0];
+        const optionalSlashSlash = customSchemes[i][1];
+        const flags = optionalSlashSlash ? {
+          [scheme]: true
+        } : {
+          [slashscheme]: true
+        };
+        if (sch.indexOf('-') >= 0) {
+          flags[domain] = true;
+        } else if (!ASCII_LETTER.test(sch)) {
+          flags[numeric] = true; // numbers only
+        } else if (DIGIT.test(sch)) {
+          flags[asciinumeric] = true;
+        } else {
+          flags[ascii] = true;
+        }
+        ts(Start, sch, sch, flags);
+      }
+
+      // Localhost token
+      ts(Start, 'localhost', LOCALHOST, {
+        ascii: true
+      });
+
+      // Set default transition for start state (some symbol)
+      Start.jd = new State$1(SYM);
+      return {
+        start: Start,
+        tokens: assign({
+          groups
+        }, tk)
+      };
+    }
+
+    /**
+    	Given a string, returns an array of TOKEN instances representing the
+    	composition of that string.
+
+    	@method run
+    	@param {State<string>} start scanner starting state
+    	@param {string} str input string to scan
+    	@return {Token[]} list of tokens, each with a type and value
+    */
+    function run$1(start, str) {
+      // State machine is not case sensitive, so input is tokenized in lowercased
+      // form (still returns regular case). Uses selective `toLowerCase` because
+      // lowercasing the entire string causes the length and character position to
+      // vary in some non-English strings with V8-based runtimes.
+      const iterable = stringToArray(str.replace(/[A-Z]/g, c => c.toLowerCase()));
+      const charCount = iterable.length; // <= len if there are emojis, etc
+      const tokens = []; // return value
+
+      // cursor through the string itself, accounting for characters that have
+      // width with length 2 such as emojis
+      let cursor = 0;
+
+      // Cursor through the array-representation of the string
+      let charCursor = 0;
+
+      // Tokenize the string
+      while (charCursor < charCount) {
+        let state = start;
+        let nextState = null;
+        let tokenLength = 0;
+        let latestAccepting = null;
+        let sinceAccepts = -1;
+        let charsSinceAccepts = -1;
+        while (charCursor < charCount && (nextState = state.go(iterable[charCursor]))) {
+          state = nextState;
+
+          // Keep track of the latest accepting state
+          if (state.accepts()) {
+            sinceAccepts = 0;
+            charsSinceAccepts = 0;
+            latestAccepting = state;
+          } else if (sinceAccepts >= 0) {
+            sinceAccepts += iterable[charCursor].length;
+            charsSinceAccepts++;
+          }
+          tokenLength += iterable[charCursor].length;
+          cursor += iterable[charCursor].length;
+          charCursor++;
+        }
+
+        // Roll back to the latest accepting state
+        cursor -= sinceAccepts;
+        charCursor -= charsSinceAccepts;
+        tokenLength -= sinceAccepts;
+
+        // No more jumps, just make a new token from the last accepting one
+        tokens.push({
+          t: latestAccepting.t,
+          // token type/name
+          v: str.slice(cursor - tokenLength, cursor),
+          // string value
+          s: cursor - tokenLength,
+          // start index
+          e: cursor // end index (excluding)
+        });
+      }
+
+      return tokens;
+    }
+
+    /**
+     * Convert a String to an Array of characters, taking into account that some
+     * characters like emojis take up two string indexes.
+     *
+     * Adapted from core-js (MIT license)
+     * https://github.com/zloirock/core-js/blob/2d69cf5f99ab3ea3463c395df81e5a15b68f49d9/packages/core-js/internals/string-multibyte.js
+     *
+     * @function stringToArray
+     * @param {string} str
+     * @returns {string[]}
+     */
+    function stringToArray(str) {
+      const result = [];
+      const len = str.length;
+      let index = 0;
+      while (index < len) {
+        let first = str.charCodeAt(index);
+        let second;
+        let char = first < 0xd800 || first > 0xdbff || index + 1 === len || (second = str.charCodeAt(index + 1)) < 0xdc00 || second > 0xdfff ? str[index] // single character
+        : str.slice(index, index + 2); // two-index characters
+        result.push(char);
+        index += char.length;
+      }
+      return result;
+    }
+
+    /**
+     * Fast version of ts function for when transition defaults are well known
+     * @param {State<string>} state
+     * @param {string} input
+     * @param {string} t
+     * @param {string} defaultt
+     * @param {[RegExp, State<string>][]} jr
+     * @returns {State<string>}
+     */
+    function fastts(state, input, t, defaultt, jr) {
+      let next;
+      const len = input.length;
+      for (let i = 0; i < len - 1; i++) {
+        const char = input[i];
+        if (state.j[char]) {
+          next = state.j[char];
+        } else {
+          next = new State$1(defaultt);
+          next.jr = jr.slice();
+          state.j[char] = next;
+        }
+        state = next;
+      }
+      next = new State$1(t);
+      next.jr = jr.slice();
+      state.j[input[len - 1]] = next;
+      return next;
+    }
+
+    /**
+     * Converts a string of Top-Level Domain names encoded in update-tlds.js back
+     * into a list of strings.
+     * @param {str} encoded encoded TLDs string
+     * @returns {str[]} original TLDs list
+     */
+    function decodeTlds(encoded) {
+      const words = [];
+      const stack = [];
+      let i = 0;
+      let digits = '0123456789';
+      while (i < encoded.length) {
+        let popDigitCount = 0;
+        while (digits.indexOf(encoded[i + popDigitCount]) >= 0) {
+          popDigitCount++; // encountered some digits, have to pop to go one level up trie
+        }
+
+        if (popDigitCount > 0) {
+          words.push(stack.join('')); // whatever preceded the pop digits must be a word
+          for (let popCount = parseInt(encoded.substring(i, i + popDigitCount), 10); popCount > 0; popCount--) {
+            stack.pop();
+          }
+          i += popDigitCount;
+        } else {
+          stack.push(encoded[i]); // drop down a level into the trie
+          i++;
+        }
+      }
+      return words;
+    }
+
+    /**
+     * An object where each key is a valid DOM Event Name such as `click` or `focus`
+     * and each value is an event handler function.
+     *
+     * https://developer.mozilla.org/en-US/docs/Web/API/Element#events
+     * @typedef {?{ [event: string]: Function }} EventListeners
+     */
+
+    /**
+     * All formatted properties required to render a link, including `tagName`,
+     * `attributes`, `content` and `eventListeners`.
+     * @typedef {{ tagName: any, attributes: {[attr: string]: any}, content: string,
+     * eventListeners: EventListeners }} IntermediateRepresentation
+     */
+
+    /**
+     * Specify either an object described by the template type `O` or a function.
+     *
+     * The function takes a string value (usually the link's href attribute), the
+     * link type (`'url'`, `'hashtag`', etc.) and an internal token representation
+     * of the link. It should return an object of the template type `O`
+     * @template O
+     * @typedef {O | ((value: string, type: string, token: MultiToken) => O)} OptObj
+     */
+
+    /**
+     * Specify either a function described by template type `F` or an object.
+     *
+     * Each key in the object should be a link type (`'url'`, `'hashtag`', etc.). Each
+     * value should be a function with template type `F` that is called when the
+     * corresponding link type is encountered.
+     * @template F
+     * @typedef {F | { [type: string]: F}} OptFn
+     */
+
+    /**
+     * Specify either a value with template type `V`, a function that returns `V` or
+     * an object where each value resolves to `V`.
+     *
+     * The function takes a string value (usually the link's href attribute), the
+     * link type (`'url'`, `'hashtag`', etc.) and an internal token representation
+     * of the link. It should return an object of the template type `V`
+     *
+     * For the object, each key should be a link type (`'url'`, `'hashtag`', etc.).
+     * Each value should either have type `V` or a function that returns V. This
+     * function similarly takes a string value and a token.
+     *
+     * Example valid types for `Opt<string>`:
+     *
+     * ```js
+     * 'hello'
+     * (value, type, token) => 'world'
+     * { url: 'hello', email: (value, token) => 'world'}
+     * ```
+     * @template V
+     * @typedef {V | ((value: string, type: string, token: MultiToken) => V) | { [type: string]: V | ((value: string, token: MultiToken) => V) }} Opt
+     */
+
+    /**
+     * See available options: https://linkify.js.org/docs/options.html
+     * @typedef {{
+     * 	defaultProtocol?: string,
+     *  events?: OptObj<EventListeners>,
+     * 	format?: Opt<string>,
+     * 	formatHref?: Opt<string>,
+     * 	nl2br?: boolean,
+     * 	tagName?: Opt<any>,
+     * 	target?: Opt<string>,
+     * 	rel?: Opt<string>,
+     * 	validate?: Opt<boolean>,
+     * 	truncate?: Opt<number>,
+     * 	className?: Opt<string>,
+     * 	attributes?: OptObj<({ [attr: string]: any })>,
+     *  ignoreTags?: string[],
+     * 	render?: OptFn<((ir: IntermediateRepresentation) => any)>
+     * }} Opts
+     */
+
+    /**
+     * @type Required<Opts>
+     */
+    const defaults$1 = {
+      defaultProtocol: 'http',
+      events: null,
+      format: noop,
+      formatHref: noop,
+      nl2br: false,
+      tagName: 'a',
+      target: null,
+      rel: null,
+      validate: true,
+      truncate: Infinity,
+      className: null,
+      attributes: null,
+      ignoreTags: [],
+      render: null
+    };
+
+    /**
+     * Utility class for linkify interfaces to apply specified
+     * {@link Opts formatting and rendering options}.
+     *
+     * @param {Opts | Options} [opts] Option value overrides.
+     * @param {(ir: IntermediateRepresentation) => any} [defaultRender] (For
+     *   internal use) default render function that determines how to generate an
+     *   HTML element based on a link token's derived tagName, attributes and HTML.
+     *   Similar to render option
+     */
+    function Options(opts, defaultRender) {
+      if (defaultRender === void 0) {
+        defaultRender = null;
+      }
+      let o = assign({}, defaults$1);
+      if (opts) {
+        o = assign(o, opts instanceof Options ? opts.o : opts);
+      }
+
+      // Ensure all ignored tags are uppercase
+      const ignoredTags = o.ignoreTags;
+      const uppercaseIgnoredTags = [];
+      for (let i = 0; i < ignoredTags.length; i++) {
+        uppercaseIgnoredTags.push(ignoredTags[i].toUpperCase());
+      }
+      /** @protected */
+      this.o = o;
+      if (defaultRender) {
+        this.defaultRender = defaultRender;
+      }
+      this.ignoreTags = uppercaseIgnoredTags;
+    }
+    Options.prototype = {
+      o: defaults$1,
+      /**
+       * @type string[]
+       */
+      ignoreTags: [],
+      /**
+       * @param {IntermediateRepresentation} ir
+       * @returns {any}
+       */
+      defaultRender(ir) {
+        return ir;
+      },
+      /**
+       * Returns true or false based on whether a token should be displayed as a
+       * link based on the user options.
+       * @param {MultiToken} token
+       * @returns {boolean}
+       */
+      check(token) {
+        return this.get('validate', token.toString(), token);
+      },
+      // Private methods
+
+      /**
+       * Resolve an option's value based on the value of the option and the given
+       * params. If operator and token are specified and the target option is
+       * callable, automatically calls the function with the given argument.
+       * @template {keyof Opts} K
+       * @param {K} key Name of option to use
+       * @param {string} [operator] will be passed to the target option if it's a
+       * function. If not specified, RAW function value gets returned
+       * @param {MultiToken} [token] The token from linkify.tokenize
+       * @returns {Opts[K] | any}
+       */
+      get(key, operator, token) {
+        const isCallable = operator != null;
+        let option = this.o[key];
+        if (!option) {
+          return option;
+        }
+        if (typeof option === 'object') {
+          option = token.t in option ? option[token.t] : defaults$1[key];
+          if (typeof option === 'function' && isCallable) {
+            option = option(operator, token);
+          }
+        } else if (typeof option === 'function' && isCallable) {
+          option = option(operator, token.t, token);
+        }
+        return option;
+      },
+      /**
+       * @template {keyof Opts} L
+       * @param {L} key Name of options object to use
+       * @param {string} [operator]
+       * @param {MultiToken} [token]
+       * @returns {Opts[L] | any}
+       */
+      getObj(key, operator, token) {
+        let obj = this.o[key];
+        if (typeof obj === 'function' && operator != null) {
+          obj = obj(operator, token.t, token);
+        }
+        return obj;
+      },
+      /**
+       * Convert the given token to a rendered element that may be added to the
+       * calling-interface's DOM
+       * @param {MultiToken} token Token to render to an HTML element
+       * @returns {any} Render result; e.g., HTML string, DOM element, React
+       *   Component, etc.
+       */
+      render(token) {
+        const ir = token.render(this); // intermediate representation
+        const renderFn = this.get('render', null, token) || this.defaultRender;
+        return renderFn(ir, token.t, token);
+      }
+    };
+    function noop(val) {
+      return val;
+    }
+
+    /******************************************************************************
+    	Multi-Tokens
+    	Tokens composed of arrays of TextTokens
+    ******************************************************************************/
+
+    /**
+     * @param {string} value
+     * @param {Token[]} tokens
+     */
+    function MultiToken(value, tokens) {
+      this.t = 'token';
+      this.v = value;
+      this.tk = tokens;
+    }
+
+    /**
+     * Abstract class used for manufacturing tokens of text tokens. That is rather
+     * than the value for a token being a small string of text, it's value an array
+     * of text tokens.
+     *
+     * Used for grouping together URLs, emails, hashtags, and other potential
+     * creations.
+     * @class MultiToken
+     * @property {string} t
+     * @property {string} v
+     * @property {Token[]} tk
+     * @abstract
+     */
+    MultiToken.prototype = {
+      isLink: false,
+      /**
+       * Return the string this token represents.
+       * @return {string}
+       */
+      toString() {
+        return this.v;
+      },
+      /**
+       * What should the value for this token be in the `href` HTML attribute?
+       * Returns the `.toString` value by default.
+       * @param {string} [scheme]
+       * @return {string}
+      */
+      toHref(scheme) {
+        return this.toString();
+      },
+      /**
+       * @param {Options} options Formatting options
+       * @returns {string}
+       */
+      toFormattedString(options) {
+        const val = this.toString();
+        const truncate = options.get('truncate', val, this);
+        const formatted = options.get('format', val, this);
+        return truncate && formatted.length > truncate ? formatted.substring(0, truncate) + '…' : formatted;
+      },
+      /**
+       *
+       * @param {Options} options
+       * @returns {string}
+       */
+      toFormattedHref(options) {
+        return options.get('formatHref', this.toHref(options.get('defaultProtocol')), this);
+      },
+      /**
+       * The start index of this token in the original input string
+       * @returns {number}
+       */
+      startIndex() {
+        return this.tk[0].s;
+      },
+      /**
+       * The end index of this token in the original input string (up to this
+       * index but not including it)
+       * @returns {number}
+       */
+      endIndex() {
+        return this.tk[this.tk.length - 1].e;
+      },
+      /**
+      	Returns an object  of relevant values for this token, which includes keys
+      	* type - Kind of token ('url', 'email', etc.)
+      	* value - Original text
+      	* href - The value that should be added to the anchor tag's href
+      		attribute
+      		@method toObject
+      	@param {string} [protocol] `'http'` by default
+      */
+      toObject(protocol) {
+        if (protocol === void 0) {
+          protocol = defaults$1.defaultProtocol;
+        }
+        return {
+          type: this.t,
+          value: this.toString(),
+          isLink: this.isLink,
+          href: this.toHref(protocol),
+          start: this.startIndex(),
+          end: this.endIndex()
+        };
+      },
+      /**
+       *
+       * @param {Options} options Formatting option
+       */
+      toFormattedObject(options) {
+        return {
+          type: this.t,
+          value: this.toFormattedString(options),
+          isLink: this.isLink,
+          href: this.toFormattedHref(options),
+          start: this.startIndex(),
+          end: this.endIndex()
+        };
+      },
+      /**
+       * Whether this token should be rendered as a link according to the given options
+       * @param {Options} options
+       * @returns {boolean}
+       */
+      validate(options) {
+        return options.get('validate', this.toString(), this);
+      },
+      /**
+       * Return an object that represents how this link should be rendered.
+       * @param {Options} options Formattinng options
+       */
+      render(options) {
+        const token = this;
+        const href = this.toHref(options.get('defaultProtocol'));
+        const formattedHref = options.get('formatHref', href, this);
+        const tagName = options.get('tagName', href, token);
+        const content = this.toFormattedString(options);
+        const attributes = {};
+        const className = options.get('className', href, token);
+        const target = options.get('target', href, token);
+        const rel = options.get('rel', href, token);
+        const attrs = options.getObj('attributes', href, token);
+        const eventListeners = options.getObj('events', href, token);
+        attributes.href = formattedHref;
+        if (className) {
+          attributes.class = className;
+        }
+        if (target) {
+          attributes.target = target;
+        }
+        if (rel) {
+          attributes.rel = rel;
+        }
+        if (attrs) {
+          assign(attributes, attrs);
+        }
+        return {
+          tagName,
+          attributes,
+          content,
+          eventListeners
+        };
+      }
+    };
+
+    /**
+     * Create a new token that can be emitted by the parser state machine
+     * @param {string} type readable type of the token
+     * @param {object} props properties to assign or override, including isLink = true or false
+     * @returns {new (value: string, tokens: Token[]) => MultiToken} new token class
+     */
+    function createTokenClass(type, props) {
+      class Token extends MultiToken {
+        constructor(value, tokens) {
+          super(value, tokens);
+          this.t = type;
+        }
+      }
+      for (const p in props) {
+        Token.prototype[p] = props[p];
+      }
+      Token.t = type;
+      return Token;
+    }
+
+    /**
+    	Represents a list of tokens making up a valid email address
+    */
+    const Email = createTokenClass('email', {
+      isLink: true,
+      toHref() {
+        return 'mailto:' + this.toString();
+      }
+    });
+
+    /**
+    	Represents some plain text
+    */
+    const Text$1 = createTokenClass('text');
+
+    /**
+    	Multi-linebreak token - represents a line break
+    	@class Nl
+    */
+    const Nl = createTokenClass('nl');
+
+    /**
+    	Represents a list of text tokens making up a valid URL
+    	@class Url
+    */
+    const Url = createTokenClass('url', {
+      isLink: true,
+      /**
+      	Lowercases relevant parts of the domain and adds the protocol if
+      	required. Note that this will not escape unsafe HTML characters in the
+      	URL.
+      		@param {string} [scheme] default scheme (e.g., 'https')
+      	@return {string} the full href
+      */
+      toHref(scheme) {
+        if (scheme === void 0) {
+          scheme = defaults$1.defaultProtocol;
+        }
+        // Check if already has a prefix scheme
+        return this.hasProtocol() ? this.v : `${scheme}://${this.v}`;
+      },
+      /**
+       * Check whether this URL token has a protocol
+       * @return {boolean}
+       */
+      hasProtocol() {
+        const tokens = this.tk;
+        return tokens.length >= 2 && tokens[0].t !== LOCALHOST && tokens[1].t === COLON;
+      }
+    });
+
+    /**
+    	Not exactly parser, more like the second-stage scanner (although we can
+    	theoretically hotswap the code here with a real parser in the future... but
+    	for a little URL-finding utility abstract syntax trees may be a little
+    	overkill).
+
+    	URL format: http://en.wikipedia.org/wiki/URI_scheme
+    	Email format: http://en.wikipedia.org/wiki/EmailAddress (links to RFC in
+    	reference)
+
+    	@module linkify
+    	@submodule parser
+    	@main run
+    */
+    const makeState = arg => new State$1(arg);
+
+    /**
+     * Generate the parser multi token-based state machine
+     * @param {{ groups: Collections<string> }} tokens
+     */
+    function init$1(_ref) {
+      let {
+        groups
+      } = _ref;
+      // Types of characters the URL can definitely end in
+      const qsAccepting = groups.domain.concat([AMPERSAND, ASTERISK, AT, BACKSLASH, BACKTICK, CARET, DOLLAR, EQUALS, HYPHEN, NUM, PERCENT, PIPE, PLUS, POUND, SLASH, SYM, TILDE, UNDERSCORE]);
+
+      // Types of tokens that can follow a URL and be part of the query string
+      // but cannot be the very last characters
+      // Characters that cannot appear in the URL at all should be excluded
+      const qsNonAccepting = [APOSTROPHE, COLON, COMMA, DOT, EXCLAMATION, QUERY, QUOTE, SEMI, OPENANGLEBRACKET, CLOSEANGLEBRACKET, OPENBRACE, CLOSEBRACE, CLOSEBRACKET, OPENBRACKET, OPENPAREN, CLOSEPAREN, FULLWIDTHLEFTPAREN, FULLWIDTHRIGHTPAREN, LEFTCORNERBRACKET, RIGHTCORNERBRACKET, LEFTWHITECORNERBRACKET, RIGHTWHITECORNERBRACKET, FULLWIDTHLESSTHAN, FULLWIDTHGREATERTHAN];
+
+      // For addresses without the mailto prefix
+      // Tokens allowed in the localpart of the email
+      const localpartAccepting = [AMPERSAND, APOSTROPHE, ASTERISK, BACKSLASH, BACKTICK, CARET, DOLLAR, EQUALS, HYPHEN, OPENBRACE, CLOSEBRACE, PERCENT, PIPE, PLUS, POUND, QUERY, SLASH, SYM, TILDE, UNDERSCORE];
+
+      // The universal starting state.
+      /**
+       * @type State<Token>
+       */
+      const Start = makeState();
+      const Localpart = tt(Start, TILDE); // Local part of the email address
+      ta(Localpart, localpartAccepting, Localpart);
+      ta(Localpart, groups.domain, Localpart);
+      const Domain = makeState(),
+        Scheme = makeState(),
+        SlashScheme = makeState();
+      ta(Start, groups.domain, Domain); // parsed string ends with a potential domain name (A)
+      ta(Start, groups.scheme, Scheme); // e.g., 'mailto'
+      ta(Start, groups.slashscheme, SlashScheme); // e.g., 'http'
+
+      ta(Domain, localpartAccepting, Localpart);
+      ta(Domain, groups.domain, Domain);
+      const LocalpartAt = tt(Domain, AT); // Local part of the email address plus @
+
+      tt(Localpart, AT, LocalpartAt); // close to an email address now
+
+      // Local part of an email address can be e.g. 'http' or 'mailto'
+      tt(Scheme, AT, LocalpartAt);
+      tt(SlashScheme, AT, LocalpartAt);
+      const LocalpartDot = tt(Localpart, DOT); // Local part of the email address plus '.' (localpart cannot end in .)
+      ta(LocalpartDot, localpartAccepting, Localpart);
+      ta(LocalpartDot, groups.domain, Localpart);
+      const EmailDomain = makeState();
+      ta(LocalpartAt, groups.domain, EmailDomain); // parsed string starts with local email info + @ with a potential domain name
+      ta(EmailDomain, groups.domain, EmailDomain);
+      const EmailDomainDot = tt(EmailDomain, DOT); // domain followed by DOT
+      ta(EmailDomainDot, groups.domain, EmailDomain);
+      const Email$1 = makeState(Email); // Possible email address (could have more tlds)
+      ta(EmailDomainDot, groups.tld, Email$1);
+      ta(EmailDomainDot, groups.utld, Email$1);
+      tt(LocalpartAt, LOCALHOST, Email$1);
+
+      // Hyphen can jump back to a domain name
+      const EmailDomainHyphen = tt(EmailDomain, HYPHEN); // parsed string starts with local email info + @ with a potential domain name
+      ta(EmailDomainHyphen, groups.domain, EmailDomain);
+      ta(Email$1, groups.domain, EmailDomain);
+      tt(Email$1, DOT, EmailDomainDot);
+      tt(Email$1, HYPHEN, EmailDomainHyphen);
+
+      // Final possible email states
+      const EmailColon = tt(Email$1, COLON); // URL followed by colon (potential port number here)
+      /*const EmailColonPort = */
+      ta(EmailColon, groups.numeric, Email); // URL followed by colon and port number
+
+      // Account for dots and hyphens. Hyphens are usually parts of domain names
+      // (but not TLDs)
+      const DomainHyphen = tt(Domain, HYPHEN); // domain followed by hyphen
+      const DomainDot = tt(Domain, DOT); // domain followed by DOT
+      ta(DomainHyphen, groups.domain, Domain);
+      ta(DomainDot, localpartAccepting, Localpart);
+      ta(DomainDot, groups.domain, Domain);
+      const DomainDotTld = makeState(Url); // Simplest possible URL with no query string
+      ta(DomainDot, groups.tld, DomainDotTld);
+      ta(DomainDot, groups.utld, DomainDotTld);
+      ta(DomainDotTld, groups.domain, Domain);
+      ta(DomainDotTld, localpartAccepting, Localpart);
+      tt(DomainDotTld, DOT, DomainDot);
+      tt(DomainDotTld, HYPHEN, DomainHyphen);
+      tt(DomainDotTld, AT, LocalpartAt);
+      const DomainDotTldColon = tt(DomainDotTld, COLON); // URL followed by colon (potential port number here)
+      const DomainDotTldColonPort = makeState(Url); // TLD followed by a port number
+      ta(DomainDotTldColon, groups.numeric, DomainDotTldColonPort);
+
+      // Long URL with optional port and maybe query string
+      const Url$1 = makeState(Url);
+
+      // URL with extra symbols at the end, followed by an opening bracket
+      const UrlNonaccept = makeState(); // URL followed by some symbols (will not be part of the final URL)
+
+      // Query strings
+      ta(Url$1, qsAccepting, Url$1);
+      ta(Url$1, qsNonAccepting, UrlNonaccept);
+      ta(UrlNonaccept, qsAccepting, Url$1);
+      ta(UrlNonaccept, qsNonAccepting, UrlNonaccept);
+
+      // Become real URLs after `SLASH` or `COLON NUM SLASH`
+      // Here works with or without scheme:// prefix
+      tt(DomainDotTld, SLASH, Url$1);
+      tt(DomainDotTldColonPort, SLASH, Url$1);
+
+      // Note that domains that begin with schemes are treated slighly differently
+      const SchemeColon = tt(Scheme, COLON); // e.g., 'mailto:'
+      const SlashSchemeColon = tt(SlashScheme, COLON); // e.g., 'http:'
+      const SlashSchemeColonSlash = tt(SlashSchemeColon, SLASH); // e.g., 'http:/'
+
+      const UriPrefix = tt(SlashSchemeColonSlash, SLASH); // e.g., 'http://'
+
+      // Scheme states can transition to domain states
+      ta(Scheme, groups.domain, Domain);
+      tt(Scheme, DOT, DomainDot);
+      tt(Scheme, HYPHEN, DomainHyphen);
+      ta(SlashScheme, groups.domain, Domain);
+      tt(SlashScheme, DOT, DomainDot);
+      tt(SlashScheme, HYPHEN, DomainHyphen);
+
+      // Force URL with scheme prefix followed by anything sane
+      ta(SchemeColon, groups.domain, Url$1);
+      tt(SchemeColon, SLASH, Url$1);
+      ta(UriPrefix, groups.domain, Url$1);
+      ta(UriPrefix, qsAccepting, Url$1);
+      tt(UriPrefix, SLASH, Url$1);
+      const bracketPairs = [[OPENBRACE, CLOSEBRACE],
+      // {}
+      [OPENBRACKET, CLOSEBRACKET],
+      // []
+      [OPENPAREN, CLOSEPAREN],
+      // ()
+      [OPENANGLEBRACKET, CLOSEANGLEBRACKET],
+      // <>
+      [FULLWIDTHLEFTPAREN, FULLWIDTHRIGHTPAREN],
+      // （）
+      [LEFTCORNERBRACKET, RIGHTCORNERBRACKET],
+      // 「」
+      [LEFTWHITECORNERBRACKET, RIGHTWHITECORNERBRACKET],
+      // 『』
+      [FULLWIDTHLESSTHAN, FULLWIDTHGREATERTHAN] // ＜＞
+      ];
+
+      for (let i = 0; i < bracketPairs.length; i++) {
+        const [OPEN, CLOSE] = bracketPairs[i];
+        const UrlOpen = tt(Url$1, OPEN); // URL followed by open bracket
+
+        // Continue not accepting for open brackets
+        tt(UrlNonaccept, OPEN, UrlOpen);
+
+        // Closing bracket component. This character WILL be included in the URL
+        tt(UrlOpen, CLOSE, Url$1);
+
+        // URL that beings with an opening bracket, followed by a symbols.
+        // Note that the final state can still be `UrlOpen` (if the URL has a
+        // single opening bracket for some reason).
+        const UrlOpenQ = makeState(Url);
+        ta(UrlOpen, qsAccepting, UrlOpenQ);
+        const UrlOpenSyms = makeState(); // UrlOpen followed by some symbols it cannot end it
+        ta(UrlOpen, qsNonAccepting);
+
+        // URL that begins with an opening bracket, followed by some symbols
+        ta(UrlOpenQ, qsAccepting, UrlOpenQ);
+        ta(UrlOpenQ, qsNonAccepting, UrlOpenSyms);
+        ta(UrlOpenSyms, qsAccepting, UrlOpenQ);
+        ta(UrlOpenSyms, qsNonAccepting, UrlOpenSyms);
+
+        // Close brace/bracket to become regular URL
+        tt(UrlOpenQ, CLOSE, Url$1);
+        tt(UrlOpenSyms, CLOSE, Url$1);
+      }
+      tt(Start, LOCALHOST, DomainDotTld); // localhost is a valid URL state
+      tt(Start, NL$1, Nl); // single new line
+
+      return {
+        start: Start,
+        tokens: tk
+      };
+    }
+
+    /**
+     * Run the parser state machine on a list of scanned string-based tokens to
+     * create a list of multi tokens, each of which represents a URL, email address,
+     * plain text, etc.
+     *
+     * @param {State<MultiToken>} start parser start state
+     * @param {string} input the original input used to generate the given tokens
+     * @param {Token[]} tokens list of scanned tokens
+     * @returns {MultiToken[]}
+     */
+    function run(start, input, tokens) {
+      let len = tokens.length;
+      let cursor = 0;
+      let multis = [];
+      let textTokens = [];
+      while (cursor < len) {
+        let state = start;
+        let secondState = null;
+        let nextState = null;
+        let multiLength = 0;
+        let latestAccepting = null;
+        let sinceAccepts = -1;
+        while (cursor < len && !(secondState = state.go(tokens[cursor].t))) {
+          // Starting tokens with nowhere to jump to.
+          // Consider these to be just plain text
+          textTokens.push(tokens[cursor++]);
+        }
+        while (cursor < len && (nextState = secondState || state.go(tokens[cursor].t))) {
+          // Get the next state
+          secondState = null;
+          state = nextState;
+
+          // Keep track of the latest accepting state
+          if (state.accepts()) {
+            sinceAccepts = 0;
+            latestAccepting = state;
+          } else if (sinceAccepts >= 0) {
+            sinceAccepts++;
+          }
+          cursor++;
+          multiLength++;
+        }
+        if (sinceAccepts < 0) {
+          // No accepting state was found, part of a regular text token add
+          // the first text token to the text tokens array and try again from
+          // the next
+          cursor -= multiLength;
+          if (cursor < len) {
+            textTokens.push(tokens[cursor]);
+            cursor++;
+          }
+        } else {
+          // Accepting state!
+          // First close off the textTokens (if available)
+          if (textTokens.length > 0) {
+            multis.push(initMultiToken(Text$1, input, textTokens));
+            textTokens = [];
+          }
+
+          // Roll back to the latest accepting state
+          cursor -= sinceAccepts;
+          multiLength -= sinceAccepts;
+
+          // Create a new multitoken
+          const Multi = latestAccepting.t;
+          const subtokens = tokens.slice(cursor - multiLength, cursor);
+          multis.push(initMultiToken(Multi, input, subtokens));
+        }
+      }
+
+      // Finally close off the textTokens (if available)
+      if (textTokens.length > 0) {
+        multis.push(initMultiToken(Text$1, input, textTokens));
+      }
+      return multis;
+    }
+
+    /**
+     * Utility function for instantiating a new multitoken with all the relevant
+     * fields during parsing.
+     * @param {new (value: string, tokens: Token[]) => MultiToken} Multi class to instantiate
+     * @param {string} input original input string
+     * @param {Token[]} tokens consecutive tokens scanned from input string
+     * @returns {MultiToken}
+     */
+    function initMultiToken(Multi, input, tokens) {
+      const startIdx = tokens[0].s;
+      const endIdx = tokens[tokens.length - 1].e;
+      const value = input.slice(startIdx, endIdx);
+      return new Multi(value, tokens);
+    }
+
+    const warn = typeof console !== 'undefined' && console && console.warn || (() => {});
+    const warnAdvice = 'until manual call of linkify.init(). Register all schemes and plugins before invoking linkify the first time.';
+
+    // Side-effect initialization state
+    const INIT = {
+      scanner: null,
+      parser: null,
+      tokenQueue: [],
+      pluginQueue: [],
+      customSchemes: [],
+      initialized: false
+    };
+
+    /**
+     * @typedef {{
+     * 	start: State<string>,
+     * 	tokens: { groups: Collections<string> } & typeof tk
+     * }} ScannerInit
+     */
+
+    /**
+     * @typedef {{
+     * 	start: State<MultiToken>,
+     * 	tokens: typeof multi
+     * }} ParserInit
+     */
+
+    /**
+     * @typedef {(arg: { scanner: ScannerInit }) => void} TokenPlugin
+     */
+
+    /**
+     * @typedef {(arg: { scanner: ScannerInit, parser: ParserInit }) => void} Plugin
+     */
+
+    /**
+     * De-register all plugins and reset the internal state-machine. Used for
+     * testing; not required in practice.
+     * @private
+     */
+    function reset() {
+      State$1.groups = {};
+      INIT.scanner = null;
+      INIT.parser = null;
+      INIT.tokenQueue = [];
+      INIT.pluginQueue = [];
+      INIT.customSchemes = [];
+      INIT.initialized = false;
+    }
+
+    /**
+     * Detect URLs with the following additional protocol. Anything with format
+     * "protocol://..." will be considered a link. If `optionalSlashSlash` is set to
+     * `true`, anything with format "protocol:..." will be considered a link.
+     * @param {string} protocol
+     * @param {boolean} [optionalSlashSlash]
+     */
+    function registerCustomProtocol(scheme, optionalSlashSlash) {
+      if (optionalSlashSlash === void 0) {
+        optionalSlashSlash = false;
+      }
+      if (INIT.initialized) {
+        warn(`linkifyjs: already initialized - will not register custom scheme "${scheme}" ${warnAdvice}`);
+      }
+      if (!/^[0-9a-z]+(-[0-9a-z]+)*$/.test(scheme)) {
+        throw new Error(`linkifyjs: incorrect scheme format.
+1. Must only contain digits, lowercase ASCII letters or "-"
+2. Cannot start or end with "-"
+3. "-" cannot repeat`);
+      }
+      INIT.customSchemes.push([scheme, optionalSlashSlash]);
+    }
+
+    /**
+     * Initialize the linkify state machine. Called automatically the first time
+     * linkify is called on a string, but may be called manually as well.
+     */
+    function init() {
+      // Initialize scanner state machine and plugins
+      INIT.scanner = init$2(INIT.customSchemes);
+      for (let i = 0; i < INIT.tokenQueue.length; i++) {
+        INIT.tokenQueue[i][1]({
+          scanner: INIT.scanner
+        });
+      }
+
+      // Initialize parser state machine and plugins
+      INIT.parser = init$1(INIT.scanner.tokens);
+      for (let i = 0; i < INIT.pluginQueue.length; i++) {
+        INIT.pluginQueue[i][1]({
+          scanner: INIT.scanner,
+          parser: INIT.parser
+        });
+      }
+      INIT.initialized = true;
+    }
+
+    /**
+     * Parse a string into tokens that represent linkable and non-linkable sub-components
+     * @param {string} str
+     * @return {MultiToken[]} tokens
+     */
+    function tokenize(str) {
+      if (!INIT.initialized) {
+        init();
+      }
+      return run(INIT.parser.start, str, run$1(INIT.scanner.start, str));
+    }
+
+    /**
+     * Find a list of linkable items in the given string.
+     * @param {string} str string to find links in
+     * @param {string | Opts} [type] either formatting options or specific type of
+     * links to find, e.g., 'url' or 'email'
+     * @param {Opts} [opts] formatting options for final output. Cannot be specified
+     * if opts already provided in `type` argument
+     */
+    function find$1(str, type, opts) {
+      if (type === void 0) {
+        type = null;
+      }
+      if (opts === void 0) {
+        opts = null;
+      }
+      if (type && typeof type === 'object') {
+        if (opts) {
+          throw Error(`linkifyjs: Invalid link type ${type}; must be a string`);
+        }
+        opts = type;
+        type = null;
+      }
+      const options = new Options(opts);
+      const tokens = tokenize(str);
+      const filtered = [];
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        if (token.isLink && (!type || token.t === type) && options.check(token)) {
+          filtered.push(token.toFormattedObject(options));
+        }
+      }
+      return filtered;
+    }
+
+    /**
+     * Check if the provided tokens form a valid link structure, which can either be a single link token
+     * or a link token surrounded by parentheses or square brackets.
+     *
+     * This ensures that only complete and valid text is hyperlinked, preventing cases where a valid
+     * top-level domain (TLD) is immediately followed by an invalid character, like a number. For
+     * example, with the `find` method from Linkify, entering `example.com1` would result in
+     * `example.com` being linked and the trailing `1` left as plain text. By using the `tokenize`
+     * method, we can perform more comprehensive validation on the input text.
+     */
+    function isValidLinkStructure(tokens) {
+        if (tokens.length === 1) {
+            return tokens[0].isLink;
+        }
+        if (tokens.length === 3 && tokens[1].isLink) {
+            return ['()', '[]'].includes(tokens[0].value + tokens[2].value);
+        }
+        return false;
+    }
+    /**
+     * This plugin allows you to automatically add links to your editor.
+     * @param options The plugin options
+     * @returns The plugin instance
+     */
+    function autolink$1(options) {
+        return new Plugin({
+            key: new PluginKey('autolink'),
+            appendTransaction: function (transactions, oldState, newState) {
+                /**
+                 * Does the transaction change the document?
+                 */
+                var docChanges = transactions.some(function (transaction) { return transaction.docChanged; }) &&
+                    !oldState.doc.eq(newState.doc);
+                /**
+                 * Prevent autolink if the transaction is not a document change or if the transaction has the meta `preventAutolink`.
+                 */
+                var preventAutolink = transactions.some(function (transaction) {
+                    return transaction.getMeta('preventAutolink');
+                });
+                /**
+                 * Prevent autolink if the transaction is not a document change
+                 * or if the transaction has the meta `preventAutolink`.
+                 */
+                if (!docChanges || preventAutolink) {
+                    return;
+                }
+                var tr = newState.tr;
+                var transform = combineTransactionSteps(oldState.doc, __spreadArray([], transactions, true));
+                var changes = getChangedRanges(transform);
+                changes.forEach(function (_a) {
+                    var newRange = _a.newRange;
+                    // Now let’s see if we can add new links.
+                    var nodesInChangedRanges = findChildrenInRange(newState.doc, newRange, function (node) { return node.isTextblock; });
+                    var textBlock;
+                    var textBeforeWhitespace;
+                    if (nodesInChangedRanges.length > 1) {
+                        // Grab the first node within the changed ranges (ex. the first of two paragraphs when hitting enter).
+                        textBlock = nodesInChangedRanges[0];
+                        textBeforeWhitespace = newState.doc.textBetween(textBlock.pos, textBlock.pos + textBlock.node.nodeSize, undefined, ' ');
+                    }
+                    else if (nodesInChangedRanges.length &&
+                        // We want to make sure to include the block seperator argument to treat hard breaks like spaces.
+                        newState.doc
+                            .textBetween(newRange.from, newRange.to, ' ', ' ')
+                            .endsWith(' ')) {
+                        textBlock = nodesInChangedRanges[0];
+                        textBeforeWhitespace = newState.doc.textBetween(textBlock.pos, newRange.to, undefined, ' ');
+                    }
+                    if (textBlock && textBeforeWhitespace) {
+                        var wordsBeforeWhitespace = textBeforeWhitespace
+                            .split(' ')
+                            .filter(function (s) { return s !== ''; });
+                        if (wordsBeforeWhitespace.length <= 0) {
+                            return false;
+                        }
+                        var lastWordBeforeSpace = wordsBeforeWhitespace[wordsBeforeWhitespace.length - 1];
+                        var lastWordAndBlockOffset_1 = textBlock.pos +
+                            textBeforeWhitespace.lastIndexOf(lastWordBeforeSpace);
+                        if (!lastWordBeforeSpace) {
+                            return false;
+                        }
+                        var linksBeforeSpace = tokenize(lastWordBeforeSpace).map(function (t) {
+                            return t.toObject(options.defaultProtocol);
+                        });
+                        if (!isValidLinkStructure(linksBeforeSpace)) {
+                            return false;
+                        }
+                        linksBeforeSpace
+                            .filter(function (link) { return link.isLink; })
+                            // Calculate link position.
+                            .map(function (link) { return (__assign$2(__assign$2({}, link), { from: lastWordAndBlockOffset_1 + link.start + 1, to: lastWordAndBlockOffset_1 + link.end + 1 })); })
+                            // ignore link inside code mark
+                            .filter(function (link) {
+                            if (!newState.schema.marks.code) {
+                                return true;
+                            }
+                            return !newState.doc.rangeHasMark(link.from, link.to, newState.schema.marks.code);
+                        })
+                            // validate link
+                            .filter(function (link) { return options.validate(link.value); })
+                            // Add link mark.
+                            .forEach(function (link) {
+                            if (getMarksBetween(link.from, link.to, newState.doc).some(function (item) { return item.mark.type === options.type; })) {
+                                return;
+                            }
+                            tr.addMark(link.from, link.to, options.type.create({
+                                href: link.href,
+                            }));
+                        });
+                    }
+                });
+                if (!tr.steps.length) {
+                    return;
+                }
+                return tr;
+            },
+        });
+    }
+
+    function clickHandler(options) {
+        return new Plugin({
+            key: new PluginKey('handleClickLink'),
+            props: {
+                handleClick: function (view, pos, event) {
+                    var _a, _b;
+                    if (event.button !== 0) {
+                        return false;
+                    }
+                    var a = event.target;
+                    var els = [];
+                    while (a.nodeName !== 'DIV') {
+                        els.push(a);
+                        a = a.parentNode;
+                    }
+                    if (!els.find(function (value) { return value.nodeName === 'A'; })) {
+                        return false;
+                    }
+                    var attrs = getAttributes(view.state, options.type.name);
+                    var link = event.target;
+                    var href = (_a = link === null || link === void 0 ? void 0 : link.href) !== null && _a !== void 0 ? _a : attrs.href;
+                    var target = (_b = link === null || link === void 0 ? void 0 : link.target) !== null && _b !== void 0 ? _b : attrs.target;
+                    if (link && href) {
+                        window.open(href, target);
+                        return true;
+                    }
+                    return false;
+                },
+            },
+        });
+    }
+
+    function pasteHandler(options) {
+        return new Plugin({
+            key: new PluginKey('handlePasteLink'),
+            props: {
+                handlePaste: function (view, event, slice) {
+                    var state = view.state;
+                    var selection = state.selection;
+                    var empty = selection.empty;
+                    if (empty) {
+                        return false;
+                    }
+                    var textContent = '';
+                    slice.content.forEach(function (node) {
+                        textContent += node.textContent;
+                    });
+                    var link = find$1(textContent, {
+                        defaultProtocol: options.defaultProtocol,
+                    }).find(function (item) { return item.isLink && item.value === textContent; });
+                    if (!textContent || !link) {
+                        return false;
+                    }
+                    options.editor.commands.setMark(options.type, {
+                        href: link.href,
+                    });
+                    return true;
+                },
+            },
+        });
+    }
+
+    var pasteRegex$1 = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z]{2,}\b(?:[-a-zA-Z0-9@:%._+~#=?!&/]*)(?:[-a-zA-Z0-9@:%._+~#=?!&/]*)/gi;
+    // From DOMPurify
+    // https://github.com/cure53/DOMPurify/blob/main/src/regexp.js
+    var ATTR_WHITESPACE = /[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g; // eslint-disable-line no-control-regex
+    var IS_ALLOWED_URI = /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i; // eslint-disable-line no-useless-escape
+    function isAllowedUri(uri) {
+        return !uri || uri.replace(ATTR_WHITESPACE, '').match(IS_ALLOWED_URI);
+    }
+    /**
+     * This extension allows you to create links.
+     * @see https://www.tiptap.dev/api/marks/link
+     */
+    var Link = Mark.create({
+        name: 'link',
+        priority: 1000,
+        keepOnSplit: false,
+        exitable: true,
+        onCreate: function () {
+            this.options.protocols.forEach(function (protocol) {
+                if (typeof protocol === 'string') {
+                    registerCustomProtocol(protocol);
+                    return;
+                }
+                registerCustomProtocol(protocol.scheme, protocol.optionalSlashes);
+            });
+        },
+        onDestroy: function () {
+            reset();
+        },
+        inclusive: function () {
+            return this.options.autolink;
+        },
+        addOptions: function () {
+            return {
+                openOnClick: true,
+                linkOnPaste: true,
+                autolink: true,
+                protocols: [],
+                defaultProtocol: 'http',
+                HTMLAttributes: {
+                    target: '_blank',
+                    rel: 'noopener noreferrer nofollow',
+                    class: null,
+                },
+                validate: function (url) { return !!url; },
+            };
+        },
+        addAttributes: function () {
+            return {
+                href: {
+                    default: null,
+                },
+                target: {
+                    default: this.options.HTMLAttributes.target,
+                },
+                rel: {
+                    default: this.options.HTMLAttributes.rel,
+                },
+                class: {
+                    default: this.options.HTMLAttributes.class,
+                },
+            };
+        },
+        parseHTML: function () {
+            return [
+                {
+                    tag: 'a[href]:not([class="mention"])',
+                    getAttrs: function (dom) {
+                        var href = dom.getAttribute('href');
+                        // prevent XSS attacks
+                        if (!href || !isAllowedUri(href)) {
+                            return false;
+                        }
+                        return { href: href };
+                    },
+                },
+            ];
+        },
+        renderHTML: function (_a) {
+            var HTMLAttributes = _a.HTMLAttributes;
+            // prevent XSS attacks
+            if (!isAllowedUri(HTMLAttributes.href)) {
+                // strip out the href
+                return [
+                    'a',
+                    mergeAttributes(this.options.HTMLAttributes, __assign$2(__assign$2({}, HTMLAttributes), { href: '' })),
+                    0,
+                ];
+            }
+            return [
+                'a',
+                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+                0,
+            ];
+        },
+        addCommands: function () {
+            var _this = this;
+            return {
+                setLink: function (attributes) {
+                    return function (_a) {
+                        var chain = _a.chain;
+                        return chain()
+                            .setMark(_this.name, attributes)
+                            .setMeta('preventAutolink', true)
+                            .run();
+                    };
+                },
+                toggleLink: function (attributes) {
+                    return function (_a) {
+                        var chain = _a.chain;
+                        return chain()
+                            .toggleMark(_this.name, attributes, { extendEmptyMarkRange: true })
+                            .setMeta('preventAutolink', true)
+                            .run();
+                    };
+                },
+                unsetLink: function () {
+                    return function (_a) {
+                        var chain = _a.chain;
+                        return chain()
+                            .unsetMark(_this.name, { extendEmptyMarkRange: true })
+                            .setMeta('preventAutolink', true)
+                            .run();
+                    };
+                },
+            };
+        },
+        addPasteRules: function () {
+            var _this = this;
+            return [
+                markPasteRule({
+                    find: function (text) {
+                        var foundLinks = [];
+                        if (text) {
+                            var validate_1 = _this.options.validate;
+                            var links = find$1(text).filter(function (item) { return item.isLink && validate_1(item.value); });
+                            if (links.length) {
+                                links.forEach(function (link) {
+                                    return foundLinks.push({
+                                        // remove non-ASCII characters
+                                        text: link.value.replace(/[^ -~]/g, ''),
+                                        data: {
+                                            href: link.href.replace(/[^ -~]/g, ''),
+                                        },
+                                        index: link.start,
+                                    });
+                                });
+                            }
+                        }
+                        return foundLinks;
+                    },
+                    type: this.type,
+                    getAttributes: function (match) {
+                        var _a;
+                        return {
+                            href: (_a = match.data) === null || _a === void 0 ? void 0 : _a.href,
+                        };
+                    },
+                }),
+            ];
+        },
+        addProseMirrorPlugins: function () {
+            var plugins = [];
+            if (this.options.autolink) {
+                plugins.push(autolink$1({
+                    type: this.type,
+                    defaultProtocol: this.options.defaultProtocol,
+                    validate: this.options.validate,
+                }));
+            }
+            if (this.options.openOnClick) {
+                plugins.push(clickHandler({
+                    type: this.type,
+                }));
+            }
+            if (this.options.linkOnPaste) {
+                plugins.push(pasteHandler({
+                    editor: this.editor,
+                    defaultProtocol: this.options.defaultProtocol,
+                    type: this.type,
+                }));
+            }
+            return plugins;
+        },
+    });
+
+    function findSuggestionMatch(config) {
+        var _a;
+        const { char, allowSpaces, allowedPrefixes, startOfLine, $position, } = config;
+        const escapedChar = escapeForRegEx(char);
+        const suffix = new RegExp(`\\s${escapedChar}$`);
+        const prefix = startOfLine ? '^' : '';
+        const regexp = allowSpaces
+            ? new RegExp(`${prefix}${escapedChar}.*?(?=\\s${escapedChar}|$)`, 'gm')
+            : new RegExp(`${prefix}(?:^)?${escapedChar}[^\\s${escapedChar}]*`, 'gm');
+        const text = ((_a = $position.nodeBefore) === null || _a === void 0 ? void 0 : _a.isText) && $position.nodeBefore.text;
+        if (!text) {
+            return null;
+        }
+        const textFrom = $position.pos - text.length;
+        const match = Array.from(text.matchAll(regexp)).pop();
+        if (!match || match.input === undefined || match.index === undefined) {
+            return null;
+        }
+        // JavaScript doesn't have lookbehinds. This hacks a check that first character
+        // is a space or the start of the line
+        const matchPrefix = match.input.slice(Math.max(0, match.index - 1), match.index);
+        const matchPrefixIsAllowed = new RegExp(`^[${allowedPrefixes === null || allowedPrefixes === void 0 ? void 0 : allowedPrefixes.join('')}\0]?$`).test(matchPrefix);
+        if (allowedPrefixes !== null && !matchPrefixIsAllowed) {
+            return null;
+        }
+        // The absolute position of the match in the document
+        const from = textFrom + match.index;
+        let to = from + match[0].length;
+        // Edge case handling; if spaces are allowed and we're directly in between
+        // two triggers
+        if (allowSpaces && suffix.test(text.slice(to - 1, to + 1))) {
+            match[0] += ' ';
+            to += 1;
+        }
+        // If the $position is located within the matched substring, return that range
+        if (from < $position.pos && to >= $position.pos) {
+            return {
+                range: {
+                    from,
+                    to,
+                },
+                query: match[0].slice(char.length),
+                text: match[0],
+            };
+        }
+        return null;
+    }
+
+    const SuggestionPluginKey = new PluginKey('suggestion');
+    /**
+     * This utility allows you to create suggestions.
+     * @see https://tiptap.dev/api/utilities/suggestion
+     */
+    function Suggestion({ pluginKey = SuggestionPluginKey, editor, char = '@', allowSpaces = false, allowedPrefixes = [' '], startOfLine = false, decorationTag = 'span', decorationClass = 'suggestion', command = () => null, items = () => [], render = () => ({}), allow = () => true, findSuggestionMatch: findSuggestionMatch$1 = findSuggestionMatch, }) {
+        let props;
+        const renderer = render === null || render === void 0 ? void 0 : render();
+        const plugin = new Plugin({
+            key: pluginKey,
+            view() {
+                return {
+                    update: async (view, prevState) => {
+                        var _a, _b, _c, _d, _e, _f, _g;
+                        const prev = (_a = this.key) === null || _a === void 0 ? void 0 : _a.getState(prevState);
+                        const next = (_b = this.key) === null || _b === void 0 ? void 0 : _b.getState(view.state);
+                        // See how the state changed
+                        const moved = prev.active && next.active && prev.range.from !== next.range.from;
+                        const started = !prev.active && next.active;
+                        const stopped = prev.active && !next.active;
+                        const changed = !started && !stopped && prev.query !== next.query;
+                        const handleStart = started;
+                        const handleChange = changed || moved;
+                        const handleExit = stopped;
+                        // Cancel when suggestion isn't active
+                        if (!handleStart && !handleChange && !handleExit) {
+                            return;
+                        }
+                        const state = handleExit && !handleStart ? prev : next;
+                        const decorationNode = view.dom.querySelector(`[data-decoration-id="${state.decorationId}"]`);
+                        props = {
+                            editor,
+                            range: state.range,
+                            query: state.query,
+                            text: state.text,
+                            items: [],
+                            command: commandProps => {
+                                return command({
+                                    editor,
+                                    range: state.range,
+                                    props: commandProps,
+                                });
+                            },
+                            decorationNode,
+                            // virtual node for popper.js or tippy.js
+                            // this can be used for building popups without a DOM node
+                            clientRect: decorationNode
+                                ? () => {
+                                    var _a;
+                                    // because of `items` can be asynchrounous we’ll search for the current decoration node
+                                    const { decorationId } = (_a = this.key) === null || _a === void 0 ? void 0 : _a.getState(editor.state); // eslint-disable-line
+                                    const currentDecorationNode = view.dom.querySelector(`[data-decoration-id="${decorationId}"]`);
+                                    return (currentDecorationNode === null || currentDecorationNode === void 0 ? void 0 : currentDecorationNode.getBoundingClientRect()) || null;
+                                }
+                                : null,
+                        };
+                        if (handleStart) {
+                            (_c = renderer === null || renderer === void 0 ? void 0 : renderer.onBeforeStart) === null || _c === void 0 ? void 0 : _c.call(renderer, props);
+                        }
+                        if (handleChange) {
+                            (_d = renderer === null || renderer === void 0 ? void 0 : renderer.onBeforeUpdate) === null || _d === void 0 ? void 0 : _d.call(renderer, props);
+                        }
+                        if (handleChange || handleStart) {
+                            props.items = await items({
+                                editor,
+                                query: state.query,
+                            });
+                        }
+                        if (handleExit) {
+                            (_e = renderer === null || renderer === void 0 ? void 0 : renderer.onExit) === null || _e === void 0 ? void 0 : _e.call(renderer, props);
+                        }
+                        if (handleChange) {
+                            (_f = renderer === null || renderer === void 0 ? void 0 : renderer.onUpdate) === null || _f === void 0 ? void 0 : _f.call(renderer, props);
+                        }
+                        if (handleStart) {
+                            (_g = renderer === null || renderer === void 0 ? void 0 : renderer.onStart) === null || _g === void 0 ? void 0 : _g.call(renderer, props);
+                        }
+                    },
+                    destroy: () => {
+                        var _a;
+                        if (!props) {
+                            return;
+                        }
+                        (_a = renderer === null || renderer === void 0 ? void 0 : renderer.onExit) === null || _a === void 0 ? void 0 : _a.call(renderer, props);
+                    },
+                };
+            },
+            state: {
+                // Initialize the plugin's internal state.
+                init() {
+                    const state = {
+                        active: false,
+                        range: {
+                            from: 0,
+                            to: 0,
+                        },
+                        query: null,
+                        text: null,
+                        composing: false,
+                    };
+                    return state;
+                },
+                // Apply changes to the plugin state from a view transaction.
+                apply(transaction, prev, _oldState, state) {
+                    const { isEditable } = editor;
+                    const { composing } = editor.view;
+                    const { selection } = transaction;
+                    const { empty, from } = selection;
+                    const next = { ...prev };
+                    next.composing = composing;
+                    // We can only be suggesting if the view is editable, and:
+                    //   * there is no selection, or
+                    //   * a composition is active (see: https://github.com/ueberdosis/tiptap/issues/1449)
+                    if (isEditable && (empty || editor.view.composing)) {
+                        // Reset active state if we just left the previous suggestion range
+                        if ((from < prev.range.from || from > prev.range.to) && !composing && !prev.composing) {
+                            next.active = false;
+                        }
+                        // Try to match against where our cursor currently is
+                        const match = findSuggestionMatch$1({
+                            char,
+                            allowSpaces,
+                            allowedPrefixes,
+                            startOfLine,
+                            $position: selection.$from,
+                        });
+                        const decorationId = `id_${Math.floor(Math.random() * 0xffffffff)}`;
+                        // If we found a match, update the current state to show it
+                        if (match && allow({
+                            editor, state, range: match.range, isActive: prev.active,
+                        })) {
+                            next.active = true;
+                            next.decorationId = prev.decorationId ? prev.decorationId : decorationId;
+                            next.range = match.range;
+                            next.query = match.query;
+                            next.text = match.text;
+                        }
+                        else {
+                            next.active = false;
+                        }
+                    }
+                    else {
+                        next.active = false;
+                    }
+                    // Make sure to empty the range if suggestion is inactive
+                    if (!next.active) {
+                        next.decorationId = null;
+                        next.range = { from: 0, to: 0 };
+                        next.query = null;
+                        next.text = null;
+                    }
+                    return next;
+                },
+            },
+            props: {
+                // Call the keydown hook if suggestion is active.
+                handleKeyDown(view, event) {
+                    var _a;
+                    const { active, range } = plugin.getState(view.state);
+                    if (!active) {
+                        return false;
+                    }
+                    return ((_a = renderer === null || renderer === void 0 ? void 0 : renderer.onKeyDown) === null || _a === void 0 ? void 0 : _a.call(renderer, { view, event, range })) || false;
+                },
+                // Setup decorator on the currently active suggestion.
+                decorations(state) {
+                    const { active, range, decorationId } = plugin.getState(state);
+                    if (!active) {
+                        return null;
+                    }
+                    return DecorationSet.create(state.doc, [
+                        Decoration.inline(range.from, range.to, {
+                            nodeName: decorationTag,
+                            class: decorationClass,
+                            'data-decoration-id': decorationId,
+                        }),
+                    ]);
+                },
+            },
+        });
+        return plugin;
+    }
+
+    var MentionPluginKey = new PluginKey('mention');
+    var Mention = Node.create({
+        name: 'mention',
+        group: 'inline',
+        inline: true,
+        selectable: false,
+        atom: true,
+        addOptions: function () {
+            var _this = this;
+            return {
+                suggestion: {
+                    char: '@',
+                    allowedPrefixes: null,
+                    pluginKey: MentionPluginKey,
+                    command: function (_a) {
+                        var _b, _c;
+                        var editor = _a.editor, range = _a.range, props = _a.props;
+                        // FIXME: fix incorrect `range.to`
+                        range.to = editor.state.selection.to;
+                        // increase range.to by one when the next node is of type "text"
+                        // and starts with a space character
+                        var nodeAfter = editor.view.state.selection.$to.nodeAfter;
+                        var overrideSpace = (_b = nodeAfter === null || nodeAfter === void 0 ? void 0 : nodeAfter.text) === null || _b === void 0 ? void 0 : _b.startsWith(' ');
+                        if (overrideSpace) {
+                            range.to += 1;
+                        }
+                        editor
+                            .chain()
+                            .focus()
+                            .insertContentAt(range, [
+                            {
+                                type: _this.name,
+                                attrs: props,
+                            },
+                            {
+                                type: 'text',
+                                text: ' ',
+                            },
+                        ])
+                            .run();
+                        (_c = window.getSelection()) === null || _c === void 0 ? void 0 : _c.collapseToEnd();
+                    },
+                    allow: function (_a) {
+                        var state = _a.state, range = _a.range;
+                        var $from = state.doc.resolve(range.from);
+                        var type = state.schema.nodes[_this.name];
+                        var allow = !!$from.parent.type.contentMatch.matchType(type);
+                        return allow;
+                    },
+                },
+            };
+        },
+        addAttributes: function () {
+            return {
+                id: {
+                    default: null,
+                    parseHTML: function (element) { return element.getAttribute('data-id'); },
+                },
+                userName: {
+                    default: null,
+                    parseHTML: function (element) { return element.getAttribute('data-user-name'); },
+                },
+                displayName: {
+                    default: null,
+                    parseHTML: function (element) { return element.getAttribute('data-display-name'); },
+                },
+            };
+        },
+        parseHTML: function () {
+            return [
+                {
+                    tag: 'a[class="mention"]',
+                },
+            ];
+        },
+        renderHTML: function (_a) {
+            var _b;
+            var node = _a.node;
+            return [
+                'a',
+                {
+                    class: 'mention',
+                    href: '/' + this.options.suggestion.char + node.attrs.userName,
+                    'data-id': node.attrs.id,
+                    'data-user-name': node.attrs.userName,
+                    'data-display-name': node.attrs.displayName,
+                    rel: 'noopener noreferrer nofollow',
+                },
+                ['span', "@".concat((_b = node.attrs.displayName) !== null && _b !== void 0 ? _b : node.attrs.userName)],
+            ];
+        },
+        addKeyboardShortcuts: function () {
+            var _this = this;
+            return {
+                Backspace: function () {
+                    return _this.editor.commands.command(function (_a) {
+                        var tr = _a.tr, state = _a.state;
+                        var isMention = false;
+                        var selection = state.selection;
+                        var empty = selection.empty, anchor = selection.anchor;
+                        if (!empty) {
+                            return false;
+                        }
+                        state.doc.nodesBetween(anchor - 1, anchor, function (node, pos) {
+                            var _a;
+                            if (node.type.name === _this.name) {
+                                isMention = true;
+                                tr.insertText((_a = _this.options.suggestion.char) !== null && _a !== void 0 ? _a : '', pos, pos + node.nodeSize);
+                                return false;
+                            }
+                        });
+                        return isMention;
+                    });
+                },
+            };
+        },
+        addProseMirrorPlugins: function () {
+            return [
+                Suggestion(__assign$2({ editor: this.editor }, this.options.suggestion)),
+            ];
+        },
+    });
+
+    var pluginName = 'pasteDropFile';
+    var makePlugin = function (_a) {
+        var editor = _a.editor, onDrop = _a.onDrop, onPaste = _a.onPaste, mimeTypes = _a.mimeTypes;
+        return new Plugin({
+            key: new PluginKey(pluginName),
+            props: {
+                handleDrop: function (view, event) {
+                    var _a;
+                    var files = Array.from(((_a = event.dataTransfer) === null || _a === void 0 ? void 0 : _a.files) || []).filter(function (file) { return mimeTypes.includes(file.type); });
+                    if (files.length <= 0)
+                        return;
+                    var position = view.posAtCoords({
+                        left: event.clientX,
+                        top: event.clientY,
+                    });
+                    event.stopPropagation();
+                    onDrop(editor, files, (position === null || position === void 0 ? void 0 : position.pos) || 0);
+                    return true;
+                },
+                handlePaste: function (view, event) {
+                    var _a;
+                    var files = Array.from(((_a = event.clipboardData) === null || _a === void 0 ? void 0 : _a.files) || []).filter(function (file) { return mimeTypes.includes(file.type); });
+                    if (files.length <= 0)
+                        return;
+                    event.stopPropagation();
+                    onPaste(editor, files);
+                    return true;
+                },
+            },
+        });
+    };
+    var PasteDropFile = Node.create({
+        name: pluginName,
+        addProseMirrorPlugins: function () {
+            return [makePlugin(__assign$2(__assign$2({}, this.options), { editor: this.editor }))];
+        },
+    });
+
+    /**
+    Create a plugin that, when added to a ProseMirror instance,
+    causes a decoration to show up at the drop position when something
+    is dragged over the editor.
+
+    Nodes may add a `disableDropCursor` property to their spec to
+    control the showing of a drop cursor inside them. This may be a
+    boolean or a function, which will be called with a view and a
+    position, and should return a boolean.
+    */
+    function dropCursor(options = {}) {
+        return new Plugin({
+            view(editorView) { return new DropCursorView(editorView, options); }
+        });
+    }
+    class DropCursorView {
+        constructor(editorView, options) {
+            var _a;
+            this.editorView = editorView;
+            this.cursorPos = null;
+            this.element = null;
+            this.timeout = -1;
+            this.width = (_a = options.width) !== null && _a !== void 0 ? _a : 1;
+            this.color = options.color === false ? undefined : (options.color || "black");
+            this.class = options.class;
+            this.handlers = ["dragover", "dragend", "drop", "dragleave"].map(name => {
+                let handler = (e) => { this[name](e); };
+                editorView.dom.addEventListener(name, handler);
+                return { name, handler };
+            });
+        }
+        destroy() {
+            this.handlers.forEach(({ name, handler }) => this.editorView.dom.removeEventListener(name, handler));
+        }
+        update(editorView, prevState) {
+            if (this.cursorPos != null && prevState.doc != editorView.state.doc) {
+                if (this.cursorPos > editorView.state.doc.content.size)
+                    this.setCursor(null);
+                else
+                    this.updateOverlay();
+            }
+        }
+        setCursor(pos) {
+            if (pos == this.cursorPos)
+                return;
+            this.cursorPos = pos;
+            if (pos == null) {
+                this.element.parentNode.removeChild(this.element);
+                this.element = null;
+            }
+            else {
+                this.updateOverlay();
+            }
+        }
+        updateOverlay() {
+            let $pos = this.editorView.state.doc.resolve(this.cursorPos);
+            let isBlock = !$pos.parent.inlineContent, rect;
+            if (isBlock) {
+                let before = $pos.nodeBefore, after = $pos.nodeAfter;
+                if (before || after) {
+                    let node = this.editorView.nodeDOM(this.cursorPos - (before ? before.nodeSize : 0));
+                    if (node) {
+                        let nodeRect = node.getBoundingClientRect();
+                        let top = before ? nodeRect.bottom : nodeRect.top;
+                        if (before && after)
+                            top = (top + this.editorView.nodeDOM(this.cursorPos).getBoundingClientRect().top) / 2;
+                        rect = { left: nodeRect.left, right: nodeRect.right, top: top - this.width / 2, bottom: top + this.width / 2 };
+                    }
+                }
+            }
+            if (!rect) {
+                let coords = this.editorView.coordsAtPos(this.cursorPos);
+                rect = { left: coords.left - this.width / 2, right: coords.left + this.width / 2, top: coords.top, bottom: coords.bottom };
+            }
+            let parent = this.editorView.dom.offsetParent;
+            if (!this.element) {
+                this.element = parent.appendChild(document.createElement("div"));
+                if (this.class)
+                    this.element.className = this.class;
+                this.element.style.cssText = "position: absolute; z-index: 50; pointer-events: none;";
+                if (this.color) {
+                    this.element.style.backgroundColor = this.color;
+                }
+            }
+            this.element.classList.toggle("prosemirror-dropcursor-block", isBlock);
+            this.element.classList.toggle("prosemirror-dropcursor-inline", !isBlock);
+            let parentLeft, parentTop;
+            if (!parent || parent == document.body && getComputedStyle(parent).position == "static") {
+                parentLeft = -pageXOffset;
+                parentTop = -pageYOffset;
+            }
+            else {
+                let rect = parent.getBoundingClientRect();
+                parentLeft = rect.left - parent.scrollLeft;
+                parentTop = rect.top - parent.scrollTop;
+            }
+            this.element.style.left = (rect.left - parentLeft) + "px";
+            this.element.style.top = (rect.top - parentTop) + "px";
+            this.element.style.width = (rect.right - rect.left) + "px";
+            this.element.style.height = (rect.bottom - rect.top) + "px";
+        }
+        scheduleRemoval(timeout) {
+            clearTimeout(this.timeout);
+            this.timeout = setTimeout(() => this.setCursor(null), timeout);
+        }
+        dragover(event) {
+            if (!this.editorView.editable)
+                return;
+            let pos = this.editorView.posAtCoords({ left: event.clientX, top: event.clientY });
+            let node = pos && pos.inside >= 0 && this.editorView.state.doc.nodeAt(pos.inside);
+            let disableDropCursor = node && node.type.spec.disableDropCursor;
+            let disabled = typeof disableDropCursor == "function" ? disableDropCursor(this.editorView, pos, event) : disableDropCursor;
+            if (pos && !disabled) {
+                let target = pos.pos;
+                if (this.editorView.dragging && this.editorView.dragging.slice) {
+                    let point = dropPoint(this.editorView.state.doc, target, this.editorView.dragging.slice);
+                    if (point != null)
+                        target = point;
+                }
+                this.setCursor(target);
+                this.scheduleRemoval(5000);
+            }
+        }
+        dragend() {
+            this.scheduleRemoval(20);
+        }
+        drop() {
+            this.scheduleRemoval(20);
+        }
+        dragleave(event) {
+            if (event.target == this.editorView.dom || !this.editorView.dom.contains(event.relatedTarget))
+                this.setCursor(null);
+        }
+    }
+
+    /**
+     * This extension allows you to add a drop cursor to your editor.
+     * A drop cursor is a line that appears when you drag and drop content
+     * inbetween nodes.
+     * @see https://tiptap.dev/api/extensions/dropcursor
+     */
+    const Dropcursor = Extension.create({
+        name: 'dropCursor',
+        addOptions() {
+            return {
+                color: 'currentColor',
+                width: 1,
+                class: undefined,
+            };
+        },
+        addProseMirrorPlugins() {
+            return [
+                dropCursor(this.options),
+            ];
+        },
+    });
+
+    /**
+     * This extension allows you to add a placeholder to your editor.
+     * A placeholder is a text that appears when the editor or a node is empty.
+     * @see https://www.tiptap.dev/api/extensions/placeholder
+     */
+    const Placeholder = Extension.create({
+        name: 'placeholder',
+        addOptions() {
+            return {
+                emptyEditorClass: 'is-editor-empty',
+                emptyNodeClass: 'is-empty',
+                placeholder: 'Write something …',
+                showOnlyWhenEditable: true,
+                showOnlyCurrent: true,
+                includeChildren: false,
+            };
+        },
+        addProseMirrorPlugins() {
+            return [
+                new Plugin({
+                    key: new PluginKey('placeholder'),
+                    props: {
+                        decorations: ({ doc, selection }) => {
+                            const active = this.editor.isEditable || !this.options.showOnlyWhenEditable;
+                            const { anchor } = selection;
+                            const decorations = [];
+                            if (!active) {
+                                return null;
+                            }
+                            const isEmptyDoc = this.editor.isEmpty;
+                            doc.descendants((node, pos) => {
+                                const hasAnchor = anchor >= pos && anchor <= pos + node.nodeSize;
+                                const isEmpty = !node.isLeaf && isNodeEmpty(node);
+                                if ((hasAnchor || !this.options.showOnlyCurrent) && isEmpty) {
+                                    const classes = [this.options.emptyNodeClass];
+                                    if (isEmptyDoc) {
+                                        classes.push(this.options.emptyEditorClass);
+                                    }
+                                    const decoration = Decoration.node(pos, pos + node.nodeSize, {
+                                        class: classes.join(' '),
+                                        'data-placeholder': typeof this.options.placeholder === 'function'
+                                            ? this.options.placeholder({
+                                                editor: this.editor,
+                                                node,
+                                                pos,
+                                                hasAnchor,
+                                            })
+                                            : this.options.placeholder,
+                                    });
+                                    decorations.push(decoration);
+                                }
+                                return this.options.includeChildren;
+                            });
+                            return DecorationSet.create(doc, decorations);
+                        },
+                    },
+                }),
+            ];
+        },
+    });
+
+    /**
+     * This extension allows you to create list items.
+     * @see https://www.tiptap.dev/api/nodes/list-item
+     */
+    const ListItem$2 = Node.create({
+        name: 'listItem',
+        addOptions() {
+            return {
+                HTMLAttributes: {},
+                bulletListTypeName: 'bulletList',
+                orderedListTypeName: 'orderedList',
+            };
+        },
+        content: 'paragraph block*',
+        defining: true,
+        parseHTML() {
+            return [
+                {
+                    tag: 'li',
+                },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addKeyboardShortcuts() {
+            return {
+                Enter: () => this.editor.commands.splitListItem(this.name),
+                Tab: () => this.editor.commands.sinkListItem(this.name),
+                'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
+            };
+        },
+    });
+
+    /**
+     * This extension allows you to create text styles. It is required by default
+     * for the `textColor` and `backgroundColor` extensions.
+     * @see https://www.tiptap.dev/api/marks/text-style
+     */
+    const TextStyle$1 = Mark.create({
+        name: 'textStyle',
+        addOptions() {
+            return {
+                HTMLAttributes: {},
+            };
+        },
+        parseHTML() {
+            return [
+                {
+                    tag: 'span',
+                    getAttrs: element => {
+                        const hasStyles = element.hasAttribute('style');
+                        if (!hasStyles) {
+                            return false;
+                        }
+                        return {};
+                    },
+                },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addCommands() {
+            return {
+                removeEmptyTextStyle: () => ({ state, commands }) => {
+                    const attributes = getMarkAttributes(state, this.type);
+                    const hasStyles = Object.entries(attributes).some(([, value]) => !!value);
+                    if (hasStyles) {
+                        return true;
+                    }
+                    return commands.unsetMark(this.name);
+                },
+            };
+        },
+    });
+
+    /**
+     * Matches a bullet list to a dash or asterisk.
+     */
+    const inputRegex$2 = /^\s*([-+*])\s$/;
+    /**
+     * This extension allows you to create bullet lists.
+     * This requires the ListItem extension
+     * @see https://tiptap.dev/api/nodes/bullet-list
+     * @see https://tiptap.dev/api/nodes/list-item.
+     */
+    const BulletList = Node.create({
+        name: 'bulletList',
+        addOptions() {
+            return {
+                itemTypeName: 'listItem',
+                HTMLAttributes: {},
+                keepMarks: false,
+                keepAttributes: false,
+            };
+        },
+        group: 'block list',
+        content() {
+            return `${this.options.itemTypeName}+`;
+        },
+        parseHTML() {
+            return [
+                { tag: 'ul' },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['ul', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addCommands() {
+            return {
+                toggleBulletList: () => ({ commands, chain }) => {
+                    if (this.options.keepAttributes) {
+                        return chain().toggleList(this.name, this.options.itemTypeName, this.options.keepMarks).updateAttributes(ListItem$2.name, this.editor.getAttributes(TextStyle$1.name)).run();
+                    }
+                    return commands.toggleList(this.name, this.options.itemTypeName, this.options.keepMarks);
+                },
+            };
+        },
+        addKeyboardShortcuts() {
+            return {
+                'Mod-Shift-8': () => this.editor.commands.toggleBulletList(),
+            };
+        },
+        addInputRules() {
+            let inputRule = wrappingInputRule({
+                find: inputRegex$2,
+                type: this.type,
+            });
+            if (this.options.keepMarks || this.options.keepAttributes) {
+                inputRule = wrappingInputRule({
+                    find: inputRegex$2,
+                    type: this.type,
+                    keepMarks: this.options.keepMarks,
+                    keepAttributes: this.options.keepAttributes,
+                    getAttributes: () => { return this.editor.getAttributes(TextStyle$1.name); },
+                    editor: this.editor,
+                });
+            }
+            return [
+                inputRule,
+            ];
+        },
+    });
+
+    /**
+     * Matches a code block with backticks.
+     */
+    const backtickInputRegex = /^```([a-z]+)?[\s\n]$/;
+    /**
+     * Matches a code block with tildes.
+     */
+    const tildeInputRegex = /^~~~([a-z]+)?[\s\n]$/;
+    /**
+     * This extension allows you to create code blocks.
+     * @see https://tiptap.dev/api/nodes/code-block
+     */
+    const CodeBlock = Node.create({
+        name: 'codeBlock',
+        addOptions() {
+            return {
+                languageClassPrefix: 'language-',
+                exitOnTripleEnter: true,
+                exitOnArrowDown: true,
+                HTMLAttributes: {},
+            };
+        },
+        content: 'text*',
+        marks: '',
+        group: 'block',
+        code: true,
+        defining: true,
+        addAttributes() {
+            return {
+                language: {
+                    default: null,
+                    parseHTML: element => {
+                        var _a;
+                        const { languageClassPrefix } = this.options;
+                        const classNames = [...(((_a = element.firstElementChild) === null || _a === void 0 ? void 0 : _a.classList) || [])];
+                        const languages = classNames
+                            .filter(className => className.startsWith(languageClassPrefix))
+                            .map(className => className.replace(languageClassPrefix, ''));
+                        const language = languages[0];
+                        if (!language) {
+                            return null;
+                        }
+                        return language;
+                    },
+                    rendered: false,
+                },
+            };
+        },
+        parseHTML() {
+            return [
+                {
+                    tag: 'pre',
+                    preserveWhitespace: 'full',
+                },
+            ];
+        },
+        renderHTML({ node, HTMLAttributes }) {
+            return [
+                'pre',
+                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+                [
+                    'code',
+                    {
+                        class: node.attrs.language
+                            ? this.options.languageClassPrefix + node.attrs.language
+                            : null,
+                    },
+                    0,
+                ],
+            ];
+        },
+        addCommands() {
+            return {
+                setCodeBlock: attributes => ({ commands }) => {
+                    return commands.setNode(this.name, attributes);
+                },
+                toggleCodeBlock: attributes => ({ commands }) => {
+                    return commands.toggleNode(this.name, 'paragraph', attributes);
+                },
+            };
+        },
+        addKeyboardShortcuts() {
+            return {
+                'Mod-Alt-c': () => this.editor.commands.toggleCodeBlock(),
+                // remove code block when at start of document or code block is empty
+                Backspace: () => {
+                    const { empty, $anchor } = this.editor.state.selection;
+                    const isAtStart = $anchor.pos === 1;
+                    if (!empty || $anchor.parent.type.name !== this.name) {
+                        return false;
+                    }
+                    if (isAtStart || !$anchor.parent.textContent.length) {
+                        return this.editor.commands.clearNodes();
+                    }
+                    return false;
+                },
+                // exit node on triple enter
+                Enter: ({ editor }) => {
+                    if (!this.options.exitOnTripleEnter) {
+                        return false;
+                    }
+                    const { state } = editor;
+                    const { selection } = state;
+                    const { $from, empty } = selection;
+                    if (!empty || $from.parent.type !== this.type) {
+                        return false;
+                    }
+                    const isAtEnd = $from.parentOffset === $from.parent.nodeSize - 2;
+                    const endsWithDoubleNewline = $from.parent.textContent.endsWith('\n\n');
+                    if (!isAtEnd || !endsWithDoubleNewline) {
+                        return false;
+                    }
+                    return editor
+                        .chain()
+                        .command(({ tr }) => {
+                        tr.delete($from.pos - 2, $from.pos);
+                        return true;
+                    })
+                        .exitCode()
+                        .run();
+                },
+                // exit node on arrow down
+                ArrowDown: ({ editor }) => {
+                    if (!this.options.exitOnArrowDown) {
+                        return false;
+                    }
+                    const { state } = editor;
+                    const { selection, doc } = state;
+                    const { $from, empty } = selection;
+                    if (!empty || $from.parent.type !== this.type) {
+                        return false;
+                    }
+                    const isAtEnd = $from.parentOffset === $from.parent.nodeSize - 2;
+                    if (!isAtEnd) {
+                        return false;
+                    }
+                    const after = $from.after();
+                    if (after === undefined) {
+                        return false;
+                    }
+                    const nodeAfter = doc.nodeAt(after);
+                    if (nodeAfter) {
+                        return editor.commands.command(({ tr }) => {
+                            tr.setSelection(Selection.near(doc.resolve(after)));
+                            return true;
+                        });
+                    }
+                    return editor.commands.exitCode();
+                },
+            };
+        },
+        addInputRules() {
+            return [
+                textblockTypeInputRule({
+                    find: backtickInputRegex,
+                    type: this.type,
+                    getAttributes: match => ({
+                        language: match[1],
+                    }),
+                }),
+                textblockTypeInputRule({
+                    find: tildeInputRegex,
+                    type: this.type,
+                    getAttributes: match => ({
+                        language: match[1],
+                    }),
+                }),
+            ];
+        },
+        addProseMirrorPlugins() {
+            return [
+                // this plugin creates a code block for pasted content from VS Code
+                // we can also detect the copied code language
+                new Plugin({
+                    key: new PluginKey('codeBlockVSCodeHandler'),
+                    props: {
+                        handlePaste: (view, event) => {
+                            if (!event.clipboardData) {
+                                return false;
+                            }
+                            // don’t create a new code block within code blocks
+                            if (this.editor.isActive(this.type.name)) {
+                                return false;
+                            }
+                            const text = event.clipboardData.getData('text/plain');
+                            const vscode = event.clipboardData.getData('vscode-editor-data');
+                            const vscodeData = vscode ? JSON.parse(vscode) : undefined;
+                            const language = vscodeData === null || vscodeData === void 0 ? void 0 : vscodeData.mode;
+                            if (!text || !language) {
+                                return false;
+                            }
+                            const { tr, schema } = view.state;
+                            // prepare a text node
+                            // strip carriage return chars from text pasted as code
+                            // see: https://github.com/ProseMirror/prosemirror-view/commit/a50a6bcceb4ce52ac8fcc6162488d8875613aacd
+                            const textNode = schema.text(text.replace(/\r\n?/g, '\n'));
+                            // create a code block with the text node
+                            // replace selection with the code block
+                            tr.replaceSelectionWith(this.type.create({ language }, textNode));
+                            if (tr.selection.$from.parent.type !== this.type) {
+                                // put cursor inside the newly created code block
+                                tr.setSelection(TextSelection.near(tr.doc.resolve(Math.max(0, tr.selection.from - 2))));
+                            }
+                            // store meta information
+                            // this is useful for other plugins that depends on the paste event
+                            // like the paste rule plugin
+                            tr.setMeta('paste', true);
+                            view.dispatch(tr);
+                            return true;
+                        },
+                    },
+                }),
+            ];
+        },
+    });
+
+    /**
+     * The default document node which represents the top level node of the editor.
+     * @see https://tiptap.dev/api/nodes/document
+     */
+    const Document = Node.create({
+        name: 'doc',
+        topNode: true,
+        content: 'block+',
+    });
+
+    /**
+    Gap cursor selections are represented using this class. Its
+    `$anchor` and `$head` properties both point at the cursor position.
+    */
+    class GapCursor extends Selection {
+        /**
+        Create a gap cursor.
+        */
+        constructor($pos) {
+            super($pos, $pos);
+        }
+        map(doc, mapping) {
+            let $pos = doc.resolve(mapping.map(this.head));
+            return GapCursor.valid($pos) ? new GapCursor($pos) : Selection.near($pos);
+        }
+        content() { return Slice.empty; }
+        eq(other) {
+            return other instanceof GapCursor && other.head == this.head;
+        }
+        toJSON() {
+            return { type: "gapcursor", pos: this.head };
+        }
+        /**
+        @internal
+        */
+        static fromJSON(doc, json) {
+            if (typeof json.pos != "number")
+                throw new RangeError("Invalid input for GapCursor.fromJSON");
+            return new GapCursor(doc.resolve(json.pos));
+        }
+        /**
+        @internal
+        */
+        getBookmark() { return new GapBookmark(this.anchor); }
+        /**
+        @internal
+        */
+        static valid($pos) {
+            let parent = $pos.parent;
+            if (parent.isTextblock || !closedBefore($pos) || !closedAfter($pos))
+                return false;
+            let override = parent.type.spec.allowGapCursor;
+            if (override != null)
+                return override;
+            let deflt = parent.contentMatchAt($pos.index()).defaultType;
+            return deflt && deflt.isTextblock;
+        }
+        /**
+        @internal
+        */
+        static findGapCursorFrom($pos, dir, mustMove = false) {
+            search: for (;;) {
+                if (!mustMove && GapCursor.valid($pos))
+                    return $pos;
+                let pos = $pos.pos, next = null;
+                // Scan up from this position
+                for (let d = $pos.depth;; d--) {
+                    let parent = $pos.node(d);
+                    if (dir > 0 ? $pos.indexAfter(d) < parent.childCount : $pos.index(d) > 0) {
+                        next = parent.child(dir > 0 ? $pos.indexAfter(d) : $pos.index(d) - 1);
+                        break;
+                    }
+                    else if (d == 0) {
+                        return null;
+                    }
+                    pos += dir;
+                    let $cur = $pos.doc.resolve(pos);
+                    if (GapCursor.valid($cur))
+                        return $cur;
+                }
+                // And then down into the next node
+                for (;;) {
+                    let inside = dir > 0 ? next.firstChild : next.lastChild;
+                    if (!inside) {
+                        if (next.isAtom && !next.isText && !NodeSelection.isSelectable(next)) {
+                            $pos = $pos.doc.resolve(pos + next.nodeSize * dir);
+                            mustMove = false;
+                            continue search;
+                        }
+                        break;
+                    }
+                    next = inside;
+                    pos += dir;
+                    let $cur = $pos.doc.resolve(pos);
+                    if (GapCursor.valid($cur))
+                        return $cur;
+                }
+                return null;
+            }
+        }
+    }
+    GapCursor.prototype.visible = false;
+    GapCursor.findFrom = GapCursor.findGapCursorFrom;
+    Selection.jsonID("gapcursor", GapCursor);
+    class GapBookmark {
+        constructor(pos) {
+            this.pos = pos;
+        }
+        map(mapping) {
+            return new GapBookmark(mapping.map(this.pos));
+        }
+        resolve(doc) {
+            let $pos = doc.resolve(this.pos);
+            return GapCursor.valid($pos) ? new GapCursor($pos) : Selection.near($pos);
+        }
+    }
+    function closedBefore($pos) {
+        for (let d = $pos.depth; d >= 0; d--) {
+            let index = $pos.index(d), parent = $pos.node(d);
+            // At the start of this parent, look at next one
+            if (index == 0) {
+                if (parent.type.spec.isolating)
+                    return true;
+                continue;
+            }
+            // See if the node before (or its first ancestor) is closed
+            for (let before = parent.child(index - 1);; before = before.lastChild) {
+                if ((before.childCount == 0 && !before.inlineContent) || before.isAtom || before.type.spec.isolating)
+                    return true;
+                if (before.inlineContent)
+                    return false;
+            }
+        }
+        // Hit start of document
+        return true;
+    }
+    function closedAfter($pos) {
+        for (let d = $pos.depth; d >= 0; d--) {
+            let index = $pos.indexAfter(d), parent = $pos.node(d);
+            if (index == parent.childCount) {
+                if (parent.type.spec.isolating)
+                    return true;
+                continue;
+            }
+            for (let after = parent.child(index);; after = after.firstChild) {
+                if ((after.childCount == 0 && !after.inlineContent) || after.isAtom || after.type.spec.isolating)
+                    return true;
+                if (after.inlineContent)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+    Create a gap cursor plugin. When enabled, this will capture clicks
+    near and arrow-key-motion past places that don't have a normally
+    selectable position nearby, and create a gap cursor selection for
+    them. The cursor is drawn as an element with class
+    `ProseMirror-gapcursor`. You can either include
+    `style/gapcursor.css` from the package's directory or add your own
+    styles to make it visible.
+    */
+    function gapCursor() {
+        return new Plugin({
+            props: {
+                decorations: drawGapCursor,
+                createSelectionBetween(_view, $anchor, $head) {
+                    return $anchor.pos == $head.pos && GapCursor.valid($head) ? new GapCursor($head) : null;
+                },
+                handleClick,
+                handleKeyDown,
+                handleDOMEvents: { beforeinput: beforeinput }
+            }
+        });
+    }
+    const handleKeyDown = keydownHandler({
+        "ArrowLeft": arrow$2("horiz", -1),
+        "ArrowRight": arrow$2("horiz", 1),
+        "ArrowUp": arrow$2("vert", -1),
+        "ArrowDown": arrow$2("vert", 1)
+    });
+    function arrow$2(axis, dir) {
+        const dirStr = axis == "vert" ? (dir > 0 ? "down" : "up") : (dir > 0 ? "right" : "left");
+        return function (state, dispatch, view) {
+            let sel = state.selection;
+            let $start = dir > 0 ? sel.$to : sel.$from, mustMove = sel.empty;
+            if (sel instanceof TextSelection) {
+                if (!view.endOfTextblock(dirStr) || $start.depth == 0)
+                    return false;
+                mustMove = false;
+                $start = state.doc.resolve(dir > 0 ? $start.after() : $start.before());
+            }
+            let $found = GapCursor.findGapCursorFrom($start, dir, mustMove);
+            if (!$found)
+                return false;
+            if (dispatch)
+                dispatch(state.tr.setSelection(new GapCursor($found)));
+            return true;
+        };
+    }
+    function handleClick(view, pos, event) {
+        if (!view || !view.editable)
+            return false;
+        let $pos = view.state.doc.resolve(pos);
+        if (!GapCursor.valid($pos))
+            return false;
+        let clickPos = view.posAtCoords({ left: event.clientX, top: event.clientY });
+        if (clickPos && clickPos.inside > -1 && NodeSelection.isSelectable(view.state.doc.nodeAt(clickPos.inside)))
+            return false;
+        view.dispatch(view.state.tr.setSelection(new GapCursor($pos)));
+        return true;
+    }
+    // This is a hack that, when a composition starts while a gap cursor
+    // is active, quickly creates an inline context for the composition to
+    // happen in, to avoid it being aborted by the DOM selection being
+    // moved into a valid position.
+    function beforeinput(view, event) {
+        if (event.inputType != "insertCompositionText" || !(view.state.selection instanceof GapCursor))
+            return false;
+        let { $from } = view.state.selection;
+        let insert = $from.parent.contentMatchAt($from.index()).findWrapping(view.state.schema.nodes.text);
+        if (!insert)
+            return false;
+        let frag = Fragment.empty;
+        for (let i = insert.length - 1; i >= 0; i--)
+            frag = Fragment.from(insert[i].createAndFill(null, frag));
+        let tr = view.state.tr.replace($from.pos, $from.pos, new Slice(frag, 0, 0));
+        tr.setSelection(TextSelection.near(tr.doc.resolve($from.pos + 1)));
+        view.dispatch(tr);
+        return false;
+    }
+    function drawGapCursor(state) {
+        if (!(state.selection instanceof GapCursor))
+            return null;
+        let node = document.createElement("div");
+        node.className = "ProseMirror-gapcursor";
+        return DecorationSet.create(state.doc, [Decoration.widget(state.selection.head, node, { key: "gapcursor" })]);
+    }
+
+    /**
+     * This extension allows you to add a gap cursor to your editor.
+     * A gap cursor is a cursor that appears when you click on a place
+     * where no content is present, for example inbetween nodes.
+     * @see https://tiptap.dev/api/extensions/gapcursor
+     */
+    const Gapcursor = Extension.create({
+        name: 'gapCursor',
+        addProseMirrorPlugins() {
+            return [
+                gapCursor(),
+            ];
+        },
+        extendNodeSchema(extension) {
+            var _a;
+            const context = {
+                name: extension.name,
+                options: extension.options,
+                storage: extension.storage,
+            };
+            return {
+                allowGapCursor: (_a = callOrReturn(getExtensionField(extension, 'allowGapCursor', context))) !== null && _a !== void 0 ? _a : null,
+            };
+        },
+    });
+
+    /**
+     * This extension allows you to insert hard breaks.
+     * @see https://www.tiptap.dev/api/nodes/hard-break
+     */
+    const HardBreak = Node.create({
+        name: 'hardBreak',
+        addOptions() {
+            return {
+                keepMarks: true,
+                HTMLAttributes: {},
+            };
+        },
+        inline: true,
+        group: 'inline',
+        selectable: false,
+        parseHTML() {
+            return [
+                { tag: 'br' },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['br', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes)];
+        },
+        renderText() {
+            return '\n';
+        },
+        addCommands() {
+            return {
+                setHardBreak: () => ({ commands, chain, state, editor, }) => {
+                    return commands.first([
+                        () => commands.exitCode(),
+                        () => commands.command(() => {
+                            const { selection, storedMarks } = state;
+                            if (selection.$from.parent.type.spec.isolating) {
+                                return false;
+                            }
+                            const { keepMarks } = this.options;
+                            const { splittableMarks } = editor.extensionManager;
+                            const marks = storedMarks
+                                || (selection.$to.parentOffset && selection.$from.marks());
+                            return chain()
+                                .insertContent({ type: this.name })
+                                .command(({ tr, dispatch }) => {
+                                if (dispatch && marks && keepMarks) {
+                                    const filteredMarks = marks
+                                        .filter(mark => splittableMarks.includes(mark.type.name));
+                                    tr.ensureMarks(filteredMarks);
+                                }
+                                return true;
+                            })
+                                .run();
+                        }),
+                    ]);
+                },
+            };
+        },
+        addKeyboardShortcuts() {
+            return {
+                'Mod-Enter': () => this.editor.commands.setHardBreak(),
+                'Shift-Enter': () => this.editor.commands.setHardBreak(),
+            };
+        },
+    });
+
+    /**
+     * This extension allows you to create headings.
+     * @see https://www.tiptap.dev/api/nodes/heading
+     */
+    const Heading = Node.create({
+        name: 'heading',
+        addOptions() {
+            return {
+                levels: [1, 2, 3, 4, 5, 6],
+                HTMLAttributes: {},
+            };
+        },
+        content: 'inline*',
+        group: 'block',
+        defining: true,
+        addAttributes() {
+            return {
+                level: {
+                    default: 1,
+                    rendered: false,
+                },
+            };
+        },
+        parseHTML() {
+            return this.options.levels
+                .map((level) => ({
+                tag: `h${level}`,
+                attrs: { level },
+            }));
+        },
+        renderHTML({ node, HTMLAttributes }) {
+            const hasLevel = this.options.levels.includes(node.attrs.level);
+            const level = hasLevel
+                ? node.attrs.level
+                : this.options.levels[0];
+            return [`h${level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addCommands() {
+            return {
+                setHeading: attributes => ({ commands }) => {
+                    if (!this.options.levels.includes(attributes.level)) {
+                        return false;
+                    }
+                    return commands.setNode(this.name, attributes);
+                },
+                toggleHeading: attributes => ({ commands }) => {
+                    if (!this.options.levels.includes(attributes.level)) {
+                        return false;
+                    }
+                    return commands.toggleNode(this.name, 'paragraph', attributes);
+                },
+            };
+        },
+        addKeyboardShortcuts() {
+            return this.options.levels.reduce((items, level) => ({
+                ...items,
+                ...{
+                    [`Mod-Alt-${level}`]: () => this.editor.commands.toggleHeading({ level }),
+                },
+            }), {});
+        },
+        addInputRules() {
+            return this.options.levels.map(level => {
+                return textblockTypeInputRule({
+                    find: new RegExp(`^(#{1,${level}})\\s$`),
+                    type: this.type,
+                    getAttributes: {
+                        level,
+                    },
+                });
+            });
+        },
+    });
+
+    var GOOD_LEAF_SIZE = 200;
+
+    // :: class<T> A rope sequence is a persistent sequence data structure
+    // that supports appending, prepending, and slicing without doing a
+    // full copy. It is represented as a mostly-balanced tree.
+    var RopeSequence = function RopeSequence () {};
+
+    RopeSequence.prototype.append = function append (other) {
+      if (!other.length) { return this }
+      other = RopeSequence.from(other);
+
+      return (!this.length && other) ||
+        (other.length < GOOD_LEAF_SIZE && this.leafAppend(other)) ||
+        (this.length < GOOD_LEAF_SIZE && other.leafPrepend(this)) ||
+        this.appendInner(other)
+    };
+
+    // :: (union<[T], RopeSequence<T>>) → RopeSequence<T>
+    // Prepend an array or other rope to this one, returning a new rope.
+    RopeSequence.prototype.prepend = function prepend (other) {
+      if (!other.length) { return this }
+      return RopeSequence.from(other).append(this)
+    };
+
+    RopeSequence.prototype.appendInner = function appendInner (other) {
+      return new Append(this, other)
+    };
+
+    // :: (?number, ?number) → RopeSequence<T>
+    // Create a rope repesenting a sub-sequence of this rope.
+    RopeSequence.prototype.slice = function slice (from, to) {
+        if ( from === void 0 ) from = 0;
+        if ( to === void 0 ) to = this.length;
+
+      if (from >= to) { return RopeSequence.empty }
+      return this.sliceInner(Math.max(0, from), Math.min(this.length, to))
+    };
+
+    // :: (number) → T
+    // Retrieve the element at the given position from this rope.
+    RopeSequence.prototype.get = function get (i) {
+      if (i < 0 || i >= this.length) { return undefined }
+      return this.getInner(i)
+    };
+
+    // :: ((element: T, index: number) → ?bool, ?number, ?number)
+    // Call the given function for each element between the given
+    // indices. This tends to be more efficient than looping over the
+    // indices and calling `get`, because it doesn't have to descend the
+    // tree for every element.
+    RopeSequence.prototype.forEach = function forEach (f, from, to) {
+        if ( from === void 0 ) from = 0;
+        if ( to === void 0 ) to = this.length;
+
+      if (from <= to)
+        { this.forEachInner(f, from, to, 0); }
+      else
+        { this.forEachInvertedInner(f, from, to, 0); }
+    };
+
+    // :: ((element: T, index: number) → U, ?number, ?number) → [U]
+    // Map the given functions over the elements of the rope, producing
+    // a flat array.
+    RopeSequence.prototype.map = function map (f, from, to) {
+        if ( from === void 0 ) from = 0;
+        if ( to === void 0 ) to = this.length;
+
+      var result = [];
+      this.forEach(function (elt, i) { return result.push(f(elt, i)); }, from, to);
+      return result
+    };
+
+    // :: (?union<[T], RopeSequence<T>>) → RopeSequence<T>
+    // Create a rope representing the given array, or return the rope
+    // itself if a rope was given.
+    RopeSequence.from = function from (values) {
+      if (values instanceof RopeSequence) { return values }
+      return values && values.length ? new Leaf(values) : RopeSequence.empty
+    };
+
+    var Leaf = /*@__PURE__*/(function (RopeSequence) {
+      function Leaf(values) {
+        RopeSequence.call(this);
+        this.values = values;
+      }
+
+      if ( RopeSequence ) Leaf.__proto__ = RopeSequence;
+      Leaf.prototype = Object.create( RopeSequence && RopeSequence.prototype );
+      Leaf.prototype.constructor = Leaf;
+
+      var prototypeAccessors = { length: { configurable: true },depth: { configurable: true } };
+
+      Leaf.prototype.flatten = function flatten () {
+        return this.values
+      };
+
+      Leaf.prototype.sliceInner = function sliceInner (from, to) {
+        if (from == 0 && to == this.length) { return this }
+        return new Leaf(this.values.slice(from, to))
+      };
+
+      Leaf.prototype.getInner = function getInner (i) {
+        return this.values[i]
+      };
+
+      Leaf.prototype.forEachInner = function forEachInner (f, from, to, start) {
+        for (var i = from; i < to; i++)
+          { if (f(this.values[i], start + i) === false) { return false } }
+      };
+
+      Leaf.prototype.forEachInvertedInner = function forEachInvertedInner (f, from, to, start) {
+        for (var i = from - 1; i >= to; i--)
+          { if (f(this.values[i], start + i) === false) { return false } }
+      };
+
+      Leaf.prototype.leafAppend = function leafAppend (other) {
+        if (this.length + other.length <= GOOD_LEAF_SIZE)
+          { return new Leaf(this.values.concat(other.flatten())) }
+      };
+
+      Leaf.prototype.leafPrepend = function leafPrepend (other) {
+        if (this.length + other.length <= GOOD_LEAF_SIZE)
+          { return new Leaf(other.flatten().concat(this.values)) }
+      };
+
+      prototypeAccessors.length.get = function () { return this.values.length };
+
+      prototypeAccessors.depth.get = function () { return 0 };
+
+      Object.defineProperties( Leaf.prototype, prototypeAccessors );
+
+      return Leaf;
+    }(RopeSequence));
+
+    // :: RopeSequence
+    // The empty rope sequence.
+    RopeSequence.empty = new Leaf([]);
+
+    var Append = /*@__PURE__*/(function (RopeSequence) {
+      function Append(left, right) {
+        RopeSequence.call(this);
+        this.left = left;
+        this.right = right;
+        this.length = left.length + right.length;
+        this.depth = Math.max(left.depth, right.depth) + 1;
+      }
+
+      if ( RopeSequence ) Append.__proto__ = RopeSequence;
+      Append.prototype = Object.create( RopeSequence && RopeSequence.prototype );
+      Append.prototype.constructor = Append;
+
+      Append.prototype.flatten = function flatten () {
+        return this.left.flatten().concat(this.right.flatten())
+      };
+
+      Append.prototype.getInner = function getInner (i) {
+        return i < this.left.length ? this.left.get(i) : this.right.get(i - this.left.length)
+      };
+
+      Append.prototype.forEachInner = function forEachInner (f, from, to, start) {
+        var leftLen = this.left.length;
+        if (from < leftLen &&
+            this.left.forEachInner(f, from, Math.min(to, leftLen), start) === false)
+          { return false }
+        if (to > leftLen &&
+            this.right.forEachInner(f, Math.max(from - leftLen, 0), Math.min(this.length, to) - leftLen, start + leftLen) === false)
+          { return false }
+      };
+
+      Append.prototype.forEachInvertedInner = function forEachInvertedInner (f, from, to, start) {
+        var leftLen = this.left.length;
+        if (from > leftLen &&
+            this.right.forEachInvertedInner(f, from - leftLen, Math.max(to, leftLen) - leftLen, start + leftLen) === false)
+          { return false }
+        if (to < leftLen &&
+            this.left.forEachInvertedInner(f, Math.min(from, leftLen), to, start) === false)
+          { return false }
+      };
+
+      Append.prototype.sliceInner = function sliceInner (from, to) {
+        if (from == 0 && to == this.length) { return this }
+        var leftLen = this.left.length;
+        if (to <= leftLen) { return this.left.slice(from, to) }
+        if (from >= leftLen) { return this.right.slice(from - leftLen, to - leftLen) }
+        return this.left.slice(from, leftLen).append(this.right.slice(0, to - leftLen))
+      };
+
+      Append.prototype.leafAppend = function leafAppend (other) {
+        var inner = this.right.leafAppend(other);
+        if (inner) { return new Append(this.left, inner) }
+      };
+
+      Append.prototype.leafPrepend = function leafPrepend (other) {
+        var inner = this.left.leafPrepend(other);
+        if (inner) { return new Append(inner, this.right) }
+      };
+
+      Append.prototype.appendInner = function appendInner (other) {
+        if (this.left.depth >= Math.max(this.right.depth, other.depth) + 1)
+          { return new Append(this.left, new Append(this.right, other)) }
+        return new Append(this, other)
+      };
+
+      return Append;
+    }(RopeSequence));
+
+    // ProseMirror's history isn't simply a way to roll back to a previous
+    // state, because ProseMirror supports applying changes without adding
+    // them to the history (for example during collaboration).
+    //
+    // To this end, each 'Branch' (one for the undo history and one for
+    // the redo history) keeps an array of 'Items', which can optionally
+    // hold a step (an actual undoable change), and always hold a position
+    // map (which is needed to move changes below them to apply to the
+    // current document).
+    //
+    // An item that has both a step and a selection bookmark is the start
+    // of an 'event' — a group of changes that will be undone or redone at
+    // once. (It stores only the bookmark, since that way we don't have to
+    // provide a document until the selection is actually applied, which
+    // is useful when compressing.)
+    // Used to schedule history compression
+    const max_empty_items = 500;
+    class Branch {
+        constructor(items, eventCount) {
+            this.items = items;
+            this.eventCount = eventCount;
+        }
+        // Pop the latest event off the branch's history and apply it
+        // to a document transform.
+        popEvent(state, preserveItems) {
+            if (this.eventCount == 0)
+                return null;
+            let end = this.items.length;
+            for (;; end--) {
+                let next = this.items.get(end - 1);
+                if (next.selection) {
+                    --end;
+                    break;
+                }
+            }
+            let remap, mapFrom;
+            if (preserveItems) {
+                remap = this.remapping(end, this.items.length);
+                mapFrom = remap.maps.length;
+            }
+            let transform = state.tr;
+            let selection, remaining;
+            let addAfter = [], addBefore = [];
+            this.items.forEach((item, i) => {
+                if (!item.step) {
+                    if (!remap) {
+                        remap = this.remapping(end, i + 1);
+                        mapFrom = remap.maps.length;
+                    }
+                    mapFrom--;
+                    addBefore.push(item);
+                    return;
+                }
+                if (remap) {
+                    addBefore.push(new Item(item.map));
+                    let step = item.step.map(remap.slice(mapFrom)), map;
+                    if (step && transform.maybeStep(step).doc) {
+                        map = transform.mapping.maps[transform.mapping.maps.length - 1];
+                        addAfter.push(new Item(map, undefined, undefined, addAfter.length + addBefore.length));
+                    }
+                    mapFrom--;
+                    if (map)
+                        remap.appendMap(map, mapFrom);
+                }
+                else {
+                    transform.maybeStep(item.step);
+                }
+                if (item.selection) {
+                    selection = remap ? item.selection.map(remap.slice(mapFrom)) : item.selection;
+                    remaining = new Branch(this.items.slice(0, end).append(addBefore.reverse().concat(addAfter)), this.eventCount - 1);
+                    return false;
+                }
+            }, this.items.length, 0);
+            return { remaining: remaining, transform, selection: selection };
+        }
+        // Create a new branch with the given transform added.
+        addTransform(transform, selection, histOptions, preserveItems) {
+            let newItems = [], eventCount = this.eventCount;
+            let oldItems = this.items, lastItem = !preserveItems && oldItems.length ? oldItems.get(oldItems.length - 1) : null;
+            for (let i = 0; i < transform.steps.length; i++) {
+                let step = transform.steps[i].invert(transform.docs[i]);
+                let item = new Item(transform.mapping.maps[i], step, selection), merged;
+                if (merged = lastItem && lastItem.merge(item)) {
+                    item = merged;
+                    if (i)
+                        newItems.pop();
+                    else
+                        oldItems = oldItems.slice(0, oldItems.length - 1);
+                }
+                newItems.push(item);
+                if (selection) {
+                    eventCount++;
+                    selection = undefined;
+                }
+                if (!preserveItems)
+                    lastItem = item;
+            }
+            let overflow = eventCount - histOptions.depth;
+            if (overflow > DEPTH_OVERFLOW) {
+                oldItems = cutOffEvents(oldItems, overflow);
+                eventCount -= overflow;
+            }
+            return new Branch(oldItems.append(newItems), eventCount);
+        }
+        remapping(from, to) {
+            let maps = new Mapping;
+            this.items.forEach((item, i) => {
+                let mirrorPos = item.mirrorOffset != null && i - item.mirrorOffset >= from
+                    ? maps.maps.length - item.mirrorOffset : undefined;
+                maps.appendMap(item.map, mirrorPos);
+            }, from, to);
+            return maps;
+        }
+        addMaps(array) {
+            if (this.eventCount == 0)
+                return this;
+            return new Branch(this.items.append(array.map(map => new Item(map))), this.eventCount);
+        }
+        // When the collab module receives remote changes, the history has
+        // to know about those, so that it can adjust the steps that were
+        // rebased on top of the remote changes, and include the position
+        // maps for the remote changes in its array of items.
+        rebased(rebasedTransform, rebasedCount) {
+            if (!this.eventCount)
+                return this;
+            let rebasedItems = [], start = Math.max(0, this.items.length - rebasedCount);
+            let mapping = rebasedTransform.mapping;
+            let newUntil = rebasedTransform.steps.length;
+            let eventCount = this.eventCount;
+            this.items.forEach(item => { if (item.selection)
+                eventCount--; }, start);
+            let iRebased = rebasedCount;
+            this.items.forEach(item => {
+                let pos = mapping.getMirror(--iRebased);
+                if (pos == null)
+                    return;
+                newUntil = Math.min(newUntil, pos);
+                let map = mapping.maps[pos];
+                if (item.step) {
+                    let step = rebasedTransform.steps[pos].invert(rebasedTransform.docs[pos]);
+                    let selection = item.selection && item.selection.map(mapping.slice(iRebased + 1, pos));
+                    if (selection)
+                        eventCount++;
+                    rebasedItems.push(new Item(map, step, selection));
+                }
+                else {
+                    rebasedItems.push(new Item(map));
+                }
+            }, start);
+            let newMaps = [];
+            for (let i = rebasedCount; i < newUntil; i++)
+                newMaps.push(new Item(mapping.maps[i]));
+            let items = this.items.slice(0, start).append(newMaps).append(rebasedItems);
+            let branch = new Branch(items, eventCount);
+            if (branch.emptyItemCount() > max_empty_items)
+                branch = branch.compress(this.items.length - rebasedItems.length);
+            return branch;
+        }
+        emptyItemCount() {
+            let count = 0;
+            this.items.forEach(item => { if (!item.step)
+                count++; });
+            return count;
+        }
+        // Compressing a branch means rewriting it to push the air (map-only
+        // items) out. During collaboration, these naturally accumulate
+        // because each remote change adds one. The `upto` argument is used
+        // to ensure that only the items below a given level are compressed,
+        // because `rebased` relies on a clean, untouched set of items in
+        // order to associate old items with rebased steps.
+        compress(upto = this.items.length) {
+            let remap = this.remapping(0, upto), mapFrom = remap.maps.length;
+            let items = [], events = 0;
+            this.items.forEach((item, i) => {
+                if (i >= upto) {
+                    items.push(item);
+                    if (item.selection)
+                        events++;
+                }
+                else if (item.step) {
+                    let step = item.step.map(remap.slice(mapFrom)), map = step && step.getMap();
+                    mapFrom--;
+                    if (map)
+                        remap.appendMap(map, mapFrom);
+                    if (step) {
+                        let selection = item.selection && item.selection.map(remap.slice(mapFrom));
+                        if (selection)
+                            events++;
+                        let newItem = new Item(map.invert(), step, selection), merged, last = items.length - 1;
+                        if (merged = items.length && items[last].merge(newItem))
+                            items[last] = merged;
+                        else
+                            items.push(newItem);
+                    }
+                }
+                else if (item.map) {
+                    mapFrom--;
+                }
+            }, this.items.length, 0);
+            return new Branch(RopeSequence.from(items.reverse()), events);
+        }
+    }
+    Branch.empty = new Branch(RopeSequence.empty, 0);
+    function cutOffEvents(items, n) {
+        let cutPoint;
+        items.forEach((item, i) => {
+            if (item.selection && (n-- == 0)) {
+                cutPoint = i;
+                return false;
+            }
+        });
+        return items.slice(cutPoint);
+    }
+    class Item {
+        constructor(
+        // The (forward) step map for this item.
+        map, 
+        // The inverted step
+        step, 
+        // If this is non-null, this item is the start of a group, and
+        // this selection is the starting selection for the group (the one
+        // that was active before the first step was applied)
+        selection, 
+        // If this item is the inverse of a previous mapping on the stack,
+        // this points at the inverse's offset
+        mirrorOffset) {
+            this.map = map;
+            this.step = step;
+            this.selection = selection;
+            this.mirrorOffset = mirrorOffset;
+        }
+        merge(other) {
+            if (this.step && other.step && !other.selection) {
+                let step = other.step.merge(this.step);
+                if (step)
+                    return new Item(step.getMap().invert(), step, this.selection);
+            }
+        }
+    }
+    // The value of the state field that tracks undo/redo history for that
+    // state. Will be stored in the plugin state when the history plugin
+    // is active.
+    class HistoryState {
+        constructor(done, undone, prevRanges, prevTime, prevComposition) {
+            this.done = done;
+            this.undone = undone;
+            this.prevRanges = prevRanges;
+            this.prevTime = prevTime;
+            this.prevComposition = prevComposition;
+        }
+    }
+    const DEPTH_OVERFLOW = 20;
+    // Record a transformation in undo history.
+    function applyTransaction(history, state, tr, options) {
+        let historyTr = tr.getMeta(historyKey), rebased;
+        if (historyTr)
+            return historyTr.historyState;
+        if (tr.getMeta(closeHistoryKey))
+            history = new HistoryState(history.done, history.undone, null, 0, -1);
+        let appended = tr.getMeta("appendedTransaction");
+        if (tr.steps.length == 0) {
+            return history;
+        }
+        else if (appended && appended.getMeta(historyKey)) {
+            if (appended.getMeta(historyKey).redo)
+                return new HistoryState(history.done.addTransform(tr, undefined, options, mustPreserveItems(state)), history.undone, rangesFor(tr.mapping.maps), history.prevTime, history.prevComposition);
+            else
+                return new HistoryState(history.done, history.undone.addTransform(tr, undefined, options, mustPreserveItems(state)), null, history.prevTime, history.prevComposition);
+        }
+        else if (tr.getMeta("addToHistory") !== false && !(appended && appended.getMeta("addToHistory") === false)) {
+            // Group transforms that occur in quick succession into one event.
+            let composition = tr.getMeta("composition");
+            let newGroup = history.prevTime == 0 ||
+                (!appended && history.prevComposition != composition &&
+                    (history.prevTime < (tr.time || 0) - options.newGroupDelay || !isAdjacentTo(tr, history.prevRanges)));
+            let prevRanges = appended ? mapRanges(history.prevRanges, tr.mapping) : rangesFor(tr.mapping.maps);
+            return new HistoryState(history.done.addTransform(tr, newGroup ? state.selection.getBookmark() : undefined, options, mustPreserveItems(state)), Branch.empty, prevRanges, tr.time, composition == null ? history.prevComposition : composition);
+        }
+        else if (rebased = tr.getMeta("rebased")) {
+            // Used by the collab module to tell the history that some of its
+            // content has been rebased.
+            return new HistoryState(history.done.rebased(tr, rebased), history.undone.rebased(tr, rebased), mapRanges(history.prevRanges, tr.mapping), history.prevTime, history.prevComposition);
+        }
+        else {
+            return new HistoryState(history.done.addMaps(tr.mapping.maps), history.undone.addMaps(tr.mapping.maps), mapRanges(history.prevRanges, tr.mapping), history.prevTime, history.prevComposition);
+        }
+    }
+    function isAdjacentTo(transform, prevRanges) {
+        if (!prevRanges)
+            return false;
+        if (!transform.docChanged)
+            return true;
+        let adjacent = false;
+        transform.mapping.maps[0].forEach((start, end) => {
+            for (let i = 0; i < prevRanges.length; i += 2)
+                if (start <= prevRanges[i + 1] && end >= prevRanges[i])
+                    adjacent = true;
+        });
+        return adjacent;
+    }
+    function rangesFor(maps) {
+        let result = [];
+        for (let i = maps.length - 1; i >= 0 && result.length == 0; i--)
+            maps[i].forEach((_from, _to, from, to) => result.push(from, to));
+        return result;
+    }
+    function mapRanges(ranges, mapping) {
+        if (!ranges)
+            return null;
+        let result = [];
+        for (let i = 0; i < ranges.length; i += 2) {
+            let from = mapping.map(ranges[i], 1), to = mapping.map(ranges[i + 1], -1);
+            if (from <= to)
+                result.push(from, to);
+        }
+        return result;
+    }
+    // Apply the latest event from one branch to the document and shift the event
+    // onto the other branch.
+    function histTransaction(history, state, redo) {
+        let preserveItems = mustPreserveItems(state);
+        let histOptions = historyKey.get(state).spec.config;
+        let pop = (redo ? history.undone : history.done).popEvent(state, preserveItems);
+        if (!pop)
+            return null;
+        let selection = pop.selection.resolve(pop.transform.doc);
+        let added = (redo ? history.done : history.undone).addTransform(pop.transform, state.selection.getBookmark(), histOptions, preserveItems);
+        let newHist = new HistoryState(redo ? added : pop.remaining, redo ? pop.remaining : added, null, 0, -1);
+        return pop.transform.setSelection(selection).setMeta(historyKey, { redo, historyState: newHist });
+    }
+    let cachedPreserveItems = false, cachedPreserveItemsPlugins = null;
+    // Check whether any plugin in the given state has a
+    // `historyPreserveItems` property in its spec, in which case we must
+    // preserve steps exactly as they came in, so that they can be
+    // rebased.
+    function mustPreserveItems(state) {
+        let plugins = state.plugins;
+        if (cachedPreserveItemsPlugins != plugins) {
+            cachedPreserveItems = false;
+            cachedPreserveItemsPlugins = plugins;
+            for (let i = 0; i < plugins.length; i++)
+                if (plugins[i].spec.historyPreserveItems) {
+                    cachedPreserveItems = true;
+                    break;
+                }
+        }
+        return cachedPreserveItems;
+    }
+    const historyKey = new PluginKey("history");
+    const closeHistoryKey = new PluginKey("closeHistory");
+    /**
+    Returns a plugin that enables the undo history for an editor. The
+    plugin will track undo and redo stacks, which can be used with the
+    [`undo`](https://prosemirror.net/docs/ref/#history.undo) and [`redo`](https://prosemirror.net/docs/ref/#history.redo) commands.
+
+    You can set an `"addToHistory"` [metadata
+    property](https://prosemirror.net/docs/ref/#state.Transaction.setMeta) of `false` on a transaction
+    to prevent it from being rolled back by undo.
+    */
+    function history(config = {}) {
+        config = { depth: config.depth || 100,
+            newGroupDelay: config.newGroupDelay || 500 };
+        return new Plugin({
+            key: historyKey,
+            state: {
+                init() {
+                    return new HistoryState(Branch.empty, Branch.empty, null, 0, -1);
+                },
+                apply(tr, hist, state) {
+                    return applyTransaction(hist, state, tr, config);
+                }
+            },
+            config,
+            props: {
+                handleDOMEvents: {
+                    beforeinput(view, e) {
+                        let inputType = e.inputType;
+                        let command = inputType == "historyUndo" ? undo : inputType == "historyRedo" ? redo : null;
+                        if (!command)
+                            return false;
+                        e.preventDefault();
+                        return command(view.state, view.dispatch);
+                    }
+                }
+            }
+        });
+    }
+    function buildCommand(redo, scroll) {
+        return (state, dispatch) => {
+            let hist = historyKey.getState(state);
+            if (!hist || (redo ? hist.undone : hist.done).eventCount == 0)
+                return false;
+            if (dispatch) {
+                let tr = histTransaction(hist, state, redo);
+                if (tr)
+                    dispatch(scroll ? tr.scrollIntoView() : tr);
+            }
+            return true;
+        };
+    }
+    /**
+    A command function that undoes the last change, if any.
+    */
+    const undo = buildCommand(false, true);
+    /**
+    A command function that redoes the last undone change, if any.
+    */
+    const redo = buildCommand(true, true);
+
+    /**
+     * This extension allows you to undo and redo recent changes.
+     * @see https://www.tiptap.dev/api/extensions/history
+     *
+     * **Important**: If the `@tiptap/extension-collaboration` package is used, make sure to remove
+     * the `history` extension, as it is not compatible with the `collaboration` extension.
+     *
+     * `@tiptap/extension-collaboration` uses its own history implementation.
+     */
+    const History = Extension.create({
+        name: 'history',
+        addOptions() {
+            return {
+                depth: 100,
+                newGroupDelay: 500,
+            };
+        },
+        addCommands() {
+            return {
+                undo: () => ({ state, dispatch }) => {
+                    return undo(state, dispatch);
+                },
+                redo: () => ({ state, dispatch }) => {
+                    return redo(state, dispatch);
+                },
+            };
+        },
+        addProseMirrorPlugins() {
+            return [
+                history(this.options),
+            ];
+        },
+        addKeyboardShortcuts() {
+            return {
+                'Mod-z': () => this.editor.commands.undo(),
+                'Shift-Mod-z': () => this.editor.commands.redo(),
+                'Mod-y': () => this.editor.commands.redo(),
+                // Russian keyboard layouts
+                'Mod-я': () => this.editor.commands.undo(),
+                'Shift-Mod-я': () => this.editor.commands.redo(),
+            };
+        },
+    });
+
+    /**
+     * This extension allows you to create list items.
+     * @see https://www.tiptap.dev/api/nodes/list-item
+     */
+    const ListItem$1 = Node.create({
+        name: 'listItem',
+        addOptions() {
+            return {
+                HTMLAttributes: {},
+                bulletListTypeName: 'bulletList',
+                orderedListTypeName: 'orderedList',
+            };
+        },
+        content: 'paragraph block*',
+        defining: true,
+        parseHTML() {
+            return [
+                {
+                    tag: 'li',
+                },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addKeyboardShortcuts() {
+            return {
+                Enter: () => this.editor.commands.splitListItem(this.name),
+                Tab: () => this.editor.commands.sinkListItem(this.name),
+                'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
+            };
+        },
+    });
+
+    /**
+     * This extension allows you to create list items.
+     * @see https://www.tiptap.dev/api/nodes/list-item
+     */
+    const ListItem = Node.create({
+        name: 'listItem',
+        addOptions() {
+            return {
+                HTMLAttributes: {},
+                bulletListTypeName: 'bulletList',
+                orderedListTypeName: 'orderedList',
+            };
+        },
+        content: 'paragraph block*',
+        defining: true,
+        parseHTML() {
+            return [
+                {
+                    tag: 'li',
+                },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addKeyboardShortcuts() {
+            return {
+                Enter: () => this.editor.commands.splitListItem(this.name),
+                Tab: () => this.editor.commands.sinkListItem(this.name),
+                'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
+            };
+        },
+    });
+
+    /**
+     * This extension allows you to create text styles. It is required by default
+     * for the `textColor` and `backgroundColor` extensions.
+     * @see https://www.tiptap.dev/api/marks/text-style
+     */
+    const TextStyle = Mark.create({
+        name: 'textStyle',
+        addOptions() {
+            return {
+                HTMLAttributes: {},
+            };
+        },
+        parseHTML() {
+            return [
+                {
+                    tag: 'span',
+                    getAttrs: element => {
+                        const hasStyles = element.hasAttribute('style');
+                        if (!hasStyles) {
+                            return false;
+                        }
+                        return {};
+                    },
+                },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addCommands() {
+            return {
+                removeEmptyTextStyle: () => ({ state, commands }) => {
+                    const attributes = getMarkAttributes(state, this.type);
+                    const hasStyles = Object.entries(attributes).some(([, value]) => !!value);
+                    if (hasStyles) {
+                        return true;
+                    }
+                    return commands.unsetMark(this.name);
+                },
+            };
+        },
+    });
+
+    /**
+     * Matches an ordered list to a 1. on input (or any number followed by a dot).
+     */
+    const inputRegex$1 = /^(\d+)\.\s$/;
+    /**
+     * This extension allows you to create ordered lists.
+     * This requires the ListItem extension
+     * @see https://www.tiptap.dev/api/nodes/ordered-list
+     * @see https://www.tiptap.dev/api/nodes/list-item
+     */
+    const OrderedList = Node.create({
+        name: 'orderedList',
+        addOptions() {
+            return {
+                itemTypeName: 'listItem',
+                HTMLAttributes: {},
+                keepMarks: false,
+                keepAttributes: false,
+            };
+        },
+        group: 'block list',
+        content() {
+            return `${this.options.itemTypeName}+`;
+        },
+        addAttributes() {
+            return {
+                start: {
+                    default: 1,
+                    parseHTML: element => {
+                        return element.hasAttribute('start')
+                            ? parseInt(element.getAttribute('start') || '', 10)
+                            : 1;
+                    },
+                },
+            };
+        },
+        parseHTML() {
+            return [
+                {
+                    tag: 'ol',
+                },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            const { start, ...attributesWithoutStart } = HTMLAttributes;
+            return start === 1
+                ? ['ol', mergeAttributes(this.options.HTMLAttributes, attributesWithoutStart), 0]
+                : ['ol', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addCommands() {
+            return {
+                toggleOrderedList: () => ({ commands, chain }) => {
+                    if (this.options.keepAttributes) {
+                        return chain().toggleList(this.name, this.options.itemTypeName, this.options.keepMarks).updateAttributes(ListItem.name, this.editor.getAttributes(TextStyle.name)).run();
+                    }
+                    return commands.toggleList(this.name, this.options.itemTypeName, this.options.keepMarks);
+                },
+            };
+        },
+        addKeyboardShortcuts() {
+            return {
+                'Mod-Shift-7': () => this.editor.commands.toggleOrderedList(),
+            };
+        },
+        addInputRules() {
+            let inputRule = wrappingInputRule({
+                find: inputRegex$1,
+                type: this.type,
+                getAttributes: match => ({ start: +match[1] }),
+                joinPredicate: (match, node) => node.childCount + node.attrs.start === +match[1],
+            });
+            if (this.options.keepMarks || this.options.keepAttributes) {
+                inputRule = wrappingInputRule({
+                    find: inputRegex$1,
+                    type: this.type,
+                    keepMarks: this.options.keepMarks,
+                    keepAttributes: this.options.keepAttributes,
+                    getAttributes: match => ({ start: +match[1], ...this.editor.getAttributes(TextStyle.name) }),
+                    joinPredicate: (match, node) => node.childCount + node.attrs.start === +match[1],
+                    editor: this.editor,
+                });
+            }
+            return [
+                inputRule,
+            ];
+        },
+    });
+
+    /**
+     * This extension allows you to create paragraphs.
+     * @see https://www.tiptap.dev/api/nodes/paragraph
+     */
+    const Paragraph = Node.create({
+        name: 'paragraph',
+        priority: 1000,
+        addOptions() {
+            return {
+                HTMLAttributes: {},
+            };
+        },
+        group: 'block',
+        content: 'inline*',
+        parseHTML() {
+            return [
+                { tag: 'p' },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['p', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addCommands() {
+            return {
+                setParagraph: () => ({ commands }) => {
+                    return commands.setNode(this.name);
+                },
+            };
+        },
+        addKeyboardShortcuts() {
+            return {
+                'Mod-Alt-0': () => this.editor.commands.setParagraph(),
+            };
+        },
+    });
+
+    /**
+     * Matches a strike to a ~~strike~~ on input.
+     */
+    const inputRegex = /(?:^|\s)(~~(?!\s+~~)((?:[^~]+))~~(?!\s+~~))$/;
+    /**
+     * Matches a strike to a ~~strike~~ on paste.
+     */
+    const pasteRegex = /(?:^|\s)(~~(?!\s+~~)((?:[^~]+))~~(?!\s+~~))/g;
+    /**
+     * This extension allows you to create strike text.
+     * @see https://www.tiptap.dev/api/marks/strike
+     */
+    const Strike = Mark.create({
+        name: 'strike',
+        addOptions() {
+            return {
+                HTMLAttributes: {},
+            };
+        },
+        parseHTML() {
+            return [
+                {
+                    tag: 's',
+                },
+                {
+                    tag: 'del',
+                },
+                {
+                    tag: 'strike',
+                },
+                {
+                    style: 'text-decoration',
+                    consuming: false,
+                    getAttrs: style => (style.includes('line-through') ? {} : false),
+                },
+            ];
+        },
+        renderHTML({ HTMLAttributes }) {
+            return ['s', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
+        },
+        addCommands() {
+            return {
+                setStrike: () => ({ commands }) => {
+                    return commands.setMark(this.name);
+                },
+                toggleStrike: () => ({ commands }) => {
+                    return commands.toggleMark(this.name);
+                },
+                unsetStrike: () => ({ commands }) => {
+                    return commands.unsetMark(this.name);
+                },
+            };
+        },
+        addKeyboardShortcuts() {
+            return {
+                'Mod-Shift-s': () => this.editor.commands.toggleStrike(),
+            };
+        },
+        addInputRules() {
+            return [
+                markInputRule({
+                    find: inputRegex,
+                    type: this.type,
+                }),
+            ];
+        },
+        addPasteRules() {
+            return [
+                markPasteRule({
+                    find: pasteRegex,
+                    type: this.type,
+                }),
+            ];
+        },
+    });
+
+    /**
+     * This extension allows you to create text nodes.
+     * @see https://www.tiptap.dev/api/nodes/text
+     */
+    const Text = Node.create({
+        name: 'text',
+        group: 'inline',
+    });
+
+    var baseEditorExtensions = [
+        Document,
+        History,
+        Placeholder,
+        // Basic Formats
+        Text,
+        Paragraph,
+        HardBreak.configure({
+            HTMLAttributes: {
+                class: 'smart',
+            },
+        }),
+        // Custom Formats
+        Link,
+        Blockquote,
+    ];
+    var articleEditorExtensions = __spreadArray(__spreadArray([], baseEditorExtensions, true), [
+        Gapcursor,
+        Bold,
+        Strike,
+        CodeBlock,
+        HorizontalRule,
+        OrderedList,
+        ListItem$1,
+        BulletList,
+        Heading.configure({
+            levels: [2, 3],
+        }),
+        FigureImage,
+        FigureAudio,
+        FigureEmbed,
+    ], false);
+    var commentEditorExtensions = __spreadArray([], baseEditorExtensions, true);
+    var momentEditorExtensions = __spreadArray([], baseEditorExtensions, true);
+    var campaignEditorExtensions = [
+        Document,
+        History,
+        Placeholder,
+        // Basic Formats
+        Text,
+        Paragraph,
+        HardBreak.configure({
+            HTMLAttributes: {
+                class: 'smart',
+            },
+        }),
+    ];
 
     var top = 'top';
     var bottom = 'bottom';
@@ -18505,7 +24292,7 @@ img.ProseMirror-separator {
       return mergePaddingObject(typeof padding !== 'number' ? padding : expandToHashMap(padding, basePlacements));
     };
 
-    function arrow$1(_ref) {
+    function arrow(_ref) {
       var _state$modifiersData$;
 
       var state = _ref.state,
@@ -18569,11 +24356,11 @@ img.ProseMirror-separator {
     } // eslint-disable-next-line import/no-unused-modules
 
 
-    var arrow$2 = {
+    var arrow$1 = {
       name: 'arrow',
       enabled: true,
       phase: 'main',
-      fn: arrow$1,
+      fn: arrow,
       effect: effect$1,
       requires: ['popperOffsets'],
       requiresIfExists: ['preventOverflow']
@@ -19897,7 +25684,7 @@ img.ProseMirror-separator {
       };
     }
 
-    var defaultModifiers = [eventListeners, popperOffsets$1, computeStyles$1, applyStyles$1, offset$1, flip$1, preventOverflow$1, arrow$2, hide$1];
+    var defaultModifiers = [eventListeners, popperOffsets$1, computeStyles$1, applyStyles$1, offset$1, flip$1, preventOverflow$1, arrow$1, hide$1];
     var createPopper = /*#__PURE__*/popperGenerator({
       defaultModifiers: defaultModifiers
     }); // eslint-disable-next-line import/no-unused-modules
@@ -21548,7 +27335,7 @@ img.ProseMirror-separator {
         }
         update(view, oldState) {
             const { state } = view;
-            const hasValidSelection = state.selection.$from.pos !== state.selection.$to.pos;
+            const hasValidSelection = state.selection.from !== state.selection.to;
             if (this.updateDelay > 0 && hasValidSelection) {
                 this.handleDebouncedUpdate(view, oldState);
                 return;
@@ -21804,7 +27591,7 @@ img.ProseMirror-separator {
         }
         init() {
             const { editor } = this.props;
-            if (editor && editor.options.element) {
+            if (editor && !editor.isDestroyed && editor.options.element) {
                 if (editor.contentComponent) {
                     return;
                 }
@@ -21898,99 +27685,256 @@ img.ProseMirror-separator {
         }
     }
 
+    var withSelector = {exports: {}};
+
+    var withSelector_production_min = {};
+
+    var shim = {exports: {}};
+
+    var useSyncExternalStoreShim_production_min = {};
+
     /**
-     * This hook allows you to create an editor instance.
-     * @param options The editor options
-     * @param deps The dependencies to watch for changes
-     * @returns The editor instance
-     * @example const editor = useEditor({ extensions: [...] })
+     * @license React
+     * use-sync-external-store-shim.production.min.js
+     *
+     * Copyright (c) Facebook, Inc. and its affiliates.
+     *
+     * This source code is licensed under the MIT license found in the
+     * LICENSE file in the root directory of this source tree.
      */
-    const useEditor = (options = {}, deps = []) => {
-        const editorRef = React.useRef(null);
-        const [, forceUpdate] = React.useState({});
-        const { onBeforeCreate, onBlur, onCreate, onDestroy, onFocus, onSelectionUpdate, onTransaction, onUpdate, } = options;
-        const onBeforeCreateRef = React.useRef(onBeforeCreate);
-        const onBlurRef = React.useRef(onBlur);
-        const onCreateRef = React.useRef(onCreate);
-        const onDestroyRef = React.useRef(onDestroy);
-        const onFocusRef = React.useRef(onFocus);
-        const onSelectionUpdateRef = React.useRef(onSelectionUpdate);
-        const onTransactionRef = React.useRef(onTransaction);
-        const onUpdateRef = React.useRef(onUpdate);
-        // This effect will handle updating the editor instance
-        // when the event handlers change.
+
+    var hasRequiredUseSyncExternalStoreShim_production_min;
+
+    function requireUseSyncExternalStoreShim_production_min () {
+    	if (hasRequiredUseSyncExternalStoreShim_production_min) return useSyncExternalStoreShim_production_min;
+    	hasRequiredUseSyncExternalStoreShim_production_min = 1;
+    var e=React;function h(a,b){return a===b&&(0!==a||1/a===1/b)||a!==a&&b!==b}var k="function"===typeof Object.is?Object.is:h,l=e.useState,m=e.useEffect,n=e.useLayoutEffect,p=e.useDebugValue;function q(a,b){var d=b(),f=l({inst:{value:d,getSnapshot:b}}),c=f[0].inst,g=f[1];n(function(){c.value=d;c.getSnapshot=b;r(c)&&g({inst:c});},[a,d,b]);m(function(){r(c)&&g({inst:c});return a(function(){r(c)&&g({inst:c});})},[a]);p(d);return d}
+    	function r(a){var b=a.getSnapshot;a=a.value;try{var d=b();return !k(a,d)}catch(f){return !0}}function t(a,b){return b()}var u="undefined"===typeof window||"undefined"===typeof window.document||"undefined"===typeof window.document.createElement?t:q;useSyncExternalStoreShim_production_min.useSyncExternalStore=void 0!==e.useSyncExternalStore?e.useSyncExternalStore:u;
+    	return useSyncExternalStoreShim_production_min;
+    }
+
+    var hasRequiredShim;
+
+    function requireShim () {
+    	if (hasRequiredShim) return shim.exports;
+    	hasRequiredShim = 1;
+
+    	{
+    	  shim.exports = requireUseSyncExternalStoreShim_production_min();
+    	}
+    	return shim.exports;
+    }
+
+    /**
+     * @license React
+     * use-sync-external-store-shim/with-selector.production.min.js
+     *
+     * Copyright (c) Facebook, Inc. and its affiliates.
+     *
+     * This source code is licensed under the MIT license found in the
+     * LICENSE file in the root directory of this source tree.
+     */
+
+    var hasRequiredWithSelector_production_min;
+
+    function requireWithSelector_production_min () {
+    	if (hasRequiredWithSelector_production_min) return withSelector_production_min;
+    	hasRequiredWithSelector_production_min = 1;
+    var h=React,n=requireShim();function p(a,b){return a===b&&(0!==a||1/a===1/b)||a!==a&&b!==b}var q="function"===typeof Object.is?Object.is:p,r=n.useSyncExternalStore,t=h.useRef,u=h.useEffect,v=h.useMemo,w=h.useDebugValue;
+    	withSelector_production_min.useSyncExternalStoreWithSelector=function(a,b,e,l,g){var c=t(null);if(null===c.current){var f={hasValue:!1,value:null};c.current=f;}else f=c.current;c=v(function(){function a(a){if(!c){c=!0;d=a;a=l(a);if(void 0!==g&&f.hasValue){var b=f.value;if(g(b,a))return k=b}return k=a}b=k;if(q(d,a))return b;var e=l(a);if(void 0!==g&&g(b,e))return b;d=a;return k=e}var c=!1,d,k,m=void 0===e?null:e;return [function(){return a(b())},null===m?void 0:function(){return a(m())}]},[b,e,l,g]);var d=r(a,c[0],c[1]);
+    	u(function(){f.hasValue=!0;f.value=d;},[d]);w(d);return d};
+    	return withSelector_production_min;
+    }
+
+    {
+      withSelector.exports = requireWithSelector_production_min();
+    }
+
+    var withSelectorExports = withSelector.exports;
+
+    /**
+     * To synchronize the editor instance with the component state,
+     * we need to create a separate instance that is not affected by the component re-renders.
+     */
+    function makeEditorStateInstance(initialEditor) {
+        let transactionNumber = 0;
+        let lastTransactionNumber = 0;
+        let lastSnapshot = { editor: initialEditor, transactionNumber: 0 };
+        let editor = initialEditor;
+        const subscribers = new Set();
+        const editorInstance = {
+            /**
+             * Get the current editor instance.
+             */
+            getSnapshot() {
+                if (transactionNumber === lastTransactionNumber) {
+                    return lastSnapshot;
+                }
+                lastTransactionNumber = transactionNumber;
+                lastSnapshot = { editor, transactionNumber };
+                return lastSnapshot;
+            },
+            /**
+             * Always disable the editor on the server-side.
+             */
+            getServerSnapshot() {
+                return { editor: null, transactionNumber: 0 };
+            },
+            /**
+             * Subscribe to the editor instance's changes.
+             */
+            subscribe(callback) {
+                subscribers.add(callback);
+                return () => {
+                    subscribers.delete(callback);
+                };
+            },
+            /**
+             * Watch the editor instance for changes.
+             */
+            watch(nextEditor) {
+                editor = nextEditor;
+                if (editor) {
+                    /**
+                     * This will force a re-render when the editor state changes.
+                     * This is to support things like `editor.can().toggleBold()` in components that `useEditor`.
+                     * This could be more efficient, but it's a good trade-off for now.
+                     */
+                    const fn = () => {
+                        transactionNumber += 1;
+                        subscribers.forEach(callback => callback());
+                    };
+                    const currentEditor = editor;
+                    currentEditor.on('transaction', fn);
+                    return () => {
+                        currentEditor.off('transaction', fn);
+                    };
+                }
+            },
+        };
+        return editorInstance;
+    }
+    function useEditorState(options) {
+        const [editorInstance] = React.useState(() => makeEditorStateInstance(options.editor));
+        // Using the `useSyncExternalStore` hook to sync the editor instance with the component state
+        const selectedState = withSelectorExports.useSyncExternalStoreWithSelector(editorInstance.subscribe, editorInstance.getSnapshot, editorInstance.getServerSnapshot, options.selector, options.equalityFn);
         React.useEffect(() => {
-            if (!editorRef.current) {
-                return;
+            return editorInstance.watch(options.editor);
+        }, [options.editor]);
+        React.useDebugValue(selectedState);
+        return selectedState;
+    }
+
+    const isDev = "production" !== 'production';
+    const isSSR = typeof window === 'undefined';
+    const isNext = isSSR || Boolean(typeof window !== 'undefined' && window.next);
+    /**
+     * Create a new editor instance. And attach event listeners.
+     */
+    function createEditor(options) {
+        const editor = new Editor(options.current);
+        editor.on('beforeCreate', (...args) => { var _a, _b; return (_b = (_a = options.current).onBeforeCreate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
+        editor.on('blur', (...args) => { var _a, _b; return (_b = (_a = options.current).onBlur) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
+        editor.on('create', (...args) => { var _a, _b; return (_b = (_a = options.current).onCreate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
+        editor.on('destroy', (...args) => { var _a, _b; return (_b = (_a = options.current).onDestroy) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
+        editor.on('focus', (...args) => { var _a, _b; return (_b = (_a = options.current).onFocus) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
+        editor.on('selectionUpdate', (...args) => { var _a, _b; return (_b = (_a = options.current).onSelectionUpdate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
+        editor.on('transaction', (...args) => { var _a, _b; return (_b = (_a = options.current).onTransaction) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
+        editor.on('update', (...args) => { var _a, _b; return (_b = (_a = options.current).onUpdate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
+        editor.on('contentError', (...args) => { var _a, _b; return (_b = (_a = options.current).onContentError) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
+        return editor;
+    }
+    function useEditor(options = {}, deps = []) {
+        const mostRecentOptions = React.useRef(options);
+        const [editor, setEditor] = React.useState(() => {
+            if (options.immediatelyRender === undefined) {
+                if (isSSR || isNext) {
+                    // Best faith effort in production, run the code in the legacy mode to avoid hydration mismatches and errors in production
+                    return null;
+                }
+                // Default to immediately rendering when client-side rendering
+                return createEditor(mostRecentOptions);
             }
-            if (onBeforeCreate) {
-                editorRef.current.off('beforeCreate', onBeforeCreateRef.current);
-                editorRef.current.on('beforeCreate', onBeforeCreate);
-                onBeforeCreateRef.current = onBeforeCreate;
+            if (options.immediatelyRender && isSSR && isDev) {
+                // Warn in development, to make sure the developer is aware that tiptap cannot be SSR'd, set `immediatelyRender` to `false` to avoid hydration mismatches.
+                throw new Error('Tiptap Error: SSR has been detected, and `immediatelyRender` has been set to `true` this is an unsupported configuration that may result in errors, explicitly set `immediatelyRender` to `false` to avoid hydration mismatches.');
             }
-            if (onBlur) {
-                editorRef.current.off('blur', onBlurRef.current);
-                editorRef.current.on('blur', onBlur);
-                onBlurRef.current = onBlur;
+            if (options.immediatelyRender) {
+                return createEditor(mostRecentOptions);
             }
-            if (onCreate) {
-                editorRef.current.off('create', onCreateRef.current);
-                editorRef.current.on('create', onCreate);
-                onCreateRef.current = onCreate;
-            }
-            if (onDestroy) {
-                editorRef.current.off('destroy', onDestroyRef.current);
-                editorRef.current.on('destroy', onDestroy);
-                onDestroyRef.current = onDestroy;
-            }
-            if (onFocus) {
-                editorRef.current.off('focus', onFocusRef.current);
-                editorRef.current.on('focus', onFocus);
-                onFocusRef.current = onFocus;
-            }
-            if (onSelectionUpdate) {
-                editorRef.current.off('selectionUpdate', onSelectionUpdateRef.current);
-                editorRef.current.on('selectionUpdate', onSelectionUpdate);
-                onSelectionUpdateRef.current = onSelectionUpdate;
-            }
-            if (onTransaction) {
-                editorRef.current.off('transaction', onTransactionRef.current);
-                editorRef.current.on('transaction', onTransaction);
-                onTransactionRef.current = onTransaction;
-            }
-            if (onUpdate) {
-                editorRef.current.off('update', onUpdateRef.current);
-                editorRef.current.on('update', onUpdate);
-                onUpdateRef.current = onUpdate;
-            }
-        }, [onBeforeCreate, onBlur, onCreate, onDestroy, onFocus, onSelectionUpdate, onTransaction, onUpdate, editorRef.current]);
+            return null;
+        });
+        const mostRecentEditor = React.useRef(editor);
+        mostRecentEditor.current = editor;
+        React.useDebugValue(editor);
+        // This effect will handle creating/updating the editor instance
         React.useEffect(() => {
-            let isMounted = true;
-            const editor = new Editor(options);
-            editorRef.current = editor;
-            editorRef.current.on('transaction', () => {
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        if (isMounted) {
-                            forceUpdate({});
+            const destroyUnusedEditor = (editorInstance) => {
+                if (editorInstance) {
+                    // We need to destroy the editor asynchronously to avoid memory leaks
+                    // because the editor instance is still being used in the component.
+                    setTimeout(() => {
+                        // re-use the editor instance if it hasn't been replaced yet
+                        // otherwise, asynchronously destroy the old editor instance
+                        if (editorInstance !== mostRecentEditor.current && !editorInstance.isDestroyed) {
+                            editorInstance.destroy();
                         }
                     });
-                });
-            });
-            return () => {
-                isMounted = false;
-                editor.destroy();
+                }
             };
+            let editorInstance = mostRecentEditor.current;
+            if (!editorInstance) {
+                editorInstance = createEditor(mostRecentOptions);
+                setEditor(editorInstance);
+                return () => destroyUnusedEditor(editorInstance);
+            }
+            if (!Array.isArray(deps) || deps.length === 0) {
+                // if the editor does exist & deps are empty, we don't need to re-initialize the editor
+                // we can fast-path to update the editor options on the existing instance
+                editorInstance.setOptions(options);
+                return () => destroyUnusedEditor(editorInstance);
+            }
+            // We need to destroy the editor instance and re-initialize it
+            // when the deps array changes
+            editorInstance.destroy();
+            // the deps array is used to re-initialize the editor instance
+            editorInstance = createEditor(mostRecentOptions);
+            setEditor(editorInstance);
+            return () => destroyUnusedEditor(editorInstance);
         }, deps);
-        return editorRef.current;
-    };
+        // The default behavior is to re-render on each transaction
+        // This is legacy behavior that will be removed in future versions
+        useEditorState({
+            editor,
+            selector: ({ transactionNumber }) => {
+                if (options.shouldRerenderOnTransaction === false) {
+                    // This will prevent the editor from re-rendering on each transaction
+                    return null;
+                }
+                // This will avoid re-rendering on the first transaction when `immediatelyRender` is set to `true`
+                if (options.immediatelyRender && transactionNumber === 0) {
+                    return 0;
+                }
+                return transactionNumber + 1;
+            },
+        });
+        return editor;
+    }
 
     const EditorContext = React.createContext({
         editor: null,
     });
     const EditorConsumer = EditorContext.Consumer;
+    /**
+     * A hook to get the current editor instance.
+     */
     const useCurrentEditor = () => React.useContext(EditorContext);
-    const EditorProvider = ({ children, slotAfter, slotBefore, ...editorOptions }) => {
+    /**
+     * This is the provider component for the editor.
+     * It allows the editor to be accessible across the entire component tree
+     * with `useCurrentEditor`.
+     */
+    function EditorProvider({ children, slotAfter, slotBefore, ...editorOptions }) {
         const editor = useEditor(editorOptions);
         if (!editor) {
             return null;
@@ -22000,7 +27944,7 @@ img.ProseMirror-separator {
             React.createElement(EditorConsumer, null, ({ editor: currentEditor }) => (React.createElement(EditorContent, { editor: currentEditor }))),
             children,
             slotAfter));
-    };
+    }
 
     const BubbleMenu = (props) => {
         const [element, setElement] = React.useState(null);
@@ -22312,5300 +28256,6 @@ img.ProseMirror-separator {
             return new ReactNodeView(component, props, options);
         };
     }
-
-    /**
-     * This extension allows you to create list items.
-     * @see https://www.tiptap.dev/api/nodes/list-item
-     */
-    const ListItem$2 = Node.create({
-        name: 'listItem',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-                bulletListTypeName: 'bulletList',
-                orderedListTypeName: 'orderedList',
-            };
-        },
-        content: 'paragraph block*',
-        defining: true,
-        parseHTML() {
-            return [
-                {
-                    tag: 'li',
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addKeyboardShortcuts() {
-            return {
-                Enter: () => this.editor.commands.splitListItem(this.name),
-                Tab: () => this.editor.commands.sinkListItem(this.name),
-                'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
-            };
-        },
-    });
-
-    /**
-     * This extension allows you to create text styles. It is required by default
-     * for the `textColor` and `backgroundColor` extensions.
-     * @see https://www.tiptap.dev/api/marks/text-style
-     */
-    const TextStyle$1 = Mark.create({
-        name: 'textStyle',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        parseHTML() {
-            return [
-                {
-                    tag: 'span',
-                    getAttrs: element => {
-                        const hasStyles = element.hasAttribute('style');
-                        if (!hasStyles) {
-                            return false;
-                        }
-                        return {};
-                    },
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                removeEmptyTextStyle: () => ({ state, commands }) => {
-                    const attributes = getMarkAttributes(state, this.type);
-                    const hasStyles = Object.entries(attributes).some(([, value]) => !!value);
-                    if (hasStyles) {
-                        return true;
-                    }
-                    return commands.unsetMark(this.name);
-                },
-            };
-        },
-    });
-
-    /**
-     * Matches a bullet list to a dash or asterisk.
-     */
-    const inputRegex$3 = /^\s*([-+*])\s$/;
-    /**
-     * This extension allows you to create bullet lists.
-     * This requires the ListItem extension
-     * @see https://tiptap.dev/api/nodes/bullet-list
-     * @see https://tiptap.dev/api/nodes/list-item.
-     */
-    const BulletList = Node.create({
-        name: 'bulletList',
-        addOptions() {
-            return {
-                itemTypeName: 'listItem',
-                HTMLAttributes: {},
-                keepMarks: false,
-                keepAttributes: false,
-            };
-        },
-        group: 'block list',
-        content() {
-            return `${this.options.itemTypeName}+`;
-        },
-        parseHTML() {
-            return [
-                { tag: 'ul' },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['ul', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                toggleBulletList: () => ({ commands, chain }) => {
-                    if (this.options.keepAttributes) {
-                        return chain().toggleList(this.name, this.options.itemTypeName, this.options.keepMarks).updateAttributes(ListItem$2.name, this.editor.getAttributes(TextStyle$1.name)).run();
-                    }
-                    return commands.toggleList(this.name, this.options.itemTypeName, this.options.keepMarks);
-                },
-            };
-        },
-        addKeyboardShortcuts() {
-            return {
-                'Mod-Shift-8': () => this.editor.commands.toggleBulletList(),
-            };
-        },
-        addInputRules() {
-            let inputRule = wrappingInputRule({
-                find: inputRegex$3,
-                type: this.type,
-            });
-            if (this.options.keepMarks || this.options.keepAttributes) {
-                inputRule = wrappingInputRule({
-                    find: inputRegex$3,
-                    type: this.type,
-                    keepMarks: this.options.keepMarks,
-                    keepAttributes: this.options.keepAttributes,
-                    getAttributes: () => { return this.editor.getAttributes(TextStyle$1.name); },
-                    editor: this.editor,
-                });
-            }
-            return [
-                inputRule,
-            ];
-        },
-    });
-
-    /**
-     * Matches a code block with backticks.
-     */
-    const backtickInputRegex = /^```([a-z]+)?[\s\n]$/;
-    /**
-     * Matches a code block with tildes.
-     */
-    const tildeInputRegex = /^~~~([a-z]+)?[\s\n]$/;
-    /**
-     * This extension allows you to create code blocks.
-     * @see https://tiptap.dev/api/nodes/code-block
-     */
-    const CodeBlock = Node.create({
-        name: 'codeBlock',
-        addOptions() {
-            return {
-                languageClassPrefix: 'language-',
-                exitOnTripleEnter: true,
-                exitOnArrowDown: true,
-                HTMLAttributes: {},
-            };
-        },
-        content: 'text*',
-        marks: '',
-        group: 'block',
-        code: true,
-        defining: true,
-        addAttributes() {
-            return {
-                language: {
-                    default: null,
-                    parseHTML: element => {
-                        var _a;
-                        const { languageClassPrefix } = this.options;
-                        const classNames = [...(((_a = element.firstElementChild) === null || _a === void 0 ? void 0 : _a.classList) || [])];
-                        const languages = classNames
-                            .filter(className => className.startsWith(languageClassPrefix))
-                            .map(className => className.replace(languageClassPrefix, ''));
-                        const language = languages[0];
-                        if (!language) {
-                            return null;
-                        }
-                        return language;
-                    },
-                    rendered: false,
-                },
-            };
-        },
-        parseHTML() {
-            return [
-                {
-                    tag: 'pre',
-                    preserveWhitespace: 'full',
-                },
-            ];
-        },
-        renderHTML({ node, HTMLAttributes }) {
-            return [
-                'pre',
-                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-                [
-                    'code',
-                    {
-                        class: node.attrs.language
-                            ? this.options.languageClassPrefix + node.attrs.language
-                            : null,
-                    },
-                    0,
-                ],
-            ];
-        },
-        addCommands() {
-            return {
-                setCodeBlock: attributes => ({ commands }) => {
-                    return commands.setNode(this.name, attributes);
-                },
-                toggleCodeBlock: attributes => ({ commands }) => {
-                    return commands.toggleNode(this.name, 'paragraph', attributes);
-                },
-            };
-        },
-        addKeyboardShortcuts() {
-            return {
-                'Mod-Alt-c': () => this.editor.commands.toggleCodeBlock(),
-                // remove code block when at start of document or code block is empty
-                Backspace: () => {
-                    const { empty, $anchor } = this.editor.state.selection;
-                    const isAtStart = $anchor.pos === 1;
-                    if (!empty || $anchor.parent.type.name !== this.name) {
-                        return false;
-                    }
-                    if (isAtStart || !$anchor.parent.textContent.length) {
-                        return this.editor.commands.clearNodes();
-                    }
-                    return false;
-                },
-                // exit node on triple enter
-                Enter: ({ editor }) => {
-                    if (!this.options.exitOnTripleEnter) {
-                        return false;
-                    }
-                    const { state } = editor;
-                    const { selection } = state;
-                    const { $from, empty } = selection;
-                    if (!empty || $from.parent.type !== this.type) {
-                        return false;
-                    }
-                    const isAtEnd = $from.parentOffset === $from.parent.nodeSize - 2;
-                    const endsWithDoubleNewline = $from.parent.textContent.endsWith('\n\n');
-                    if (!isAtEnd || !endsWithDoubleNewline) {
-                        return false;
-                    }
-                    return editor
-                        .chain()
-                        .command(({ tr }) => {
-                        tr.delete($from.pos - 2, $from.pos);
-                        return true;
-                    })
-                        .exitCode()
-                        .run();
-                },
-                // exit node on arrow down
-                ArrowDown: ({ editor }) => {
-                    if (!this.options.exitOnArrowDown) {
-                        return false;
-                    }
-                    const { state } = editor;
-                    const { selection, doc } = state;
-                    const { $from, empty } = selection;
-                    if (!empty || $from.parent.type !== this.type) {
-                        return false;
-                    }
-                    const isAtEnd = $from.parentOffset === $from.parent.nodeSize - 2;
-                    if (!isAtEnd) {
-                        return false;
-                    }
-                    const after = $from.after();
-                    if (after === undefined) {
-                        return false;
-                    }
-                    const nodeAfter = doc.nodeAt(after);
-                    if (nodeAfter) {
-                        return false;
-                    }
-                    return editor.commands.exitCode();
-                },
-            };
-        },
-        addInputRules() {
-            return [
-                textblockTypeInputRule({
-                    find: backtickInputRegex,
-                    type: this.type,
-                    getAttributes: match => ({
-                        language: match[1],
-                    }),
-                }),
-                textblockTypeInputRule({
-                    find: tildeInputRegex,
-                    type: this.type,
-                    getAttributes: match => ({
-                        language: match[1],
-                    }),
-                }),
-            ];
-        },
-        addProseMirrorPlugins() {
-            return [
-                // this plugin creates a code block for pasted content from VS Code
-                // we can also detect the copied code language
-                new Plugin({
-                    key: new PluginKey('codeBlockVSCodeHandler'),
-                    props: {
-                        handlePaste: (view, event) => {
-                            if (!event.clipboardData) {
-                                return false;
-                            }
-                            // don’t create a new code block within code blocks
-                            if (this.editor.isActive(this.type.name)) {
-                                return false;
-                            }
-                            const text = event.clipboardData.getData('text/plain');
-                            const vscode = event.clipboardData.getData('vscode-editor-data');
-                            const vscodeData = vscode ? JSON.parse(vscode) : undefined;
-                            const language = vscodeData === null || vscodeData === void 0 ? void 0 : vscodeData.mode;
-                            if (!text || !language) {
-                                return false;
-                            }
-                            const { tr } = view.state;
-                            // create an empty code block´
-                            // if the cursor is at the absolute end of the document, insert the code block before the cursor instead
-                            // of replacing the selection as the replaceSelectionWith function will cause the insertion to
-                            // happen at the previous node
-                            if (view.state.selection.from === view.state.doc.nodeSize - (1 + (view.state.selection.$to.depth * 2))) {
-                                tr.insert(view.state.selection.from - 1, this.type.create({ language }));
-                            }
-                            else {
-                                tr.replaceSelectionWith(this.type.create({ language }));
-                            }
-                            // put cursor inside the newly created code block
-                            tr.setSelection(TextSelection.near(tr.doc.resolve(Math.max(0, tr.selection.from - 2))));
-                            // add text to code block
-                            // strip carriage return chars from text pasted as code
-                            // see: https://github.com/ProseMirror/prosemirror-view/commit/a50a6bcceb4ce52ac8fcc6162488d8875613aacd
-                            tr.insertText(text.replace(/\r\n?/g, '\n'));
-                            // store meta information
-                            // this is useful for other plugins that depends on the paste event
-                            // like the paste rule plugin
-                            tr.setMeta('paste', true);
-                            view.dispatch(tr);
-                            return true;
-                        },
-                    },
-                }),
-            ];
-        },
-    });
-
-    /**
-     * The default document node which represents the top level node of the editor.
-     * @see https://tiptap.dev/api/nodes/document
-     */
-    const Document = Node.create({
-        name: 'doc',
-        topNode: true,
-        content: 'block+',
-    });
-
-    /**
-    Gap cursor selections are represented using this class. Its
-    `$anchor` and `$head` properties both point at the cursor position.
-    */
-    class GapCursor extends Selection {
-        /**
-        Create a gap cursor.
-        */
-        constructor($pos) {
-            super($pos, $pos);
-        }
-        map(doc, mapping) {
-            let $pos = doc.resolve(mapping.map(this.head));
-            return GapCursor.valid($pos) ? new GapCursor($pos) : Selection.near($pos);
-        }
-        content() { return Slice.empty; }
-        eq(other) {
-            return other instanceof GapCursor && other.head == this.head;
-        }
-        toJSON() {
-            return { type: "gapcursor", pos: this.head };
-        }
-        /**
-        @internal
-        */
-        static fromJSON(doc, json) {
-            if (typeof json.pos != "number")
-                throw new RangeError("Invalid input for GapCursor.fromJSON");
-            return new GapCursor(doc.resolve(json.pos));
-        }
-        /**
-        @internal
-        */
-        getBookmark() { return new GapBookmark(this.anchor); }
-        /**
-        @internal
-        */
-        static valid($pos) {
-            let parent = $pos.parent;
-            if (parent.isTextblock || !closedBefore($pos) || !closedAfter($pos))
-                return false;
-            let override = parent.type.spec.allowGapCursor;
-            if (override != null)
-                return override;
-            let deflt = parent.contentMatchAt($pos.index()).defaultType;
-            return deflt && deflt.isTextblock;
-        }
-        /**
-        @internal
-        */
-        static findGapCursorFrom($pos, dir, mustMove = false) {
-            search: for (;;) {
-                if (!mustMove && GapCursor.valid($pos))
-                    return $pos;
-                let pos = $pos.pos, next = null;
-                // Scan up from this position
-                for (let d = $pos.depth;; d--) {
-                    let parent = $pos.node(d);
-                    if (dir > 0 ? $pos.indexAfter(d) < parent.childCount : $pos.index(d) > 0) {
-                        next = parent.child(dir > 0 ? $pos.indexAfter(d) : $pos.index(d) - 1);
-                        break;
-                    }
-                    else if (d == 0) {
-                        return null;
-                    }
-                    pos += dir;
-                    let $cur = $pos.doc.resolve(pos);
-                    if (GapCursor.valid($cur))
-                        return $cur;
-                }
-                // And then down into the next node
-                for (;;) {
-                    let inside = dir > 0 ? next.firstChild : next.lastChild;
-                    if (!inside) {
-                        if (next.isAtom && !next.isText && !NodeSelection.isSelectable(next)) {
-                            $pos = $pos.doc.resolve(pos + next.nodeSize * dir);
-                            mustMove = false;
-                            continue search;
-                        }
-                        break;
-                    }
-                    next = inside;
-                    pos += dir;
-                    let $cur = $pos.doc.resolve(pos);
-                    if (GapCursor.valid($cur))
-                        return $cur;
-                }
-                return null;
-            }
-        }
-    }
-    GapCursor.prototype.visible = false;
-    GapCursor.findFrom = GapCursor.findGapCursorFrom;
-    Selection.jsonID("gapcursor", GapCursor);
-    class GapBookmark {
-        constructor(pos) {
-            this.pos = pos;
-        }
-        map(mapping) {
-            return new GapBookmark(mapping.map(this.pos));
-        }
-        resolve(doc) {
-            let $pos = doc.resolve(this.pos);
-            return GapCursor.valid($pos) ? new GapCursor($pos) : Selection.near($pos);
-        }
-    }
-    function closedBefore($pos) {
-        for (let d = $pos.depth; d >= 0; d--) {
-            let index = $pos.index(d), parent = $pos.node(d);
-            // At the start of this parent, look at next one
-            if (index == 0) {
-                if (parent.type.spec.isolating)
-                    return true;
-                continue;
-            }
-            // See if the node before (or its first ancestor) is closed
-            for (let before = parent.child(index - 1);; before = before.lastChild) {
-                if ((before.childCount == 0 && !before.inlineContent) || before.isAtom || before.type.spec.isolating)
-                    return true;
-                if (before.inlineContent)
-                    return false;
-            }
-        }
-        // Hit start of document
-        return true;
-    }
-    function closedAfter($pos) {
-        for (let d = $pos.depth; d >= 0; d--) {
-            let index = $pos.indexAfter(d), parent = $pos.node(d);
-            if (index == parent.childCount) {
-                if (parent.type.spec.isolating)
-                    return true;
-                continue;
-            }
-            for (let after = parent.child(index);; after = after.firstChild) {
-                if ((after.childCount == 0 && !after.inlineContent) || after.isAtom || after.type.spec.isolating)
-                    return true;
-                if (after.inlineContent)
-                    return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-    Create a gap cursor plugin. When enabled, this will capture clicks
-    near and arrow-key-motion past places that don't have a normally
-    selectable position nearby, and create a gap cursor selection for
-    them. The cursor is drawn as an element with class
-    `ProseMirror-gapcursor`. You can either include
-    `style/gapcursor.css` from the package's directory or add your own
-    styles to make it visible.
-    */
-    function gapCursor() {
-        return new Plugin({
-            props: {
-                decorations: drawGapCursor,
-                createSelectionBetween(_view, $anchor, $head) {
-                    return $anchor.pos == $head.pos && GapCursor.valid($head) ? new GapCursor($head) : null;
-                },
-                handleClick,
-                handleKeyDown,
-                handleDOMEvents: { beforeinput: beforeinput }
-            }
-        });
-    }
-    const handleKeyDown = keydownHandler({
-        "ArrowLeft": arrow("horiz", -1),
-        "ArrowRight": arrow("horiz", 1),
-        "ArrowUp": arrow("vert", -1),
-        "ArrowDown": arrow("vert", 1)
-    });
-    function arrow(axis, dir) {
-        const dirStr = axis == "vert" ? (dir > 0 ? "down" : "up") : (dir > 0 ? "right" : "left");
-        return function (state, dispatch, view) {
-            let sel = state.selection;
-            let $start = dir > 0 ? sel.$to : sel.$from, mustMove = sel.empty;
-            if (sel instanceof TextSelection) {
-                if (!view.endOfTextblock(dirStr) || $start.depth == 0)
-                    return false;
-                mustMove = false;
-                $start = state.doc.resolve(dir > 0 ? $start.after() : $start.before());
-            }
-            let $found = GapCursor.findGapCursorFrom($start, dir, mustMove);
-            if (!$found)
-                return false;
-            if (dispatch)
-                dispatch(state.tr.setSelection(new GapCursor($found)));
-            return true;
-        };
-    }
-    function handleClick(view, pos, event) {
-        if (!view || !view.editable)
-            return false;
-        let $pos = view.state.doc.resolve(pos);
-        if (!GapCursor.valid($pos))
-            return false;
-        let clickPos = view.posAtCoords({ left: event.clientX, top: event.clientY });
-        if (clickPos && clickPos.inside > -1 && NodeSelection.isSelectable(view.state.doc.nodeAt(clickPos.inside)))
-            return false;
-        view.dispatch(view.state.tr.setSelection(new GapCursor($pos)));
-        return true;
-    }
-    // This is a hack that, when a composition starts while a gap cursor
-    // is active, quickly creates an inline context for the composition to
-    // happen in, to avoid it being aborted by the DOM selection being
-    // moved into a valid position.
-    function beforeinput(view, event) {
-        if (event.inputType != "insertCompositionText" || !(view.state.selection instanceof GapCursor))
-            return false;
-        let { $from } = view.state.selection;
-        let insert = $from.parent.contentMatchAt($from.index()).findWrapping(view.state.schema.nodes.text);
-        if (!insert)
-            return false;
-        let frag = Fragment.empty;
-        for (let i = insert.length - 1; i >= 0; i--)
-            frag = Fragment.from(insert[i].createAndFill(null, frag));
-        let tr = view.state.tr.replace($from.pos, $from.pos, new Slice(frag, 0, 0));
-        tr.setSelection(TextSelection.near(tr.doc.resolve($from.pos + 1)));
-        view.dispatch(tr);
-        return false;
-    }
-    function drawGapCursor(state) {
-        if (!(state.selection instanceof GapCursor))
-            return null;
-        let node = document.createElement("div");
-        node.className = "ProseMirror-gapcursor";
-        return DecorationSet.create(state.doc, [Decoration.widget(state.selection.head, node, { key: "gapcursor" })]);
-    }
-
-    /**
-     * This extension allows you to add a gap cursor to your editor.
-     * A gap cursor is a cursor that appears when you click on a place
-     * where no content is present, for example inbetween nodes.
-     * @see https://tiptap.dev/api/extensions/gapcursor
-     */
-    const Gapcursor = Extension.create({
-        name: 'gapCursor',
-        addProseMirrorPlugins() {
-            return [
-                gapCursor(),
-            ];
-        },
-        extendNodeSchema(extension) {
-            var _a;
-            const context = {
-                name: extension.name,
-                options: extension.options,
-                storage: extension.storage,
-            };
-            return {
-                allowGapCursor: (_a = callOrReturn(getExtensionField(extension, 'allowGapCursor', context))) !== null && _a !== void 0 ? _a : null,
-            };
-        },
-    });
-
-    /**
-     * This extension allows you to insert hard breaks.
-     * @see https://www.tiptap.dev/api/nodes/hard-break
-     */
-    const HardBreak = Node.create({
-        name: 'hardBreak',
-        addOptions() {
-            return {
-                keepMarks: true,
-                HTMLAttributes: {},
-            };
-        },
-        inline: true,
-        group: 'inline',
-        selectable: false,
-        parseHTML() {
-            return [
-                { tag: 'br' },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['br', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes)];
-        },
-        renderText() {
-            return '\n';
-        },
-        addCommands() {
-            return {
-                setHardBreak: () => ({ commands, chain, state, editor, }) => {
-                    return commands.first([
-                        () => commands.exitCode(),
-                        () => commands.command(() => {
-                            const { selection, storedMarks } = state;
-                            if (selection.$from.parent.type.spec.isolating) {
-                                return false;
-                            }
-                            const { keepMarks } = this.options;
-                            const { splittableMarks } = editor.extensionManager;
-                            const marks = storedMarks
-                                || (selection.$to.parentOffset && selection.$from.marks());
-                            return chain()
-                                .insertContent({ type: this.name })
-                                .command(({ tr, dispatch }) => {
-                                if (dispatch && marks && keepMarks) {
-                                    const filteredMarks = marks
-                                        .filter(mark => splittableMarks.includes(mark.type.name));
-                                    tr.ensureMarks(filteredMarks);
-                                }
-                                return true;
-                            })
-                                .run();
-                        }),
-                    ]);
-                },
-            };
-        },
-        addKeyboardShortcuts() {
-            return {
-                'Mod-Enter': () => this.editor.commands.setHardBreak(),
-                'Shift-Enter': () => this.editor.commands.setHardBreak(),
-            };
-        },
-    });
-
-    /**
-     * This extension allows you to create headings.
-     * @see https://www.tiptap.dev/api/nodes/heading
-     */
-    const Heading = Node.create({
-        name: 'heading',
-        addOptions() {
-            return {
-                levels: [1, 2, 3, 4, 5, 6],
-                HTMLAttributes: {},
-            };
-        },
-        content: 'inline*',
-        group: 'block',
-        defining: true,
-        addAttributes() {
-            return {
-                level: {
-                    default: 1,
-                    rendered: false,
-                },
-            };
-        },
-        parseHTML() {
-            return this.options.levels
-                .map((level) => ({
-                tag: `h${level}`,
-                attrs: { level },
-            }));
-        },
-        renderHTML({ node, HTMLAttributes }) {
-            const hasLevel = this.options.levels.includes(node.attrs.level);
-            const level = hasLevel
-                ? node.attrs.level
-                : this.options.levels[0];
-            return [`h${level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                setHeading: attributes => ({ commands }) => {
-                    if (!this.options.levels.includes(attributes.level)) {
-                        return false;
-                    }
-                    return commands.setNode(this.name, attributes);
-                },
-                toggleHeading: attributes => ({ commands }) => {
-                    if (!this.options.levels.includes(attributes.level)) {
-                        return false;
-                    }
-                    return commands.toggleNode(this.name, 'paragraph', attributes);
-                },
-            };
-        },
-        addKeyboardShortcuts() {
-            return this.options.levels.reduce((items, level) => ({
-                ...items,
-                ...{
-                    [`Mod-Alt-${level}`]: () => this.editor.commands.toggleHeading({ level }),
-                },
-            }), {});
-        },
-        addInputRules() {
-            return this.options.levels.map(level => {
-                return textblockTypeInputRule({
-                    find: new RegExp(`^(#{1,${level}})\\s$`),
-                    type: this.type,
-                    getAttributes: {
-                        level,
-                    },
-                });
-            });
-        },
-    });
-
-    var GOOD_LEAF_SIZE = 200;
-
-    // :: class<T> A rope sequence is a persistent sequence data structure
-    // that supports appending, prepending, and slicing without doing a
-    // full copy. It is represented as a mostly-balanced tree.
-    var RopeSequence = function RopeSequence () {};
-
-    RopeSequence.prototype.append = function append (other) {
-      if (!other.length) { return this }
-      other = RopeSequence.from(other);
-
-      return (!this.length && other) ||
-        (other.length < GOOD_LEAF_SIZE && this.leafAppend(other)) ||
-        (this.length < GOOD_LEAF_SIZE && other.leafPrepend(this)) ||
-        this.appendInner(other)
-    };
-
-    // :: (union<[T], RopeSequence<T>>) → RopeSequence<T>
-    // Prepend an array or other rope to this one, returning a new rope.
-    RopeSequence.prototype.prepend = function prepend (other) {
-      if (!other.length) { return this }
-      return RopeSequence.from(other).append(this)
-    };
-
-    RopeSequence.prototype.appendInner = function appendInner (other) {
-      return new Append(this, other)
-    };
-
-    // :: (?number, ?number) → RopeSequence<T>
-    // Create a rope repesenting a sub-sequence of this rope.
-    RopeSequence.prototype.slice = function slice (from, to) {
-        if ( from === void 0 ) from = 0;
-        if ( to === void 0 ) to = this.length;
-
-      if (from >= to) { return RopeSequence.empty }
-      return this.sliceInner(Math.max(0, from), Math.min(this.length, to))
-    };
-
-    // :: (number) → T
-    // Retrieve the element at the given position from this rope.
-    RopeSequence.prototype.get = function get (i) {
-      if (i < 0 || i >= this.length) { return undefined }
-      return this.getInner(i)
-    };
-
-    // :: ((element: T, index: number) → ?bool, ?number, ?number)
-    // Call the given function for each element between the given
-    // indices. This tends to be more efficient than looping over the
-    // indices and calling `get`, because it doesn't have to descend the
-    // tree for every element.
-    RopeSequence.prototype.forEach = function forEach (f, from, to) {
-        if ( from === void 0 ) from = 0;
-        if ( to === void 0 ) to = this.length;
-
-      if (from <= to)
-        { this.forEachInner(f, from, to, 0); }
-      else
-        { this.forEachInvertedInner(f, from, to, 0); }
-    };
-
-    // :: ((element: T, index: number) → U, ?number, ?number) → [U]
-    // Map the given functions over the elements of the rope, producing
-    // a flat array.
-    RopeSequence.prototype.map = function map (f, from, to) {
-        if ( from === void 0 ) from = 0;
-        if ( to === void 0 ) to = this.length;
-
-      var result = [];
-      this.forEach(function (elt, i) { return result.push(f(elt, i)); }, from, to);
-      return result
-    };
-
-    // :: (?union<[T], RopeSequence<T>>) → RopeSequence<T>
-    // Create a rope representing the given array, or return the rope
-    // itself if a rope was given.
-    RopeSequence.from = function from (values) {
-      if (values instanceof RopeSequence) { return values }
-      return values && values.length ? new Leaf(values) : RopeSequence.empty
-    };
-
-    var Leaf = /*@__PURE__*/(function (RopeSequence) {
-      function Leaf(values) {
-        RopeSequence.call(this);
-        this.values = values;
-      }
-
-      if ( RopeSequence ) Leaf.__proto__ = RopeSequence;
-      Leaf.prototype = Object.create( RopeSequence && RopeSequence.prototype );
-      Leaf.prototype.constructor = Leaf;
-
-      var prototypeAccessors = { length: { configurable: true },depth: { configurable: true } };
-
-      Leaf.prototype.flatten = function flatten () {
-        return this.values
-      };
-
-      Leaf.prototype.sliceInner = function sliceInner (from, to) {
-        if (from == 0 && to == this.length) { return this }
-        return new Leaf(this.values.slice(from, to))
-      };
-
-      Leaf.prototype.getInner = function getInner (i) {
-        return this.values[i]
-      };
-
-      Leaf.prototype.forEachInner = function forEachInner (f, from, to, start) {
-        for (var i = from; i < to; i++)
-          { if (f(this.values[i], start + i) === false) { return false } }
-      };
-
-      Leaf.prototype.forEachInvertedInner = function forEachInvertedInner (f, from, to, start) {
-        for (var i = from - 1; i >= to; i--)
-          { if (f(this.values[i], start + i) === false) { return false } }
-      };
-
-      Leaf.prototype.leafAppend = function leafAppend (other) {
-        if (this.length + other.length <= GOOD_LEAF_SIZE)
-          { return new Leaf(this.values.concat(other.flatten())) }
-      };
-
-      Leaf.prototype.leafPrepend = function leafPrepend (other) {
-        if (this.length + other.length <= GOOD_LEAF_SIZE)
-          { return new Leaf(other.flatten().concat(this.values)) }
-      };
-
-      prototypeAccessors.length.get = function () { return this.values.length };
-
-      prototypeAccessors.depth.get = function () { return 0 };
-
-      Object.defineProperties( Leaf.prototype, prototypeAccessors );
-
-      return Leaf;
-    }(RopeSequence));
-
-    // :: RopeSequence
-    // The empty rope sequence.
-    RopeSequence.empty = new Leaf([]);
-
-    var Append = /*@__PURE__*/(function (RopeSequence) {
-      function Append(left, right) {
-        RopeSequence.call(this);
-        this.left = left;
-        this.right = right;
-        this.length = left.length + right.length;
-        this.depth = Math.max(left.depth, right.depth) + 1;
-      }
-
-      if ( RopeSequence ) Append.__proto__ = RopeSequence;
-      Append.prototype = Object.create( RopeSequence && RopeSequence.prototype );
-      Append.prototype.constructor = Append;
-
-      Append.prototype.flatten = function flatten () {
-        return this.left.flatten().concat(this.right.flatten())
-      };
-
-      Append.prototype.getInner = function getInner (i) {
-        return i < this.left.length ? this.left.get(i) : this.right.get(i - this.left.length)
-      };
-
-      Append.prototype.forEachInner = function forEachInner (f, from, to, start) {
-        var leftLen = this.left.length;
-        if (from < leftLen &&
-            this.left.forEachInner(f, from, Math.min(to, leftLen), start) === false)
-          { return false }
-        if (to > leftLen &&
-            this.right.forEachInner(f, Math.max(from - leftLen, 0), Math.min(this.length, to) - leftLen, start + leftLen) === false)
-          { return false }
-      };
-
-      Append.prototype.forEachInvertedInner = function forEachInvertedInner (f, from, to, start) {
-        var leftLen = this.left.length;
-        if (from > leftLen &&
-            this.right.forEachInvertedInner(f, from - leftLen, Math.max(to, leftLen) - leftLen, start + leftLen) === false)
-          { return false }
-        if (to < leftLen &&
-            this.left.forEachInvertedInner(f, Math.min(from, leftLen), to, start) === false)
-          { return false }
-      };
-
-      Append.prototype.sliceInner = function sliceInner (from, to) {
-        if (from == 0 && to == this.length) { return this }
-        var leftLen = this.left.length;
-        if (to <= leftLen) { return this.left.slice(from, to) }
-        if (from >= leftLen) { return this.right.slice(from - leftLen, to - leftLen) }
-        return this.left.slice(from, leftLen).append(this.right.slice(0, to - leftLen))
-      };
-
-      Append.prototype.leafAppend = function leafAppend (other) {
-        var inner = this.right.leafAppend(other);
-        if (inner) { return new Append(this.left, inner) }
-      };
-
-      Append.prototype.leafPrepend = function leafPrepend (other) {
-        var inner = this.left.leafPrepend(other);
-        if (inner) { return new Append(inner, this.right) }
-      };
-
-      Append.prototype.appendInner = function appendInner (other) {
-        if (this.left.depth >= Math.max(this.right.depth, other.depth) + 1)
-          { return new Append(this.left, new Append(this.right, other)) }
-        return new Append(this, other)
-      };
-
-      return Append;
-    }(RopeSequence));
-
-    // ProseMirror's history isn't simply a way to roll back to a previous
-    // state, because ProseMirror supports applying changes without adding
-    // them to the history (for example during collaboration).
-    //
-    // To this end, each 'Branch' (one for the undo history and one for
-    // the redo history) keeps an array of 'Items', which can optionally
-    // hold a step (an actual undoable change), and always hold a position
-    // map (which is needed to move changes below them to apply to the
-    // current document).
-    //
-    // An item that has both a step and a selection bookmark is the start
-    // of an 'event' — a group of changes that will be undone or redone at
-    // once. (It stores only the bookmark, since that way we don't have to
-    // provide a document until the selection is actually applied, which
-    // is useful when compressing.)
-    // Used to schedule history compression
-    const max_empty_items = 500;
-    class Branch {
-        constructor(items, eventCount) {
-            this.items = items;
-            this.eventCount = eventCount;
-        }
-        // Pop the latest event off the branch's history and apply it
-        // to a document transform.
-        popEvent(state, preserveItems) {
-            if (this.eventCount == 0)
-                return null;
-            let end = this.items.length;
-            for (;; end--) {
-                let next = this.items.get(end - 1);
-                if (next.selection) {
-                    --end;
-                    break;
-                }
-            }
-            let remap, mapFrom;
-            if (preserveItems) {
-                remap = this.remapping(end, this.items.length);
-                mapFrom = remap.maps.length;
-            }
-            let transform = state.tr;
-            let selection, remaining;
-            let addAfter = [], addBefore = [];
-            this.items.forEach((item, i) => {
-                if (!item.step) {
-                    if (!remap) {
-                        remap = this.remapping(end, i + 1);
-                        mapFrom = remap.maps.length;
-                    }
-                    mapFrom--;
-                    addBefore.push(item);
-                    return;
-                }
-                if (remap) {
-                    addBefore.push(new Item(item.map));
-                    let step = item.step.map(remap.slice(mapFrom)), map;
-                    if (step && transform.maybeStep(step).doc) {
-                        map = transform.mapping.maps[transform.mapping.maps.length - 1];
-                        addAfter.push(new Item(map, undefined, undefined, addAfter.length + addBefore.length));
-                    }
-                    mapFrom--;
-                    if (map)
-                        remap.appendMap(map, mapFrom);
-                }
-                else {
-                    transform.maybeStep(item.step);
-                }
-                if (item.selection) {
-                    selection = remap ? item.selection.map(remap.slice(mapFrom)) : item.selection;
-                    remaining = new Branch(this.items.slice(0, end).append(addBefore.reverse().concat(addAfter)), this.eventCount - 1);
-                    return false;
-                }
-            }, this.items.length, 0);
-            return { remaining: remaining, transform, selection: selection };
-        }
-        // Create a new branch with the given transform added.
-        addTransform(transform, selection, histOptions, preserveItems) {
-            let newItems = [], eventCount = this.eventCount;
-            let oldItems = this.items, lastItem = !preserveItems && oldItems.length ? oldItems.get(oldItems.length - 1) : null;
-            for (let i = 0; i < transform.steps.length; i++) {
-                let step = transform.steps[i].invert(transform.docs[i]);
-                let item = new Item(transform.mapping.maps[i], step, selection), merged;
-                if (merged = lastItem && lastItem.merge(item)) {
-                    item = merged;
-                    if (i)
-                        newItems.pop();
-                    else
-                        oldItems = oldItems.slice(0, oldItems.length - 1);
-                }
-                newItems.push(item);
-                if (selection) {
-                    eventCount++;
-                    selection = undefined;
-                }
-                if (!preserveItems)
-                    lastItem = item;
-            }
-            let overflow = eventCount - histOptions.depth;
-            if (overflow > DEPTH_OVERFLOW) {
-                oldItems = cutOffEvents(oldItems, overflow);
-                eventCount -= overflow;
-            }
-            return new Branch(oldItems.append(newItems), eventCount);
-        }
-        remapping(from, to) {
-            let maps = new Mapping;
-            this.items.forEach((item, i) => {
-                let mirrorPos = item.mirrorOffset != null && i - item.mirrorOffset >= from
-                    ? maps.maps.length - item.mirrorOffset : undefined;
-                maps.appendMap(item.map, mirrorPos);
-            }, from, to);
-            return maps;
-        }
-        addMaps(array) {
-            if (this.eventCount == 0)
-                return this;
-            return new Branch(this.items.append(array.map(map => new Item(map))), this.eventCount);
-        }
-        // When the collab module receives remote changes, the history has
-        // to know about those, so that it can adjust the steps that were
-        // rebased on top of the remote changes, and include the position
-        // maps for the remote changes in its array of items.
-        rebased(rebasedTransform, rebasedCount) {
-            if (!this.eventCount)
-                return this;
-            let rebasedItems = [], start = Math.max(0, this.items.length - rebasedCount);
-            let mapping = rebasedTransform.mapping;
-            let newUntil = rebasedTransform.steps.length;
-            let eventCount = this.eventCount;
-            this.items.forEach(item => { if (item.selection)
-                eventCount--; }, start);
-            let iRebased = rebasedCount;
-            this.items.forEach(item => {
-                let pos = mapping.getMirror(--iRebased);
-                if (pos == null)
-                    return;
-                newUntil = Math.min(newUntil, pos);
-                let map = mapping.maps[pos];
-                if (item.step) {
-                    let step = rebasedTransform.steps[pos].invert(rebasedTransform.docs[pos]);
-                    let selection = item.selection && item.selection.map(mapping.slice(iRebased + 1, pos));
-                    if (selection)
-                        eventCount++;
-                    rebasedItems.push(new Item(map, step, selection));
-                }
-                else {
-                    rebasedItems.push(new Item(map));
-                }
-            }, start);
-            let newMaps = [];
-            for (let i = rebasedCount; i < newUntil; i++)
-                newMaps.push(new Item(mapping.maps[i]));
-            let items = this.items.slice(0, start).append(newMaps).append(rebasedItems);
-            let branch = new Branch(items, eventCount);
-            if (branch.emptyItemCount() > max_empty_items)
-                branch = branch.compress(this.items.length - rebasedItems.length);
-            return branch;
-        }
-        emptyItemCount() {
-            let count = 0;
-            this.items.forEach(item => { if (!item.step)
-                count++; });
-            return count;
-        }
-        // Compressing a branch means rewriting it to push the air (map-only
-        // items) out. During collaboration, these naturally accumulate
-        // because each remote change adds one. The `upto` argument is used
-        // to ensure that only the items below a given level are compressed,
-        // because `rebased` relies on a clean, untouched set of items in
-        // order to associate old items with rebased steps.
-        compress(upto = this.items.length) {
-            let remap = this.remapping(0, upto), mapFrom = remap.maps.length;
-            let items = [], events = 0;
-            this.items.forEach((item, i) => {
-                if (i >= upto) {
-                    items.push(item);
-                    if (item.selection)
-                        events++;
-                }
-                else if (item.step) {
-                    let step = item.step.map(remap.slice(mapFrom)), map = step && step.getMap();
-                    mapFrom--;
-                    if (map)
-                        remap.appendMap(map, mapFrom);
-                    if (step) {
-                        let selection = item.selection && item.selection.map(remap.slice(mapFrom));
-                        if (selection)
-                            events++;
-                        let newItem = new Item(map.invert(), step, selection), merged, last = items.length - 1;
-                        if (merged = items.length && items[last].merge(newItem))
-                            items[last] = merged;
-                        else
-                            items.push(newItem);
-                    }
-                }
-                else if (item.map) {
-                    mapFrom--;
-                }
-            }, this.items.length, 0);
-            return new Branch(RopeSequence.from(items.reverse()), events);
-        }
-    }
-    Branch.empty = new Branch(RopeSequence.empty, 0);
-    function cutOffEvents(items, n) {
-        let cutPoint;
-        items.forEach((item, i) => {
-            if (item.selection && (n-- == 0)) {
-                cutPoint = i;
-                return false;
-            }
-        });
-        return items.slice(cutPoint);
-    }
-    class Item {
-        constructor(
-        // The (forward) step map for this item.
-        map, 
-        // The inverted step
-        step, 
-        // If this is non-null, this item is the start of a group, and
-        // this selection is the starting selection for the group (the one
-        // that was active before the first step was applied)
-        selection, 
-        // If this item is the inverse of a previous mapping on the stack,
-        // this points at the inverse's offset
-        mirrorOffset) {
-            this.map = map;
-            this.step = step;
-            this.selection = selection;
-            this.mirrorOffset = mirrorOffset;
-        }
-        merge(other) {
-            if (this.step && other.step && !other.selection) {
-                let step = other.step.merge(this.step);
-                if (step)
-                    return new Item(step.getMap().invert(), step, this.selection);
-            }
-        }
-    }
-    // The value of the state field that tracks undo/redo history for that
-    // state. Will be stored in the plugin state when the history plugin
-    // is active.
-    class HistoryState {
-        constructor(done, undone, prevRanges, prevTime, prevComposition) {
-            this.done = done;
-            this.undone = undone;
-            this.prevRanges = prevRanges;
-            this.prevTime = prevTime;
-            this.prevComposition = prevComposition;
-        }
-    }
-    const DEPTH_OVERFLOW = 20;
-    // Record a transformation in undo history.
-    function applyTransaction(history, state, tr, options) {
-        let historyTr = tr.getMeta(historyKey), rebased;
-        if (historyTr)
-            return historyTr.historyState;
-        if (tr.getMeta(closeHistoryKey))
-            history = new HistoryState(history.done, history.undone, null, 0, -1);
-        let appended = tr.getMeta("appendedTransaction");
-        if (tr.steps.length == 0) {
-            return history;
-        }
-        else if (appended && appended.getMeta(historyKey)) {
-            if (appended.getMeta(historyKey).redo)
-                return new HistoryState(history.done.addTransform(tr, undefined, options, mustPreserveItems(state)), history.undone, rangesFor(tr.mapping.maps[tr.steps.length - 1]), history.prevTime, history.prevComposition);
-            else
-                return new HistoryState(history.done, history.undone.addTransform(tr, undefined, options, mustPreserveItems(state)), null, history.prevTime, history.prevComposition);
-        }
-        else if (tr.getMeta("addToHistory") !== false && !(appended && appended.getMeta("addToHistory") === false)) {
-            // Group transforms that occur in quick succession into one event.
-            let composition = tr.getMeta("composition");
-            let newGroup = history.prevTime == 0 ||
-                (!appended && history.prevComposition != composition &&
-                    (history.prevTime < (tr.time || 0) - options.newGroupDelay || !isAdjacentTo(tr, history.prevRanges)));
-            let prevRanges = appended ? mapRanges(history.prevRanges, tr.mapping) : rangesFor(tr.mapping.maps[tr.steps.length - 1]);
-            return new HistoryState(history.done.addTransform(tr, newGroup ? state.selection.getBookmark() : undefined, options, mustPreserveItems(state)), Branch.empty, prevRanges, tr.time, composition == null ? history.prevComposition : composition);
-        }
-        else if (rebased = tr.getMeta("rebased")) {
-            // Used by the collab module to tell the history that some of its
-            // content has been rebased.
-            return new HistoryState(history.done.rebased(tr, rebased), history.undone.rebased(tr, rebased), mapRanges(history.prevRanges, tr.mapping), history.prevTime, history.prevComposition);
-        }
-        else {
-            return new HistoryState(history.done.addMaps(tr.mapping.maps), history.undone.addMaps(tr.mapping.maps), mapRanges(history.prevRanges, tr.mapping), history.prevTime, history.prevComposition);
-        }
-    }
-    function isAdjacentTo(transform, prevRanges) {
-        if (!prevRanges)
-            return false;
-        if (!transform.docChanged)
-            return true;
-        let adjacent = false;
-        transform.mapping.maps[0].forEach((start, end) => {
-            for (let i = 0; i < prevRanges.length; i += 2)
-                if (start <= prevRanges[i + 1] && end >= prevRanges[i])
-                    adjacent = true;
-        });
-        return adjacent;
-    }
-    function rangesFor(map) {
-        let result = [];
-        map.forEach((_from, _to, from, to) => result.push(from, to));
-        return result;
-    }
-    function mapRanges(ranges, mapping) {
-        if (!ranges)
-            return null;
-        let result = [];
-        for (let i = 0; i < ranges.length; i += 2) {
-            let from = mapping.map(ranges[i], 1), to = mapping.map(ranges[i + 1], -1);
-            if (from <= to)
-                result.push(from, to);
-        }
-        return result;
-    }
-    // Apply the latest event from one branch to the document and shift the event
-    // onto the other branch.
-    function histTransaction(history, state, dispatch, redo) {
-        let preserveItems = mustPreserveItems(state);
-        let histOptions = historyKey.get(state).spec.config;
-        let pop = (redo ? history.undone : history.done).popEvent(state, preserveItems);
-        if (!pop)
-            return;
-        let selection = pop.selection.resolve(pop.transform.doc);
-        let added = (redo ? history.done : history.undone).addTransform(pop.transform, state.selection.getBookmark(), histOptions, preserveItems);
-        let newHist = new HistoryState(redo ? added : pop.remaining, redo ? pop.remaining : added, null, 0, -1);
-        dispatch(pop.transform.setSelection(selection).setMeta(historyKey, { redo, historyState: newHist }).scrollIntoView());
-    }
-    let cachedPreserveItems = false, cachedPreserveItemsPlugins = null;
-    // Check whether any plugin in the given state has a
-    // `historyPreserveItems` property in its spec, in which case we must
-    // preserve steps exactly as they came in, so that they can be
-    // rebased.
-    function mustPreserveItems(state) {
-        let plugins = state.plugins;
-        if (cachedPreserveItemsPlugins != plugins) {
-            cachedPreserveItems = false;
-            cachedPreserveItemsPlugins = plugins;
-            for (let i = 0; i < plugins.length; i++)
-                if (plugins[i].spec.historyPreserveItems) {
-                    cachedPreserveItems = true;
-                    break;
-                }
-        }
-        return cachedPreserveItems;
-    }
-    const historyKey = new PluginKey("history");
-    const closeHistoryKey = new PluginKey("closeHistory");
-    /**
-    Returns a plugin that enables the undo history for an editor. The
-    plugin will track undo and redo stacks, which can be used with the
-    [`undo`](https://prosemirror.net/docs/ref/#history.undo) and [`redo`](https://prosemirror.net/docs/ref/#history.redo) commands.
-
-    You can set an `"addToHistory"` [metadata
-    property](https://prosemirror.net/docs/ref/#state.Transaction.setMeta) of `false` on a transaction
-    to prevent it from being rolled back by undo.
-    */
-    function history(config = {}) {
-        config = { depth: config.depth || 100,
-            newGroupDelay: config.newGroupDelay || 500 };
-        return new Plugin({
-            key: historyKey,
-            state: {
-                init() {
-                    return new HistoryState(Branch.empty, Branch.empty, null, 0, -1);
-                },
-                apply(tr, hist, state) {
-                    return applyTransaction(hist, state, tr, config);
-                }
-            },
-            config,
-            props: {
-                handleDOMEvents: {
-                    beforeinput(view, e) {
-                        let inputType = e.inputType;
-                        let command = inputType == "historyUndo" ? undo : inputType == "historyRedo" ? redo : null;
-                        if (!command)
-                            return false;
-                        e.preventDefault();
-                        return command(view.state, view.dispatch);
-                    }
-                }
-            }
-        });
-    }
-    /**
-    A command function that undoes the last change, if any.
-    */
-    const undo = (state, dispatch) => {
-        let hist = historyKey.getState(state);
-        if (!hist || hist.done.eventCount == 0)
-            return false;
-        if (dispatch)
-            histTransaction(hist, state, dispatch, false);
-        return true;
-    };
-    /**
-    A command function that redoes the last undone change, if any.
-    */
-    const redo = (state, dispatch) => {
-        let hist = historyKey.getState(state);
-        if (!hist || hist.undone.eventCount == 0)
-            return false;
-        if (dispatch)
-            histTransaction(hist, state, dispatch, true);
-        return true;
-    };
-
-    /**
-     * This extension allows you to undo and redo recent changes.
-     * @see https://www.tiptap.dev/api/extensions/history
-     *
-     * **Important**: If the `@tiptap/extension-collaboration` package is used, make sure to remove
-     * the `history` extension, as it is not compatible with the `collaboration` extension.
-     *
-     * `@tiptap/extension-collaboration` uses its own history implementation.
-     */
-    const History = Extension.create({
-        name: 'history',
-        addOptions() {
-            return {
-                depth: 100,
-                newGroupDelay: 500,
-            };
-        },
-        addCommands() {
-            return {
-                undo: () => ({ state, dispatch }) => {
-                    return undo(state, dispatch);
-                },
-                redo: () => ({ state, dispatch }) => {
-                    return redo(state, dispatch);
-                },
-            };
-        },
-        addProseMirrorPlugins() {
-            return [
-                history(this.options),
-            ];
-        },
-        addKeyboardShortcuts() {
-            return {
-                'Mod-z': () => this.editor.commands.undo(),
-                'Shift-Mod-z': () => this.editor.commands.redo(),
-                'Mod-y': () => this.editor.commands.redo(),
-                // Russian keyboard layouts
-                'Mod-я': () => this.editor.commands.undo(),
-                'Shift-Mod-я': () => this.editor.commands.redo(),
-            };
-        },
-    });
-
-    /**
-     * This extension allows you to create list items.
-     * @see https://www.tiptap.dev/api/nodes/list-item
-     */
-    const ListItem$1 = Node.create({
-        name: 'listItem',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-                bulletListTypeName: 'bulletList',
-                orderedListTypeName: 'orderedList',
-            };
-        },
-        content: 'paragraph block*',
-        defining: true,
-        parseHTML() {
-            return [
-                {
-                    tag: 'li',
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addKeyboardShortcuts() {
-            return {
-                Enter: () => this.editor.commands.splitListItem(this.name),
-                Tab: () => this.editor.commands.sinkListItem(this.name),
-                'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
-            };
-        },
-    });
-
-    /**
-     * This extension allows you to create list items.
-     * @see https://www.tiptap.dev/api/nodes/list-item
-     */
-    const ListItem = Node.create({
-        name: 'listItem',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-                bulletListTypeName: 'bulletList',
-                orderedListTypeName: 'orderedList',
-            };
-        },
-        content: 'paragraph block*',
-        defining: true,
-        parseHTML() {
-            return [
-                {
-                    tag: 'li',
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addKeyboardShortcuts() {
-            return {
-                Enter: () => this.editor.commands.splitListItem(this.name),
-                Tab: () => this.editor.commands.sinkListItem(this.name),
-                'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
-            };
-        },
-    });
-
-    /**
-     * This extension allows you to create text styles. It is required by default
-     * for the `textColor` and `backgroundColor` extensions.
-     * @see https://www.tiptap.dev/api/marks/text-style
-     */
-    const TextStyle = Mark.create({
-        name: 'textStyle',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        parseHTML() {
-            return [
-                {
-                    tag: 'span',
-                    getAttrs: element => {
-                        const hasStyles = element.hasAttribute('style');
-                        if (!hasStyles) {
-                            return false;
-                        }
-                        return {};
-                    },
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                removeEmptyTextStyle: () => ({ state, commands }) => {
-                    const attributes = getMarkAttributes(state, this.type);
-                    const hasStyles = Object.entries(attributes).some(([, value]) => !!value);
-                    if (hasStyles) {
-                        return true;
-                    }
-                    return commands.unsetMark(this.name);
-                },
-            };
-        },
-    });
-
-    /**
-     * Matches an ordered list to a 1. on input (or any number followed by a dot).
-     */
-    const inputRegex$2 = /^(\d+)\.\s$/;
-    /**
-     * This extension allows you to create ordered lists.
-     * This requires the ListItem extension
-     * @see https://www.tiptap.dev/api/nodes/ordered-list
-     * @see https://www.tiptap.dev/api/nodes/list-item
-     */
-    const OrderedList = Node.create({
-        name: 'orderedList',
-        addOptions() {
-            return {
-                itemTypeName: 'listItem',
-                HTMLAttributes: {},
-                keepMarks: false,
-                keepAttributes: false,
-            };
-        },
-        group: 'block list',
-        content() {
-            return `${this.options.itemTypeName}+`;
-        },
-        addAttributes() {
-            return {
-                start: {
-                    default: 1,
-                    parseHTML: element => {
-                        return element.hasAttribute('start')
-                            ? parseInt(element.getAttribute('start') || '', 10)
-                            : 1;
-                    },
-                },
-            };
-        },
-        parseHTML() {
-            return [
-                {
-                    tag: 'ol',
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            const { start, ...attributesWithoutStart } = HTMLAttributes;
-            return start === 1
-                ? ['ol', mergeAttributes(this.options.HTMLAttributes, attributesWithoutStart), 0]
-                : ['ol', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                toggleOrderedList: () => ({ commands, chain }) => {
-                    if (this.options.keepAttributes) {
-                        return chain().toggleList(this.name, this.options.itemTypeName, this.options.keepMarks).updateAttributes(ListItem.name, this.editor.getAttributes(TextStyle.name)).run();
-                    }
-                    return commands.toggleList(this.name, this.options.itemTypeName, this.options.keepMarks);
-                },
-            };
-        },
-        addKeyboardShortcuts() {
-            return {
-                'Mod-Shift-7': () => this.editor.commands.toggleOrderedList(),
-            };
-        },
-        addInputRules() {
-            let inputRule = wrappingInputRule({
-                find: inputRegex$2,
-                type: this.type,
-                getAttributes: match => ({ start: +match[1] }),
-                joinPredicate: (match, node) => node.childCount + node.attrs.start === +match[1],
-            });
-            if (this.options.keepMarks || this.options.keepAttributes) {
-                inputRule = wrappingInputRule({
-                    find: inputRegex$2,
-                    type: this.type,
-                    keepMarks: this.options.keepMarks,
-                    keepAttributes: this.options.keepAttributes,
-                    getAttributes: match => ({ start: +match[1], ...this.editor.getAttributes(TextStyle.name) }),
-                    joinPredicate: (match, node) => node.childCount + node.attrs.start === +match[1],
-                    editor: this.editor,
-                });
-            }
-            return [
-                inputRule,
-            ];
-        },
-    });
-
-    /**
-     * This extension allows you to create paragraphs.
-     * @see https://www.tiptap.dev/api/nodes/paragraph
-     */
-    const Paragraph = Node.create({
-        name: 'paragraph',
-        priority: 1000,
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        group: 'block',
-        content: 'inline*',
-        parseHTML() {
-            return [
-                { tag: 'p' },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['p', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                setParagraph: () => ({ commands }) => {
-                    return commands.setNode(this.name);
-                },
-            };
-        },
-        addKeyboardShortcuts() {
-            return {
-                'Mod-Alt-0': () => this.editor.commands.setParagraph(),
-            };
-        },
-    });
-
-    /**
-     * This extension allows you to add a placeholder to your editor.
-     * A placeholder is a text that appears when the editor or a node is empty.
-     * @see https://www.tiptap.dev/api/extensions/placeholder
-     */
-    const Placeholder = Extension.create({
-        name: 'placeholder',
-        addOptions() {
-            return {
-                emptyEditorClass: 'is-editor-empty',
-                emptyNodeClass: 'is-empty',
-                placeholder: 'Write something …',
-                showOnlyWhenEditable: true,
-                considerAnyAsEmpty: false,
-                showOnlyCurrent: true,
-                includeChildren: false,
-            };
-        },
-        addProseMirrorPlugins() {
-            return [
-                new Plugin({
-                    key: new PluginKey('placeholder'),
-                    props: {
-                        decorations: ({ doc, selection }) => {
-                            var _a;
-                            const active = this.editor.isEditable || !this.options.showOnlyWhenEditable;
-                            const { anchor } = selection;
-                            const decorations = [];
-                            if (!active) {
-                                return null;
-                            }
-                            // only calculate isEmpty once due to its performance impacts (see issue #3360)
-                            const { firstChild } = doc.content;
-                            const isLeaf = firstChild && firstChild.type.isLeaf;
-                            const isAtom = firstChild && firstChild.isAtom;
-                            const isValidNode = this.options.considerAnyAsEmpty
-                                ? true
-                                : firstChild && firstChild.type.name === ((_a = doc.type.contentMatch.defaultType) === null || _a === void 0 ? void 0 : _a.name);
-                            const isEmptyDoc = doc.content.childCount <= 1
-                                && firstChild
-                                && isValidNode
-                                && (firstChild.nodeSize <= 2 && (!isLeaf || !isAtom));
-                            doc.descendants((node, pos) => {
-                                const hasAnchor = anchor >= pos && anchor <= pos + node.nodeSize;
-                                const isEmpty = !node.isLeaf && !node.childCount;
-                                if ((hasAnchor || !this.options.showOnlyCurrent) && isEmpty) {
-                                    const classes = [this.options.emptyNodeClass];
-                                    if (isEmptyDoc) {
-                                        classes.push(this.options.emptyEditorClass);
-                                    }
-                                    const decoration = Decoration.node(pos, pos + node.nodeSize, {
-                                        class: classes.join(' '),
-                                        'data-placeholder': typeof this.options.placeholder === 'function'
-                                            ? this.options.placeholder({
-                                                editor: this.editor,
-                                                node,
-                                                pos,
-                                                hasAnchor,
-                                            })
-                                            : this.options.placeholder,
-                                    });
-                                    decorations.push(decoration);
-                                }
-                                return this.options.includeChildren;
-                            });
-                            return DecorationSet.create(doc, decorations);
-                        },
-                    },
-                }),
-            ];
-        },
-    });
-
-    /**
-     * Matches a strike to a ~~strike~~ on input.
-     */
-    const inputRegex$1 = /(?:^|\s)(~~(?!\s+~~)((?:[^~]+))~~(?!\s+~~))$/;
-    /**
-     * Matches a strike to a ~~strike~~ on paste.
-     */
-    const pasteRegex = /(?:^|\s)(~~(?!\s+~~)((?:[^~]+))~~(?!\s+~~))/g;
-    /**
-     * This extension allows you to create strike text.
-     * @see https://www.tiptap.dev/api/marks/strike
-     */
-    const Strike = Mark.create({
-        name: 'strike',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        parseHTML() {
-            return [
-                {
-                    tag: 's',
-                },
-                {
-                    tag: 'del',
-                },
-                {
-                    tag: 'strike',
-                },
-                {
-                    style: 'text-decoration',
-                    consuming: false,
-                    getAttrs: style => (style.includes('line-through') ? {} : false),
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['s', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                setStrike: () => ({ commands }) => {
-                    return commands.setMark(this.name);
-                },
-                toggleStrike: () => ({ commands }) => {
-                    return commands.toggleMark(this.name);
-                },
-                unsetStrike: () => ({ commands }) => {
-                    return commands.unsetMark(this.name);
-                },
-            };
-        },
-        addKeyboardShortcuts() {
-            return {
-                'Mod-Shift-s': () => this.editor.commands.toggleStrike(),
-            };
-        },
-        addInputRules() {
-            return [
-                markInputRule({
-                    find: inputRegex$1,
-                    type: this.type,
-                }),
-            ];
-        },
-        addPasteRules() {
-            return [
-                markPasteRule({
-                    find: pasteRegex,
-                    type: this.type,
-                }),
-            ];
-        },
-    });
-
-    /**
-     * This extension allows you to create text nodes.
-     * @see https://www.tiptap.dev/api/nodes/text
-     */
-    const Text$1 = Node.create({
-        name: 'text',
-        group: 'inline',
-    });
-
-    /**
-     * Matches a blockquote to a `>` as input.
-     */
-    var inputRegex = /^\s*>\s$/;
-    /**
-     * This extension allows you to create blockquotes,
-     * contains only plain text paragraph and soft break (<br>).
-     *
-     * Forked from:
-     * @see https://tiptap.dev/api/nodes/blockquote
-     */
-    var Blockquote = Node.create({
-        name: 'blockquote',
-        addOptions: function () {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        group: 'block',
-        content: 'paragraph+',
-        defining: true,
-        parseHTML: function () {
-            return [{ tag: 'blockquote' }];
-        },
-        renderHTML: function (_a) {
-            var HTMLAttributes = _a.HTMLAttributes;
-            return [
-                'blockquote',
-                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-                0,
-            ];
-        },
-        addCommands: function () {
-            var _this = this;
-            return {
-                setBlockquote: function () {
-                    return function (_a) {
-                        var commands = _a.commands;
-                        return commands.wrapIn(_this.name);
-                    };
-                },
-                toggleBlockquote: function () {
-                    return function (_a) {
-                        var commands = _a.commands;
-                        return commands.toggleWrap(_this.name);
-                    };
-                },
-                unsetBlockquote: function () {
-                    return function (_a) {
-                        var commands = _a.commands;
-                        return commands.lift(_this.name);
-                    };
-                },
-            };
-        },
-        addKeyboardShortcuts: function () {
-            var _this = this;
-            return {
-                'Mod-Shift-b': function () { return _this.editor.commands.toggleBlockquote(); },
-            };
-        },
-        addInputRules: function () {
-            return [
-                wrappingInputRule({
-                    find: inputRegex,
-                    type: this.type,
-                }),
-            ];
-        },
-        addProseMirrorPlugins: function () {
-            var _this = this;
-            return [
-                new Plugin({
-                    key: new PluginKey('restrictBlockquoteMarks'),
-                    filterTransaction: function (transaction) {
-                        // Nothing has changed, ignore it.
-                        if (!transaction.docChanged) {
-                            return true;
-                        }
-                        // Skip if not in a blockquote
-                        var $anchor = transaction.selection.$anchor;
-                        var $grandParent = $anchor.node($anchor.depth - 1);
-                        var isInBlockquote = ($grandParent === null || $grandParent === void 0 ? void 0 : $grandParent.type.name) === _this.name;
-                        if (!isInBlockquote) {
-                            return true;
-                        }
-                        // Prevent adding marks (except <br>) to blockquote
-                        var $start = $anchor.start($anchor.depth - 1);
-                        var $end = $anchor.end($anchor.depth - 1);
-                        transaction.removeMark($start, $end);
-                        return true;
-                    },
-                }),
-            ];
-        },
-    });
-
-    var italicStarInputRegex = /(?:^|\s)((?:\*)((?:[^*]+))(?:\*))$/;
-    var italicStarPasteRegex = /(?:^|\s)((?:\*)((?:[^*]+))(?:\*))/g;
-    var italicUnderscoreInputRegex = /(?:^|\s)((?:_)((?:[^_]+))(?:_))$/;
-    var italicUnderscorePasteRegex = /(?:^|\s)((?:_)((?:[^_]+))(?:_))/g;
-    var boldStarInputRegex = /(?:^|\s)((?:\*\*)((?:[^*]+))(?:\*\*))$/;
-    var boldStarPasteRegex = /(?:^|\s)((?:\*\*)((?:[^*]+))(?:\*\*))/g;
-    var boldUnderscoreInputRegex = /(?:^|\s)((?:__)((?:[^__]+))(?:__))$/;
-    var boldUnderscorePasteRegex = /(?:^|\s)((?:__)((?:[^__]+))(?:__))/g;
-    var Bold = Mark.create({
-        name: 'bold',
-        addOptions: function () {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        parseHTML: function () {
-            return [
-                // bold
-                {
-                    tag: 'strong',
-                },
-                {
-                    tag: 'b',
-                    getAttrs: function (node) {
-                        return node.style.fontWeight !== 'normal' && null;
-                    },
-                },
-                {
-                    style: 'font-weight',
-                    getAttrs: function (value) {
-                        return /^(bold(er)?|[5-9]\d{2,})$/.test(value) && null;
-                    },
-                },
-                // italic
-                {
-                    tag: 'em',
-                },
-                {
-                    tag: 'i',
-                    getAttrs: function (node) {
-                        return node.style.fontStyle !== 'normal' && null;
-                    },
-                },
-                {
-                    style: 'font-style=italic',
-                },
-                // underline
-                {
-                    tag: 'u',
-                },
-                {
-                    style: 'text-decoration',
-                    consuming: false,
-                    getAttrs: function (style) {
-                        return style.includes('underline') ? {} : false;
-                    },
-                },
-            ];
-        },
-        renderHTML: function (_a) {
-            var HTMLAttributes = _a.HTMLAttributes;
-            return [
-                'strong',
-                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-                0,
-            ];
-        },
-        addCommands: function () {
-            var _this = this;
-            return {
-                setBold: function () {
-                    return function (_a) {
-                        var commands = _a.commands;
-                        return commands.setMark(_this.name);
-                    };
-                },
-                toggleBold: function () {
-                    return function (_a) {
-                        var commands = _a.commands;
-                        return commands.toggleMark(_this.name);
-                    };
-                },
-                unsetBold: function () {
-                    return function (_a) {
-                        var commands = _a.commands;
-                        return commands.unsetMark(_this.name);
-                    };
-                },
-            };
-        },
-        addKeyboardShortcuts: function () {
-            var _this = this;
-            return {
-                // bold
-                'Mod-b': function () { return _this.editor.commands.toggleBold(); },
-                'Mod-B': function () { return _this.editor.commands.toggleBold(); },
-                // italic
-                'Mod-i': function () { return _this.editor.commands.toggleBold(); },
-                'Mod-I': function () { return _this.editor.commands.toggleBold(); },
-                // underline
-                'Mod-u': function () { return _this.editor.commands.toggleBold(); },
-                'Mod-U': function () { return _this.editor.commands.toggleBold(); },
-            };
-        },
-        addInputRules: function () {
-            return [
-                // bold
-                markInputRule({
-                    find: boldStarInputRegex,
-                    type: this.type,
-                }),
-                markInputRule({
-                    find: boldUnderscoreInputRegex,
-                    type: this.type,
-                }),
-                // italic
-                markInputRule({
-                    find: italicStarInputRegex,
-                    type: this.type,
-                }),
-                markInputRule({
-                    find: italicUnderscoreInputRegex,
-                    type: this.type,
-                }),
-                // underline
-            ];
-        },
-        addPasteRules: function () {
-            return [
-                // bold
-                markPasteRule({
-                    find: boldStarPasteRegex,
-                    type: this.type,
-                }),
-                markPasteRule({
-                    find: boldUnderscorePasteRegex,
-                    type: this.type,
-                }),
-                // italic
-                markPasteRule({
-                    find: italicStarPasteRegex,
-                    type: this.type,
-                }),
-                markPasteRule({
-                    find: italicUnderscorePasteRegex,
-                    type: this.type,
-                }),
-                // underline
-            ];
-        },
-    });
-
-    var pluginName$2 = 'figureAudio';
-    var FigureAudio = Node.create({
-        name: pluginName$2,
-        group: 'block',
-        content: 'text*',
-        draggable: true,
-        isolating: true,
-        // disallows all marks for figcaption
-        marks: '',
-        addAttributes: function () {
-            return {
-                src: {
-                    default: null,
-                    parseHTML: function (element) { var _a; return (_a = element.querySelector('source')) === null || _a === void 0 ? void 0 : _a.getAttribute('src'); },
-                },
-                title: {
-                    default: '',
-                    parseHTML: function (element) { var _a; return (_a = element.querySelector('.title')) === null || _a === void 0 ? void 0 : _a.textContent; },
-                },
-            };
-        },
-        parseHTML: function () {
-            return [
-                {
-                    tag: 'figure[class="audio"]',
-                    contentElement: 'figcaption',
-                },
-            ];
-        },
-        renderHTML: function (_a) {
-            var HTMLAttributes = _a.HTMLAttributes;
-            return [
-                'figure',
-                { class: 'audio' },
-                [
-                    'audio',
-                    {
-                        controls: true,
-                        // for backward compatibility
-                        // can be removed when fully switch to new editor
-                        'data-file-name': HTMLAttributes.title,
-                    },
-                    [
-                        'source',
-                        {
-                            src: HTMLAttributes.src,
-                            type: 'audio/mp3',
-                            draggable: false,
-                            contenteditable: false,
-                        },
-                    ],
-                ],
-                [
-                    'div',
-                    { class: 'player' },
-                    [
-                        'header',
-                        [
-                            'div',
-                            { class: 'meta' },
-                            ['h4', { class: 'title' }, HTMLAttributes.title],
-                            [
-                                'div',
-                                { class: 'time' },
-                                ['span', { class: 'current', 'data-time': '00:00' }],
-                                ['span', { class: 'duration', 'data-time': '--:--' }],
-                            ],
-                        ],
-                        ['span', { class: 'play' }],
-                    ],
-                    ['footer', ['div', { class: 'progress-bar' }, ['span', {}]]],
-                ],
-                ['figcaption', 0],
-            ];
-        },
-        addCommands: function () {
-            var _this = this;
-            return {
-                setFigureAudio: function (_a) {
-                    var caption = _a.caption, position = _a.position, attrs = __rest(_a, ["caption", "position"]);
-                    return function (_a) {
-                        var chain = _a.chain;
-                        var insertContent = [
-                            {
-                                type: _this.name,
-                                attrs: attrs,
-                                content: caption ? [{ type: 'text', text: caption }] : [],
-                            },
-                            {
-                                type: 'paragraph',
-                            },
-                        ];
-                        if (!position) {
-                            return chain().insertContent(insertContent).focus().run();
-                        }
-                        return chain().insertContentAt(position, insertContent).focus().run();
-                    };
-                },
-            };
-        },
-        addProseMirrorPlugins: function () {
-            return [
-                new Plugin({
-                    key: new PluginKey('removePastedFigureAudio'),
-                    props: {
-                        handleKeyDown: function (view, event) {
-                            var _a, _b;
-                            var isBackSpace = event.key.toLowerCase() === 'backspace';
-                            var isEnter = event.key.toLowerCase() === 'enter';
-                            if (!isBackSpace && !isEnter) {
-                                return;
-                            }
-                            var anchorParent = view.state.selection.$anchor.parent;
-                            var isCurrentPlugin = anchorParent.type.name === pluginName$2;
-                            var isEmptyFigcaption = anchorParent.content.size <= 0;
-                            if (!isCurrentPlugin) {
-                                return;
-                            }
-                            // @ts-expect-error
-                            var editor = view.dom.editor;
-                            // backSpace to remove if the figcaption is empty
-                            if (isBackSpace && isEmptyFigcaption) {
-                                // FIXME: setTimeOut to avoid repetitive deletion
-                                setTimeout(function () {
-                                    editor.commands.deleteNode(pluginName$2);
-                                });
-                                return;
-                            }
-                            // insert a new paragraph
-                            if (isEnter) {
-                                var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
-                                var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
-                                // skip if figcaption text is selected
-                                // or has text after current selection
-                                if ($from !== $to_1 || isTextAfter) {
-                                    return;
-                                }
-                                // FIXME: setTimeOut to avoid repetitive paragraph insertion
-                                setTimeout(function () {
-                                    editor.commands.insertContentAt($to_1.pos + 1, {
-                                        type: 'paragraph',
-                                    });
-                                });
-                            }
-                        },
-                        transformPastedHTML: function (html) {
-                            // remove
-                            html = html
-                                .replace(/\n/g, '')
-                                .replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '');
-                            return html;
-                        },
-                    },
-                }),
-            ];
-        },
-    });
-
-    var Provider;
-    (function (Provider) {
-        Provider["YouTube"] = "youtube";
-        Provider["Vimeo"] = "vimeo";
-        Provider["Bilibili"] = "bilibili";
-        // Twitter = 'twitter',
-        Provider["Instagram"] = "instagram";
-        Provider["JSFiddle"] = "jsfiddle";
-        Provider["CodePen"] = "codepen";
-    })(Provider || (Provider = {}));
-    var normalizeEmbedURL = function (url) {
-        var _a;
-        var fallbackReturn = {
-            url: '',
-            allowfullscreen: false,
-            sandbox: [],
-        };
-        var inputUrl;
-        try {
-            inputUrl = new URL(url);
-        }
-        catch (e) {
-            return fallbackReturn;
-        }
-        var hostname = inputUrl.hostname, pathname = inputUrl.pathname, searchParams = inputUrl.searchParams;
-        // if (!hostname) {
-        //   throw
-        // }
-        /**
-         * YouTube
-         *
-         * URL:
-         *   - https://www.youtube.com/watch?v=ARJ8cAGm6JE
-         *   - https://www.youtube.com/embed/ARJ8cAGm6JE
-         *   - https://youtu.be/ARJ8cAGm6JE
-         *
-         * Params:
-         *   - t=123 for start time
-         *   - v=ARJ8cAGm6JE for video id
-         */
-        var isYouTube = [
-            'youtube.com',
-            'youtu.be',
-            'www.youtu.be',
-            'www.youtube.com',
-        ].includes(hostname);
-        if (isYouTube) {
-            var v = searchParams.get('v');
-            var t = (_a = searchParams.get('t')) !== null && _a !== void 0 ? _a : searchParams.get('start');
-            var qs = new URLSearchParams(__assign$2({ rel: '0' }, (t ? { start: t } : {}))).toString();
-            var id = '';
-            if (v) {
-                id = v;
-            }
-            else if (pathname.match('/embed/')) {
-                id = pathname.split('/embed/')[1];
-            }
-            else if (hostname.includes('youtu.be')) {
-                id = pathname.split('/')[1];
-            }
-            return {
-                url: "https://www.youtube.com/embed/".concat(id) + (qs ? "?".concat(qs) : ''),
-                provider: Provider.YouTube,
-                allowfullscreen: true,
-                sandbox: [],
-            };
-        }
-        /**
-         * Vimeo
-         *
-         * URL:
-         *   - https://vimeo.com/332732612
-         *   - https://player.vimeo.com/video/332732612
-         */
-        var isVimeo = ['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'].includes(hostname);
-        if (isVimeo) {
-            var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
-            return {
-                url: "https://player.vimeo.com/video/".concat(id),
-                provider: Provider.Vimeo,
-                allowfullscreen: true,
-                sandbox: [],
-            };
-        }
-        /**
-         * bilibili
-         *
-         * URL:
-         *   - https://www.bilibili.com/video/BV1bW411n7fY/
-         *   - https://www.bilibili.com/BV1bW411n7fY/
-         *   - https://player.bilibili.com/player.html?bvid=BV1bW411n7fY
-         *
-         * Params:
-         *   - bvid=BV1bW411n7fY for video id
-         */
-        var isBilibili = [
-            'bilibili.com',
-            'player.bilibili.com',
-            'www.bilibili.com',
-        ].includes(hostname);
-        if (isBilibili) {
-            var bvid = searchParams.get('bvid');
-            var id = '';
-            if (bvid) {
-                id = bvid;
-            }
-            else {
-                id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
-            }
-            return {
-                url: "https://player.bilibili.com/player.html?bvid=".concat(id, "&autoplay=0"),
-                // url: `https://player.bilibili.com/player.html?bvid=${id}`,
-                provider: Provider.Bilibili,
-                allowfullscreen: true,
-                sandbox: [],
-            };
-        }
-        // Twitter
-        /**
-         * Instagram
-         *
-         * URL:
-         *   - https://www.instagram.com/p/CkszmehL4hF/
-         */
-        var isInstagram = ['instagram.com', 'www.instagram.com'].includes(hostname);
-        if (isInstagram) {
-            var id = pathname
-                .replace('/embed', '')
-                .replace(/\/$/, '')
-                .split('/')
-                .slice(-1)[0];
-            return {
-                url: "https://www.instagram.com/p/".concat(id, "/embed"),
-                provider: Provider.Instagram,
-                allowfullscreen: false,
-                sandbox: [],
-            };
-        }
-        /**
-         * JSFiddle
-         *
-         * URL:
-         *   - https://jsfiddle.net/zfUyN/
-         *   - https://jsfiddle.net/kizu/zfUyN/
-         *   - https://jsfiddle.net/kizu/zfUyN/embedded/
-         *   - https://jsfiddle.net/kizu/zfUyN/embedded/result/
-         *   - https://jsfiddle.net/kizu/zfUyN/embed/js,result/
-         */
-        var isJSFiddle = ['jsfiddle.net', 'www.jsfiddle.net'].includes(hostname);
-        if (isJSFiddle) {
-            var parts = pathname
-                .replace('/embedded', '')
-                .replace(/\/$/, '')
-                .split('/')
-                .filter(Boolean);
-            var id = parts.length === 1 ? parts[0] : parts[1];
-            return {
-                url: "https://jsfiddle.net/".concat(id, "/embedded/"),
-                provider: Provider.JSFiddle,
-                allowfullscreen: false,
-                sandbox: [],
-            };
-        }
-        /**
-         * CodePen
-         *
-         * URL:
-         *   - https://codepen.io/ykadosh/pen/jOwjmJe
-         *   - https://codepen.io/ykadosh/embed/jOwjmJe
-         *   - https://codepen.io/ykadosh/embed/preview/jOwjmJe
-         */
-        var isCodePen = ['codepen.io', 'www.codepen.io'].includes(hostname);
-        if (isCodePen) {
-            var author = pathname.split('/')[1];
-            var id = pathname.replace(/\/$/, '').split('/').slice(-1)[0];
-            return {
-                url: "https://codepen.io/".concat(author, "/embed/preview/").concat(id),
-                provider: Provider.CodePen,
-                allowfullscreen: false,
-                sandbox: [],
-            };
-        }
-        return fallbackReturn;
-    };
-    var pluginName$1 = 'figureEmbed';
-    var FigureEmbed = Node.create({
-        name: pluginName$1,
-        group: 'block',
-        content: 'text*',
-        draggable: true,
-        isolating: true,
-        // disallows all marks for figcaption
-        marks: '',
-        addAttributes: function () {
-            return {
-                class: {
-                    default: null,
-                    parseHTML: function (element) { return element.getAttribute('class'); },
-                },
-                src: {
-                    default: null,
-                    parseHTML: function (element) { var _a; return (_a = element.querySelector('iframe')) === null || _a === void 0 ? void 0 : _a.getAttribute('src'); },
-                },
-            };
-        },
-        parseHTML: function () {
-            return [
-                {
-                    // match "embed", "embed-video", "embed-code" for backward compatibility
-                    tag: 'figure[class^="embed"]',
-                    contentElement: 'figcaption',
-                },
-            ];
-        },
-        renderHTML: function (_a) {
-            var HTMLAttributes = _a.HTMLAttributes;
-            var _b = normalizeEmbedURL(HTMLAttributes.src), url = _b.url, provider = _b.provider, allowfullscreen = _b.allowfullscreen, sandbox = _b.sandbox;
-            // for backward compatibility
-            // can be removed when fully switch to new editor
-            var isVideo = [
-                Provider.YouTube,
-                Provider.Vimeo,
-                Provider.Bilibili,
-            ].includes(provider);
-            var isCode = [Provider.JSFiddle, Provider.CodePen].includes(provider);
-            var className = __spreadArray(__spreadArray([
-                'embed'
-            ], (isVideo ? ["embed-video"] : []), true), (isCode ? ["embed-code"] : []), true).join(' ');
-            return [
-                'figure',
-                __assign$2({ class: className }, (provider ? { 'data-provider': provider } : {})),
-                [
-                    'div',
-                    { class: 'iframe-container' },
-                    [
-                        'iframe',
-                        __assign$2(__assign$2(__assign$2({ src: url, loading: 'lazy' }, (sandbox && sandbox.length > 0
-                            ? { sandbox: sandbox.join(' ') }
-                            : {})), (allowfullscreen ? { allowfullscreen: true } : {})), { frameborder: '0', draggable: false, contenteditable: false }),
-                    ],
-                ],
-                ['figcaption', 0],
-            ];
-        },
-        addCommands: function () {
-            var _this = this;
-            return {
-                setFigureEmbed: function (_a) {
-                    var caption = _a.caption, position = _a.position, attrs = __rest(_a, ["caption", "position"]);
-                    return function (_a) {
-                        var chain = _a.chain;
-                        var insertContent = [
-                            {
-                                type: _this.name,
-                                attrs: attrs,
-                                content: caption ? [{ type: 'text', text: caption }] : [],
-                            },
-                            {
-                                type: 'paragraph',
-                            },
-                        ];
-                        if (!position) {
-                            return chain().insertContent(insertContent).focus().run();
-                        }
-                        return chain().insertContentAt(position, insertContent).focus().run();
-                    };
-                },
-            };
-        },
-        addProseMirrorPlugins: function () {
-            return [
-                new Plugin({
-                    key: new PluginKey('removePastedFigureEmbed'),
-                    props: {
-                        handleKeyDown: function (view, event) {
-                            var _a, _b;
-                            var isBackSpace = event.key.toLowerCase() === 'backspace';
-                            var isEnter = event.key.toLowerCase() === 'enter';
-                            if (!isBackSpace && !isEnter) {
-                                return;
-                            }
-                            var anchorParent = view.state.selection.$anchor.parent;
-                            var isCurrentPlugin = anchorParent.type.name === pluginName$1;
-                            var isEmptyFigcaption = anchorParent.content.size <= 0;
-                            if (!isCurrentPlugin) {
-                                return;
-                            }
-                            // @ts-expect-error
-                            var editor = view.dom.editor;
-                            // backSpace to remove if the figcaption is empty
-                            if (isBackSpace && isEmptyFigcaption) {
-                                // FIXME: setTimeOut to avoid repetitive deletion
-                                setTimeout(function () {
-                                    editor.commands.deleteNode(pluginName$1);
-                                });
-                                return;
-                            }
-                            // insert a new paragraph
-                            if (isEnter) {
-                                var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
-                                var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
-                                // skip if figcaption text is selected
-                                // or has text after current selection
-                                if ($from !== $to_1 || isTextAfter) {
-                                    return;
-                                }
-                                // FIXME: setTimeOut to avoid repetitive paragraph insertion
-                                setTimeout(function () {
-                                    editor.commands.insertContentAt($to_1.pos + 1, {
-                                        type: 'paragraph',
-                                    });
-                                });
-                            }
-                        },
-                        transformPastedHTML: function (html) {
-                            // remove
-                            html = html
-                                .replace(/\n/g, '')
-                                .replace(/<figure.*class=.embed.*[\n]*.*?<\/figure>/g, '');
-                            return html;
-                        },
-                    },
-                }),
-            ];
-        },
-    });
-
-    var pluginName = 'figureImage';
-    var FigureImage = Node.create({
-        name: pluginName,
-        group: 'block',
-        content: 'text*',
-        draggable: true,
-        isolating: true,
-        // disallows all marks for figcaption
-        marks: '',
-        addAttributes: function () {
-            return {
-                class: {
-                    default: null,
-                    parseHTML: function (element) { return element.getAttribute('class'); },
-                },
-                src: {
-                    default: null,
-                    parseHTML: function (element) { var _a; return (_a = element.querySelector('img')) === null || _a === void 0 ? void 0 : _a.getAttribute('src'); },
-                },
-            };
-        },
-        parseHTML: function () {
-            return [
-                {
-                    tag: 'figure[class="image"]',
-                    contentElement: 'figcaption',
-                },
-            ];
-        },
-        renderHTML: function (_a) {
-            var HTMLAttributes = _a.HTMLAttributes;
-            return [
-                'figure',
-                { class: 'image' },
-                [
-                    'img',
-                    {
-                        src: HTMLAttributes.src,
-                        draggable: false,
-                        contenteditable: false,
-                    },
-                ],
-                ['figcaption', 0],
-            ];
-        },
-        addCommands: function () {
-            var _this = this;
-            return {
-                setFigureImage: function (_a) {
-                    var caption = _a.caption, position = _a.position, attrs = __rest(_a, ["caption", "position"]);
-                    return function (_a) {
-                        var chain = _a.chain;
-                        var insertContent = [
-                            {
-                                type: _this.name,
-                                attrs: attrs,
-                                content: caption ? [{ type: 'text', text: caption }] : [],
-                            },
-                            {
-                                type: 'paragraph',
-                            },
-                        ];
-                        if (!position) {
-                            return chain().insertContent(insertContent).focus().run();
-                        }
-                        return chain().insertContentAt(position, insertContent).focus().run();
-                    };
-                },
-            };
-        },
-        addProseMirrorPlugins: function () {
-            return [
-                new Plugin({
-                    key: new PluginKey('removePastedFigureImage'),
-                    props: {
-                        handleKeyDown: function (view, event) {
-                            var _a, _b;
-                            var isBackSpace = event.key.toLowerCase() === 'backspace';
-                            var isEnter = event.key.toLowerCase() === 'enter';
-                            if (!isBackSpace && !isEnter) {
-                                return;
-                            }
-                            var anchorParent = view.state.selection.$anchor.parent;
-                            var isCurrentPlugin = anchorParent.type.name === pluginName;
-                            var isEmptyFigcaption = anchorParent.content.size <= 0;
-                            if (!isCurrentPlugin) {
-                                return;
-                            }
-                            // @ts-expect-error
-                            var editor = view.dom.editor;
-                            // backSpace to remove if the figcaption is empty
-                            if (isBackSpace && isEmptyFigcaption) {
-                                // FIXME: setTimeOut to avoid repetitive deletion
-                                setTimeout(function () {
-                                    editor.commands.deleteNode(pluginName);
-                                });
-                                return;
-                            }
-                            // insert a new paragraph
-                            if (isEnter) {
-                                var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
-                                var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
-                                // skip if figcaption text is selected
-                                // or has text after current selection
-                                if ($from !== $to_1 || isTextAfter) {
-                                    return;
-                                }
-                                // FIXME: setTimeOut to avoid repetitive paragraph insertion
-                                setTimeout(function () {
-                                    editor.commands.insertContentAt($to_1.pos + 1, {
-                                        type: 'paragraph',
-                                    });
-                                });
-                            }
-                        },
-                        transformPastedHTML: function (html) {
-                            // remove
-                            html = html
-                                .replace(/\n/g, '')
-                                .replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '');
-                            return html;
-                        },
-                    },
-                }),
-            ];
-        },
-    });
-
-    var HorizontalRule = Node.create({
-        name: 'horizontalRule',
-        addOptions: function () {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        group: 'block',
-        parseHTML: function () {
-            return [{ tag: 'hr' }];
-        },
-        renderHTML: function (_a) {
-            var HTMLAttributes = _a.HTMLAttributes;
-            return ['hr', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes)];
-        },
-        addCommands: function () {
-            var _this = this;
-            return {
-                setHorizontalRule: function () {
-                    return function (_a) {
-                        var chain = _a.chain;
-                        return chain()
-                            .insertContent([
-                            { type: _this.name },
-                            {
-                                type: 'paragraph',
-                            },
-                        ])
-                            .run();
-                    };
-                },
-            };
-        },
-        addInputRules: function () {
-            return [
-                nodeInputRule({
-                    find: /^(?:---|—-|___\s|\*\*\*\s)$/,
-                    type: this.type,
-                }),
-            ];
-        },
-    });
-
-    // THIS FILE IS AUTOMATICALLY GENERATED DO NOT EDIT DIRECTLY
-    // See update-tlds.js for encoding/decoding format
-    // https://data.iana.org/TLD/tlds-alpha-by-domain.txt
-    const encodedTlds = 'aaa1rp3bb0ott3vie4c1le2ogado5udhabi7c0ademy5centure6ountant0s9o1tor4d0s1ult4e0g1ro2tna4f0l1rica5g0akhan5ency5i0g1rbus3force5tel5kdn3l0ibaba4pay4lfinanz6state5y2sace3tom5m0azon4ericanexpress7family11x2fam3ica3sterdam8nalytics7droid5quan4z2o0l2partments8p0le4q0uarelle8r0ab1mco4chi3my2pa2t0e3s0da2ia2sociates9t0hleta5torney7u0ction5di0ble3o3spost5thor3o0s4vianca6w0s2x0a2z0ure5ba0by2idu3namex3narepublic11d1k2r0celona5laycard4s5efoot5gains6seball5ketball8uhaus5yern5b0c1t1va3cg1n2d1e0ats2uty4er2ntley5rlin4st0buy5t2f1g1h0arti5i0ble3d1ke2ng0o3o1z2j1lack0friday9ockbuster8g1omberg7ue3m0s1w2n0pparibas9o0ats3ehringer8fa2m1nd2o0k0ing5sch2tik2on4t1utique6x2r0adesco6idgestone9oadway5ker3ther5ussels7s1t1uild0ers6siness6y1zz3v1w1y1z0h3ca0b1fe2l0l1vinklein9m0era3p2non3petown5ital0one8r0avan4ds2e0er0s4s2sa1e1h1ino4t0ering5holic7ba1n1re3c1d1enter4o1rn3f0a1d2g1h0anel2nel4rity4se2t2eap3intai5ristmas6ome4urch5i0priani6rcle4sco3tadel4i0c2y3k1l0aims4eaning6ick2nic1que6othing5ud3ub0med6m1n1o0ach3des3ffee4llege4ogne5m0cast4mbank4unity6pany2re3uter5sec4ndos3struction8ulting7tact3ractors9oking4l1p2rsica5untry4pon0s4rses6pa2r0edit0card4union9icket5own3s1uise0s6u0isinella9v1w1x1y0mru3ou3z2dabur3d1nce3ta1e1ing3sun4y2clk3ds2e0al0er2s3gree4livery5l1oitte5ta3mocrat6ntal2ist5si0gn4v2hl2iamonds6et2gital5rect0ory7scount3ver5h2y2j1k1m1np2o0cs1tor4g1mains5t1wnload7rive4tv2ubai3nlop4pont4rban5vag2r2z2earth3t2c0o2deka3u0cation8e1g1mail3erck5nergy4gineer0ing9terprises10pson4quipment8r0icsson6ni3s0q1tate5t1u0rovision8s2vents5xchange6pert3osed4ress5traspace10fage2il1rwinds6th3mily4n0s2rm0ers5shion4t3edex3edback6rrari3ero6i0delity5o2lm2nal1nce1ial7re0stone6mdale6sh0ing5t0ness6j1k1lickr3ghts4r2orist4wers5y2m1o0o0d1tball6rd1ex2sale4um3undation8x2r0ee1senius7l1ogans4ntier7tr2ujitsu5n0d2rniture7tbol5yi3ga0l0lery3o1up4me0s3p1rden4y2b0iz3d0n2e0a1nt0ing5orge5f1g0ee3h1i0ft0s3ves2ing5l0ass3e1obal2o4m0ail3bh2o1x2n1odaddy5ld0point6f2o0dyear5g0le4p1t1v2p1q1r0ainger5phics5tis4een3ipe3ocery4up4s1t1u0ardian6cci3ge2ide2tars5ru3w1y2hair2mburg5ngout5us3bo2dfc0bank7ealth0care8lp1sinki6re1mes5iphop4samitsu7tachi5v2k0t2m1n1ockey4ldings5iday5medepot5goods5s0ense7nda3rse3spital5t0ing5t0els3mail5use3w2r1sbc3t1u0ghes5yatt3undai7ibm2cbc2e1u2d1e0ee3fm2kano4l1m0amat4db2mo0bilien9n0c1dustries8finiti5o2g1k1stitute6urance4e4t0ernational10uit4vestments10o1piranga7q1r0ish4s0maili5t0anbul7t0au2v3jaguar4va3cb2e0ep2tzt3welry6io2ll2m0p2nj2o0bs1urg4t1y2p0morgan6rs3uegos4niper7kaufen5ddi3e0rryhotels6logistics9properties14fh2g1h1i0a1ds2m1ndle4tchen5wi3m1n1oeln3matsu5sher5p0mg2n2r0d1ed3uokgroup8w1y0oto4z2la0caixa5mborghini8er3ncaster6d0rover6xess5salle5t0ino3robe5w0yer5b1c1ds2ease3clerc5frak4gal2o2xus4gbt3i0dl2fe0insurance9style7ghting6ke2lly3mited4o2ncoln4k2psy3ve1ing5k1lc1p2oan0s3cker3us3l1ndon4tte1o3ve3pl0financial11r1s1t0d0a3u0ndbeck6xe1ury5v1y2ma0drid4if1son4keup4n0agement7go3p1rket0ing3s4riott5shalls7ttel5ba2c0kinsey7d1e0d0ia3et2lbourne7me1orial6n0u2rckmsd7g1h1iami3crosoft7l1ni1t2t0subishi9k1l0b1s2m0a2n1o0bi0le4da2e1i1m1nash3ey2ster5rmon3tgage6scow4to0rcycles9v0ie4p1q1r1s0d2t0n1r2u0seum3ic4v1w1x1y1z2na0b1goya4me2tura4vy3ba2c1e0c1t0bank4flix4work5ustar5w0s2xt0direct7us4f0l2g0o2hk2i0co2ke1on3nja3ssan1y5l1o0kia3rton4w0ruz3tv4p1r0a1w2tt2u1yc2z2obi1server7ffice5kinawa6layan0group9dnavy5lo3m0ega4ne1g1l0ine5oo2pen3racle3nge4g0anic5igins6saka4tsuka4t2vh3pa0ge2nasonic7ris2s1tners4s1y3y2ccw3e0t2f0izer5g1h0armacy6d1ilips5one2to0graphy6s4ysio5ics1tet2ures6d1n0g1k2oneer5zza4k1l0ace2y0station9umbing5s3m1n0c2ohl2ker3litie5rn2st3r0america6xi3ess3ime3o0d0uctions8f1gressive8mo2perties3y5tection8u0dential9s1t1ub2w0c2y2qa1pon3uebec3st5racing4dio4e0ad1lestate6tor2y4cipes5d0stone5umbrella9hab3ise0n3t2liance6n0t0als5pair3ort3ublican8st0aurant8view0s5xroth6ich0ardli6oh3l1o1p2o0cks3deo3gers4om3s0vp3u0gby3hr2n2w0e2yukyu6sa0arland6fe0ty4kura4le1on3msclub4ung5ndvik0coromant12ofi4p1rl2s1ve2xo3b0i1s2c0a1b1haeffler7midt4olarships8ol3ule3warz5ience5ot3d1e0arch3t2cure1ity6ek2lect4ner3rvices6ven3w1x0y3fr2g1h0angrila6rp2w2ell3ia1ksha5oes2p0ping5uji3w3i0lk2na1gles5te3j1k0i0n2y0pe4l0ing4m0art3ile4n0cf3o0ccer3ial4ftbank4ware6hu2lar2utions7ng1y2y2pa0ce3ort2t3r0l2s1t0ada2ples4r1tebank4farm7c0group6ockholm6rage3e3ream4udio2y3yle4u0cks3pplies3y2ort5rf1gery5zuki5v1watch4iss4x1y0dney4stems6z2tab1ipei4lk2obao4rget4tamotors6r2too4x0i3c0i2d0k2eam2ch0nology8l1masek5nnis4va3f1g1h0d1eater2re6iaa2ckets5enda4ps2res2ol4j0maxx4x2k0maxx5l1m0all4n1o0day3kyo3ols3p1ray3shiba5tal3urs3wn2yota3s3r0ade1ing4ining5vel0ers0insurance16ust3v2t1ube2i1nes3shu4v0s2w1z2ua1bank3s2g1k1nicom3versity8o2ol2ps2s1y1z2va0cations7na1guard7c1e0gas3ntures6risign5mögensberater2ung14sicherung10t2g1i0ajes4deo3g1king4llas4n1p1rgin4sa1ion4va1o3laanderen9n1odka3lvo3te1ing3o2yage5u2wales2mart4ter4ng0gou5tch0es6eather0channel12bcam3er2site5d0ding5ibo2r3f1hoswho6ien2ki2lliamhill9n0dows4e1ners6me2olterskluwer11odside6rk0s2ld3w2s1tc1f3xbox3erox4finity6ihuan4n2xx2yz3yachts4hoo3maxun5ndex5e1odobashi7ga2kohama6u0tube6t1un3za0ppos4ra3ero3ip2m1one3uerich6w2';
-    // Internationalized domain names containing non-ASCII
-    const encodedUtlds = 'ελ1υ2бг1ел3дети4ею2католик6ом3мкд2он1сква6онлайн5рг3рус2ф2сайт3рб3укр3қаз3հայ3ישראל5קום3ابوظبي5رامكو5لاردن4بحرين5جزائر5سعودية6عليان5مغرب5مارات5یران5بارت2زار4يتك3ھارت5تونس4سودان3رية5شبكة4عراق2ب2مان4فلسطين6قطر3كاثوليك6وم3مصر2ليسيا5وريتانيا7قع4همراه5پاکستان7ڀارت4कॉम3नेट3भारत0म्3ोत5संगठन5বাংলা5ভারত2ৰত4ਭਾਰਤ4ભારત4ଭାରତ4இந்தியா6லங்கை6சிங்கப்பூர்11భారత్5ಭಾರತ4ഭാരതം5ලංකා4คอม3ไทย3ລາວ3გე2みんな3アマゾン4クラウド4グーグル4コム2ストア3セール3ファッション6ポイント4世界2中信1国1國1文网3亚马逊3企业2佛山2信息2健康2八卦2公司1益2台湾1灣2商城1店1标2嘉里0大酒店5在线2大拿2天主教3娱乐2家電2广东2微博2慈善2我爱你3手机2招聘2政务1府2新加坡2闻2时尚2書籍2机构2淡马锡3游戏2澳門2点看2移动2组织机构4网址1店1站1络2联通2谷歌2购物2通販2集团2電訊盈科4飞利浦3食品2餐厅2香格里拉3港2닷넷1컴2삼성2한국2';
-
-    /**
-     * @template A
-     * @template B
-     * @param {A} target
-     * @param {B} properties
-     * @return {A & B}
-     */
-    const assign = (target, properties) => {
-      for (const key in properties) {
-        target[key] = properties[key];
-      }
-      return target;
-    };
-
-    /**
-     * Finite State Machine generation utilities
-     */
-
-    /**
-     * @template T
-     * @typedef {{ [group: string]: T[] }} Collections
-     */
-
-    /**
-     * @typedef {{ [group: string]: true }} Flags
-     */
-
-    // Keys in scanner Collections instances
-    const numeric = 'numeric';
-    const ascii = 'ascii';
-    const alpha = 'alpha';
-    const asciinumeric = 'asciinumeric';
-    const alphanumeric = 'alphanumeric';
-    const domain = 'domain';
-    const emoji = 'emoji';
-    const scheme = 'scheme';
-    const slashscheme = 'slashscheme';
-    const whitespace$2 = 'whitespace';
-
-    /**
-     * @template T
-     * @param {string} name
-     * @param {Collections<T>} groups to register in
-     * @returns {T[]} Current list of tokens in the given collection
-     */
-    function registerGroup(name, groups) {
-      if (!(name in groups)) {
-        groups[name] = [];
-      }
-      return groups[name];
-    }
-
-    /**
-     * @template T
-     * @param {T} t token to add
-     * @param {Collections<T>} groups
-     * @param {Flags} flags
-     */
-    function addToGroups(t, flags, groups) {
-      if (flags[numeric]) {
-        flags[asciinumeric] = true;
-        flags[alphanumeric] = true;
-      }
-      if (flags[ascii]) {
-        flags[asciinumeric] = true;
-        flags[alpha] = true;
-      }
-      if (flags[asciinumeric]) {
-        flags[alphanumeric] = true;
-      }
-      if (flags[alpha]) {
-        flags[alphanumeric] = true;
-      }
-      if (flags[alphanumeric]) {
-        flags[domain] = true;
-      }
-      if (flags[emoji]) {
-        flags[domain] = true;
-      }
-      for (const k in flags) {
-        const group = registerGroup(k, groups);
-        if (group.indexOf(t) < 0) {
-          group.push(t);
-        }
-      }
-    }
-
-    /**
-     * @template T
-     * @param {T} t token to check
-     * @param {Collections<T>} groups
-     * @returns {Flags} group flags that contain this token
-     */
-    function flagsForToken(t, groups) {
-      const result = {};
-      for (const c in groups) {
-        if (groups[c].indexOf(t) >= 0) {
-          result[c] = true;
-        }
-      }
-      return result;
-    }
-
-    /**
-     * @template T
-     * @typedef {null | T } Transition
-     */
-
-    /**
-     * Define a basic state machine state. j is the list of character transitions,
-     * jr is the list of regex-match transitions, jd is the default state to
-     * transition to t is the accepting token type, if any. If this is the terminal
-     * state, then it does not emit a token.
-     *
-     * The template type T represents the type of the token this state accepts. This
-     * should be a string (such as of the token exports in `text.js`) or a
-     * MultiToken subclass (from `multi.js`)
-     *
-     * @template T
-     * @param {T} [token] Token that this state emits
-     */
-    function State$1(token) {
-      if (token === void 0) {
-        token = null;
-      }
-      // this.n = null; // DEBUG: State name
-      /** @type {{ [input: string]: State<T> }} j */
-      this.j = {}; // IMPLEMENTATION 1
-      // this.j = []; // IMPLEMENTATION 2
-      /** @type {[RegExp, State<T>][]} jr */
-      this.jr = [];
-      /** @type {?State<T>} jd */
-      this.jd = null;
-      /** @type {?T} t */
-      this.t = token;
-    }
-
-    /**
-     * Scanner token groups
-     * @type Collections<string>
-     */
-    State$1.groups = {};
-    State$1.prototype = {
-      accepts() {
-        return !!this.t;
-      },
-      /**
-       * Follow an existing transition from the given input to the next state.
-       * Does not mutate.
-       * @param {string} input character or token type to transition on
-       * @returns {?State<T>} the next state, if any
-       */
-      go(input) {
-        const state = this;
-        const nextState = state.j[input];
-        if (nextState) {
-          return nextState;
-        }
-        for (let i = 0; i < state.jr.length; i++) {
-          const regex = state.jr[i][0];
-          const nextState = state.jr[i][1]; // note: might be empty to prevent default jump
-          if (nextState && regex.test(input)) {
-            return nextState;
-          }
-        }
-        // Nowhere left to jump! Return default, if any
-        return state.jd;
-      },
-      /**
-       * Whether the state has a transition for the given input. Set the second
-       * argument to true to only look for an exact match (and not a default or
-       * regular-expression-based transition)
-       * @param {string} input
-       * @param {boolean} exactOnly
-       */
-      has(input, exactOnly) {
-        if (exactOnly === void 0) {
-          exactOnly = false;
-        }
-        return exactOnly ? input in this.j : !!this.go(input);
-      },
-      /**
-       * Short for "transition all"; create a transition from the array of items
-       * in the given list to the same final resulting state.
-       * @param {string | string[]} inputs Group of inputs to transition on
-       * @param {Transition<T> | State<T>} [next] Transition options
-       * @param {Flags} [flags] Collections flags to add token to
-       * @param {Collections<T>} [groups] Master list of token groups
-       */
-      ta(inputs, next, flags, groups) {
-        for (let i = 0; i < inputs.length; i++) {
-          this.tt(inputs[i], next, flags, groups);
-        }
-      },
-      /**
-       * Short for "take regexp transition"; defines a transition for this state
-       * when it encounters a token which matches the given regular expression
-       * @param {RegExp} regexp Regular expression transition (populate first)
-       * @param {T | State<T>} [next] Transition options
-       * @param {Flags} [flags] Collections flags to add token to
-       * @param {Collections<T>} [groups] Master list of token groups
-       * @returns {State<T>} taken after the given input
-       */
-      tr(regexp, next, flags, groups) {
-        groups = groups || State$1.groups;
-        let nextState;
-        if (next && next.j) {
-          nextState = next;
-        } else {
-          // Token with maybe token groups
-          nextState = new State$1(next);
-          if (flags && groups) {
-            addToGroups(next, flags, groups);
-          }
-        }
-        this.jr.push([regexp, nextState]);
-        return nextState;
-      },
-      /**
-       * Short for "take transitions", will take as many sequential transitions as
-       * the length of the given input and returns the
-       * resulting final state.
-       * @param {string | string[]} input
-       * @param {T | State<T>} [next] Transition options
-       * @param {Flags} [flags] Collections flags to add token to
-       * @param {Collections<T>} [groups] Master list of token groups
-       * @returns {State<T>} taken after the given input
-       */
-      ts(input, next, flags, groups) {
-        let state = this;
-        const len = input.length;
-        if (!len) {
-          return state;
-        }
-        for (let i = 0; i < len - 1; i++) {
-          state = state.tt(input[i]);
-        }
-        return state.tt(input[len - 1], next, flags, groups);
-      },
-      /**
-       * Short for "take transition", this is a method for building/working with
-       * state machines.
-       *
-       * If a state already exists for the given input, returns it.
-       *
-       * If a token is specified, that state will emit that token when reached by
-       * the linkify engine.
-       *
-       * If no state exists, it will be initialized with some default transitions
-       * that resemble existing default transitions.
-       *
-       * If a state is given for the second argument, that state will be
-       * transitioned to on the given input regardless of what that input
-       * previously did.
-       *
-       * Specify a token group flags to define groups that this token belongs to.
-       * The token will be added to corresponding entires in the given groups
-       * object.
-       *
-       * @param {string} input character, token type to transition on
-       * @param {T | State<T>} [next] Transition options
-       * @param {Flags} [flags] Collections flags to add token to
-       * @param {Collections<T>} [groups] Master list of groups
-       * @returns {State<T>} taken after the given input
-       */
-      tt(input, next, flags, groups) {
-        groups = groups || State$1.groups;
-        const state = this;
-
-        // Check if existing state given, just a basic transition
-        if (next && next.j) {
-          state.j[input] = next;
-          return next;
-        }
-        const t = next;
-
-        // Take the transition with the usual default mechanisms and use that as
-        // a template for creating the next state
-        let nextState,
-          templateState = state.go(input);
-        if (templateState) {
-          nextState = new State$1();
-          assign(nextState.j, templateState.j);
-          nextState.jr.push.apply(nextState.jr, templateState.jr);
-          nextState.jd = templateState.jd;
-          nextState.t = templateState.t;
-        } else {
-          nextState = new State$1();
-        }
-        if (t) {
-          // Ensure newly token is in the same groups as the old token
-          if (groups) {
-            if (nextState.t && typeof nextState.t === 'string') {
-              const allFlags = assign(flagsForToken(nextState.t, groups), flags);
-              addToGroups(t, allFlags, groups);
-            } else if (flags) {
-              addToGroups(t, flags, groups);
-            }
-          }
-          nextState.t = t; // overwrite anything that was previously there
-        }
-
-        state.j[input] = nextState;
-        return nextState;
-      }
-    };
-
-    // Helper functions to improve minification (not exported outside linkifyjs module)
-
-    /**
-     * @template T
-     * @param {State<T>} state
-     * @param {string | string[]} input
-     * @param {Flags} [flags]
-     * @param {Collections<T>} [groups]
-     */
-    const ta = (state, input, next, flags, groups) => state.ta(input, next, flags, groups);
-
-    /**
-     * @template T
-     * @param {State<T>} state
-     * @param {RegExp} regexp
-     * @param {T | State<T>} [next]
-     * @param {Flags} [flags]
-     * @param {Collections<T>} [groups]
-     */
-    const tr$1 = (state, regexp, next, flags, groups) => state.tr(regexp, next, flags, groups);
-
-    /**
-     * @template T
-     * @param {State<T>} state
-     * @param {string | string[]} input
-     * @param {T | State<T>} [next]
-     * @param {Flags} [flags]
-     * @param {Collections<T>} [groups]
-     */
-    const ts = (state, input, next, flags, groups) => state.ts(input, next, flags, groups);
-
-    /**
-     * @template T
-     * @param {State<T>} state
-     * @param {string} input
-     * @param {T | State<T>} [next]
-     * @param {Collections<T>} [groups]
-     * @param {Flags} [flags]
-     */
-    const tt = (state, input, next, flags, groups) => state.tt(input, next, flags, groups);
-
-    /******************************************************************************
-    Text Tokens
-    Identifiers for token outputs from the regexp scanner
-    ******************************************************************************/
-
-    // A valid web domain token
-    const WORD = 'WORD'; // only contains a-z
-    const UWORD = 'UWORD'; // contains letters other than a-z, used for IDN
-
-    // Special case of word
-    const LOCALHOST = 'LOCALHOST';
-
-    // Valid top-level domain, special case of WORD (see tlds.js)
-    const TLD = 'TLD';
-
-    // Valid IDN TLD, special case of UWORD (see tlds.js)
-    const UTLD = 'UTLD';
-
-    // The scheme portion of a web URI protocol. Supported types include: `mailto`,
-    // `file`, and user-defined custom protocols. Limited to schemes that contain
-    // only letters
-    const SCHEME = 'SCHEME';
-
-    // Similar to SCHEME, except makes distinction for schemes that must always be
-    // followed by `://`, not just `:`. Supported types include `http`, `https`,
-    // `ftp`, `ftps`
-    const SLASH_SCHEME = 'SLASH_SCHEME';
-
-    // Any sequence of digits 0-9
-    const NUM = 'NUM';
-
-    // Any number of consecutive whitespace characters that are not newline
-    const WS = 'WS';
-
-    // New line (unix style)
-    const NL$1 = 'NL'; // \n
-
-    // Opening/closing bracket classes
-    // TODO: Rename OPEN -> LEFT and CLOSE -> RIGHT in v5 to fit with Unicode names
-    // Also rename angle brackes to LESSTHAN and GREATER THAN
-    const OPENBRACE = 'OPENBRACE'; // {
-    const CLOSEBRACE = 'CLOSEBRACE'; // }
-    const OPENBRACKET = 'OPENBRACKET'; // [
-    const CLOSEBRACKET = 'CLOSEBRACKET'; // ]
-    const OPENPAREN = 'OPENPAREN'; // (
-    const CLOSEPAREN = 'CLOSEPAREN'; // )
-    const OPENANGLEBRACKET = 'OPENANGLEBRACKET'; // <
-    const CLOSEANGLEBRACKET = 'CLOSEANGLEBRACKET'; // >
-    const FULLWIDTHLEFTPAREN = 'FULLWIDTHLEFTPAREN'; // （
-    const FULLWIDTHRIGHTPAREN = 'FULLWIDTHRIGHTPAREN'; // ）
-    const LEFTCORNERBRACKET = 'LEFTCORNERBRACKET'; // 「
-    const RIGHTCORNERBRACKET = 'RIGHTCORNERBRACKET'; // 」
-    const LEFTWHITECORNERBRACKET = 'LEFTWHITECORNERBRACKET'; // 『
-    const RIGHTWHITECORNERBRACKET = 'RIGHTWHITECORNERBRACKET'; // 』
-    const FULLWIDTHLESSTHAN = 'FULLWIDTHLESSTHAN'; // ＜
-    const FULLWIDTHGREATERTHAN = 'FULLWIDTHGREATERTHAN'; // ＞
-
-    // Various symbols
-    const AMPERSAND = 'AMPERSAND'; // &
-    const APOSTROPHE = 'APOSTROPHE'; // '
-    const ASTERISK = 'ASTERISK'; // *
-    const AT = 'AT'; // @
-    const BACKSLASH = 'BACKSLASH'; // \
-    const BACKTICK = 'BACKTICK'; // `
-    const CARET = 'CARET'; // ^
-    const COLON = 'COLON'; // :
-    const COMMA = 'COMMA'; // ,
-    const DOLLAR = 'DOLLAR'; // $
-    const DOT = 'DOT'; // .
-    const EQUALS = 'EQUALS'; // =
-    const EXCLAMATION = 'EXCLAMATION'; // !
-    const HYPHEN = 'HYPHEN'; // -
-    const PERCENT = 'PERCENT'; // %
-    const PIPE = 'PIPE'; // |
-    const PLUS = 'PLUS'; // +
-    const POUND = 'POUND'; // #
-    const QUERY = 'QUERY'; // ?
-    const QUOTE = 'QUOTE'; // "
-
-    const SEMI = 'SEMI'; // ;
-    const SLASH = 'SLASH'; // /
-    const TILDE = 'TILDE'; // ~
-    const UNDERSCORE = 'UNDERSCORE'; // _
-
-    // Emoji symbol
-    const EMOJI$1 = 'EMOJI';
-
-    // Default token - anything that is not one of the above
-    const SYM = 'SYM';
-
-    var tk = /*#__PURE__*/Object.freeze({
-    	__proto__: null,
-    	WORD: WORD,
-    	UWORD: UWORD,
-    	LOCALHOST: LOCALHOST,
-    	TLD: TLD,
-    	UTLD: UTLD,
-    	SCHEME: SCHEME,
-    	SLASH_SCHEME: SLASH_SCHEME,
-    	NUM: NUM,
-    	WS: WS,
-    	NL: NL$1,
-    	OPENBRACE: OPENBRACE,
-    	CLOSEBRACE: CLOSEBRACE,
-    	OPENBRACKET: OPENBRACKET,
-    	CLOSEBRACKET: CLOSEBRACKET,
-    	OPENPAREN: OPENPAREN,
-    	CLOSEPAREN: CLOSEPAREN,
-    	OPENANGLEBRACKET: OPENANGLEBRACKET,
-    	CLOSEANGLEBRACKET: CLOSEANGLEBRACKET,
-    	FULLWIDTHLEFTPAREN: FULLWIDTHLEFTPAREN,
-    	FULLWIDTHRIGHTPAREN: FULLWIDTHRIGHTPAREN,
-    	LEFTCORNERBRACKET: LEFTCORNERBRACKET,
-    	RIGHTCORNERBRACKET: RIGHTCORNERBRACKET,
-    	LEFTWHITECORNERBRACKET: LEFTWHITECORNERBRACKET,
-    	RIGHTWHITECORNERBRACKET: RIGHTWHITECORNERBRACKET,
-    	FULLWIDTHLESSTHAN: FULLWIDTHLESSTHAN,
-    	FULLWIDTHGREATERTHAN: FULLWIDTHGREATERTHAN,
-    	AMPERSAND: AMPERSAND,
-    	APOSTROPHE: APOSTROPHE,
-    	ASTERISK: ASTERISK,
-    	AT: AT,
-    	BACKSLASH: BACKSLASH,
-    	BACKTICK: BACKTICK,
-    	CARET: CARET,
-    	COLON: COLON,
-    	COMMA: COMMA,
-    	DOLLAR: DOLLAR,
-    	DOT: DOT,
-    	EQUALS: EQUALS,
-    	EXCLAMATION: EXCLAMATION,
-    	HYPHEN: HYPHEN,
-    	PERCENT: PERCENT,
-    	PIPE: PIPE,
-    	PLUS: PLUS,
-    	POUND: POUND,
-    	QUERY: QUERY,
-    	QUOTE: QUOTE,
-    	SEMI: SEMI,
-    	SLASH: SLASH,
-    	TILDE: TILDE,
-    	UNDERSCORE: UNDERSCORE,
-    	EMOJI: EMOJI$1,
-    	SYM: SYM
-    });
-
-    // Note that these two Unicode ones expand into a really big one with Babel
-    const ASCII_LETTER = /[a-z]/;
-    const LETTER = /\p{L}/u; // Any Unicode character with letter data type
-    const EMOJI = /\p{Emoji}/u; // Any Unicode emoji character
-    const DIGIT = /\d/;
-    const SPACE = /\s/;
-
-    /**
-    	The scanner provides an interface that takes a string of text as input, and
-    	outputs an array of tokens instances that can be used for easy URL parsing.
-    */
-    const NL = '\n'; // New line character
-    const EMOJI_VARIATION = '\ufe0f'; // Variation selector, follows heart and others
-    const EMOJI_JOINER = '\u200d'; // zero-width joiner
-
-    let tlds = null,
-      utlds = null; // don't change so only have to be computed once
-
-    /**
-     * Scanner output token:
-     * - `t` is the token name (e.g., 'NUM', 'EMOJI', 'TLD')
-     * - `v` is the value of the token (e.g., '123', '❤️', 'com')
-     * - `s` is the start index of the token in the original string
-     * - `e` is the end index of the token in the original string
-     * @typedef {{t: string, v: string, s: number, e: number}} Token
-     */
-
-    /**
-     * @template T
-     * @typedef {{ [collection: string]: T[] }} Collections
-     */
-
-    /**
-     * Initialize the scanner character-based state machine for the given start
-     * state
-     * @param {[string, boolean][]} customSchemes List of custom schemes, where each
-     * item is a length-2 tuple with the first element set to the string scheme, and
-     * the second element set to `true` if the `://` after the scheme is optional
-     */
-    function init$2(customSchemes) {
-      if (customSchemes === void 0) {
-        customSchemes = [];
-      }
-      // Frequently used states (name argument removed during minification)
-      /** @type Collections<string> */
-      const groups = {}; // of tokens
-      State$1.groups = groups;
-      /** @type State<string> */
-      const Start = new State$1();
-      if (tlds == null) {
-        tlds = decodeTlds(encodedTlds);
-      }
-      if (utlds == null) {
-        utlds = decodeTlds(encodedUtlds);
-      }
-
-      // States for special URL symbols that accept immediately after start
-      tt(Start, "'", APOSTROPHE);
-      tt(Start, '{', OPENBRACE);
-      tt(Start, '}', CLOSEBRACE);
-      tt(Start, '[', OPENBRACKET);
-      tt(Start, ']', CLOSEBRACKET);
-      tt(Start, '(', OPENPAREN);
-      tt(Start, ')', CLOSEPAREN);
-      tt(Start, '<', OPENANGLEBRACKET);
-      tt(Start, '>', CLOSEANGLEBRACKET);
-      tt(Start, '（', FULLWIDTHLEFTPAREN);
-      tt(Start, '）', FULLWIDTHRIGHTPAREN);
-      tt(Start, '「', LEFTCORNERBRACKET);
-      tt(Start, '」', RIGHTCORNERBRACKET);
-      tt(Start, '『', LEFTWHITECORNERBRACKET);
-      tt(Start, '』', RIGHTWHITECORNERBRACKET);
-      tt(Start, '＜', FULLWIDTHLESSTHAN);
-      tt(Start, '＞', FULLWIDTHGREATERTHAN);
-      tt(Start, '&', AMPERSAND);
-      tt(Start, '*', ASTERISK);
-      tt(Start, '@', AT);
-      tt(Start, '`', BACKTICK);
-      tt(Start, '^', CARET);
-      tt(Start, ':', COLON);
-      tt(Start, ',', COMMA);
-      tt(Start, '$', DOLLAR);
-      tt(Start, '.', DOT);
-      tt(Start, '=', EQUALS);
-      tt(Start, '!', EXCLAMATION);
-      tt(Start, '-', HYPHEN);
-      tt(Start, '%', PERCENT);
-      tt(Start, '|', PIPE);
-      tt(Start, '+', PLUS);
-      tt(Start, '#', POUND);
-      tt(Start, '?', QUERY);
-      tt(Start, '"', QUOTE);
-      tt(Start, '/', SLASH);
-      tt(Start, ';', SEMI);
-      tt(Start, '~', TILDE);
-      tt(Start, '_', UNDERSCORE);
-      tt(Start, '\\', BACKSLASH);
-      const Num = tr$1(Start, DIGIT, NUM, {
-        [numeric]: true
-      });
-      tr$1(Num, DIGIT, Num);
-
-      // State which emits a word token
-      const Word = tr$1(Start, ASCII_LETTER, WORD, {
-        [ascii]: true
-      });
-      tr$1(Word, ASCII_LETTER, Word);
-
-      // Same as previous, but specific to non-fsm.ascii alphabet words
-      const UWord = tr$1(Start, LETTER, UWORD, {
-        [alpha]: true
-      });
-      tr$1(UWord, ASCII_LETTER); // Non-accepting
-      tr$1(UWord, LETTER, UWord);
-
-      // Whitespace jumps
-      // Tokens of only non-newline whitespace are arbitrarily long
-      // If any whitespace except newline, more whitespace!
-      const Ws = tr$1(Start, SPACE, WS, {
-        [whitespace$2]: true
-      });
-      tt(Start, NL, NL$1, {
-        [whitespace$2]: true
-      });
-      tt(Ws, NL); // non-accepting state to avoid mixing whitespaces
-      tr$1(Ws, SPACE, Ws);
-
-      // Emoji tokens. They are not grouped by the scanner except in cases where a
-      // zero-width joiner is present
-      const Emoji = tr$1(Start, EMOJI, EMOJI$1, {
-        [emoji]: true
-      });
-      tr$1(Emoji, EMOJI, Emoji);
-      tt(Emoji, EMOJI_VARIATION, Emoji);
-      // tt(Start, EMOJI_VARIATION, Emoji); // This one is sketchy
-
-      const EmojiJoiner = tt(Emoji, EMOJI_JOINER);
-      tr$1(EmojiJoiner, EMOJI, Emoji);
-      // tt(EmojiJoiner, EMOJI_VARIATION, Emoji); // also sketchy
-
-      // Generates states for top-level domains
-      // Note that this is most accurate when tlds are in alphabetical order
-      const wordjr = [[ASCII_LETTER, Word]];
-      const uwordjr = [[ASCII_LETTER, null], [LETTER, UWord]];
-      for (let i = 0; i < tlds.length; i++) {
-        fastts(Start, tlds[i], TLD, WORD, wordjr);
-      }
-      for (let i = 0; i < utlds.length; i++) {
-        fastts(Start, utlds[i], UTLD, UWORD, uwordjr);
-      }
-      addToGroups(TLD, {
-        tld: true,
-        ascii: true
-      }, groups);
-      addToGroups(UTLD, {
-        utld: true,
-        alpha: true
-      }, groups);
-
-      // Collect the states generated by different protocols. NOTE: If any new TLDs
-      // get added that are also protocols, set the token to be the same as the
-      // protocol to ensure parsing works as expected.
-      fastts(Start, 'file', SCHEME, WORD, wordjr);
-      fastts(Start, 'mailto', SCHEME, WORD, wordjr);
-      fastts(Start, 'http', SLASH_SCHEME, WORD, wordjr);
-      fastts(Start, 'https', SLASH_SCHEME, WORD, wordjr);
-      fastts(Start, 'ftp', SLASH_SCHEME, WORD, wordjr);
-      fastts(Start, 'ftps', SLASH_SCHEME, WORD, wordjr);
-      addToGroups(SCHEME, {
-        scheme: true,
-        ascii: true
-      }, groups);
-      addToGroups(SLASH_SCHEME, {
-        slashscheme: true,
-        ascii: true
-      }, groups);
-
-      // Register custom schemes. Assumes each scheme is asciinumeric with hyphens
-      customSchemes = customSchemes.sort((a, b) => a[0] > b[0] ? 1 : -1);
-      for (let i = 0; i < customSchemes.length; i++) {
-        const sch = customSchemes[i][0];
-        const optionalSlashSlash = customSchemes[i][1];
-        const flags = optionalSlashSlash ? {
-          [scheme]: true
-        } : {
-          [slashscheme]: true
-        };
-        if (sch.indexOf('-') >= 0) {
-          flags[domain] = true;
-        } else if (!ASCII_LETTER.test(sch)) {
-          flags[numeric] = true; // numbers only
-        } else if (DIGIT.test(sch)) {
-          flags[asciinumeric] = true;
-        } else {
-          flags[ascii] = true;
-        }
-        ts(Start, sch, sch, flags);
-      }
-
-      // Localhost token
-      ts(Start, 'localhost', LOCALHOST, {
-        ascii: true
-      });
-
-      // Set default transition for start state (some symbol)
-      Start.jd = new State$1(SYM);
-      return {
-        start: Start,
-        tokens: assign({
-          groups
-        }, tk)
-      };
-    }
-
-    /**
-    	Given a string, returns an array of TOKEN instances representing the
-    	composition of that string.
-
-    	@method run
-    	@param {State<string>} start scanner starting state
-    	@param {string} str input string to scan
-    	@return {Token[]} list of tokens, each with a type and value
-    */
-    function run$1(start, str) {
-      // State machine is not case sensitive, so input is tokenized in lowercased
-      // form (still returns regular case). Uses selective `toLowerCase` because
-      // lowercasing the entire string causes the length and character position to
-      // vary in some non-English strings with V8-based runtimes.
-      const iterable = stringToArray(str.replace(/[A-Z]/g, c => c.toLowerCase()));
-      const charCount = iterable.length; // <= len if there are emojis, etc
-      const tokens = []; // return value
-
-      // cursor through the string itself, accounting for characters that have
-      // width with length 2 such as emojis
-      let cursor = 0;
-
-      // Cursor through the array-representation of the string
-      let charCursor = 0;
-
-      // Tokenize the string
-      while (charCursor < charCount) {
-        let state = start;
-        let nextState = null;
-        let tokenLength = 0;
-        let latestAccepting = null;
-        let sinceAccepts = -1;
-        let charsSinceAccepts = -1;
-        while (charCursor < charCount && (nextState = state.go(iterable[charCursor]))) {
-          state = nextState;
-
-          // Keep track of the latest accepting state
-          if (state.accepts()) {
-            sinceAccepts = 0;
-            charsSinceAccepts = 0;
-            latestAccepting = state;
-          } else if (sinceAccepts >= 0) {
-            sinceAccepts += iterable[charCursor].length;
-            charsSinceAccepts++;
-          }
-          tokenLength += iterable[charCursor].length;
-          cursor += iterable[charCursor].length;
-          charCursor++;
-        }
-
-        // Roll back to the latest accepting state
-        cursor -= sinceAccepts;
-        charCursor -= charsSinceAccepts;
-        tokenLength -= sinceAccepts;
-
-        // No more jumps, just make a new token from the last accepting one
-        tokens.push({
-          t: latestAccepting.t,
-          // token type/name
-          v: str.slice(cursor - tokenLength, cursor),
-          // string value
-          s: cursor - tokenLength,
-          // start index
-          e: cursor // end index (excluding)
-        });
-      }
-
-      return tokens;
-    }
-
-    /**
-     * Convert a String to an Array of characters, taking into account that some
-     * characters like emojis take up two string indexes.
-     *
-     * Adapted from core-js (MIT license)
-     * https://github.com/zloirock/core-js/blob/2d69cf5f99ab3ea3463c395df81e5a15b68f49d9/packages/core-js/internals/string-multibyte.js
-     *
-     * @function stringToArray
-     * @param {string} str
-     * @returns {string[]}
-     */
-    function stringToArray(str) {
-      const result = [];
-      const len = str.length;
-      let index = 0;
-      while (index < len) {
-        let first = str.charCodeAt(index);
-        let second;
-        let char = first < 0xd800 || first > 0xdbff || index + 1 === len || (second = str.charCodeAt(index + 1)) < 0xdc00 || second > 0xdfff ? str[index] // single character
-        : str.slice(index, index + 2); // two-index characters
-        result.push(char);
-        index += char.length;
-      }
-      return result;
-    }
-
-    /**
-     * Fast version of ts function for when transition defaults are well known
-     * @param {State<string>} state
-     * @param {string} input
-     * @param {string} t
-     * @param {string} defaultt
-     * @param {[RegExp, State<string>][]} jr
-     * @returns {State<string>}
-     */
-    function fastts(state, input, t, defaultt, jr) {
-      let next;
-      const len = input.length;
-      for (let i = 0; i < len - 1; i++) {
-        const char = input[i];
-        if (state.j[char]) {
-          next = state.j[char];
-        } else {
-          next = new State$1(defaultt);
-          next.jr = jr.slice();
-          state.j[char] = next;
-        }
-        state = next;
-      }
-      next = new State$1(t);
-      next.jr = jr.slice();
-      state.j[input[len - 1]] = next;
-      return next;
-    }
-
-    /**
-     * Converts a string of Top-Level Domain names encoded in update-tlds.js back
-     * into a list of strings.
-     * @param {str} encoded encoded TLDs string
-     * @returns {str[]} original TLDs list
-     */
-    function decodeTlds(encoded) {
-      const words = [];
-      const stack = [];
-      let i = 0;
-      let digits = '0123456789';
-      while (i < encoded.length) {
-        let popDigitCount = 0;
-        while (digits.indexOf(encoded[i + popDigitCount]) >= 0) {
-          popDigitCount++; // encountered some digits, have to pop to go one level up trie
-        }
-
-        if (popDigitCount > 0) {
-          words.push(stack.join('')); // whatever preceded the pop digits must be a word
-          for (let popCount = parseInt(encoded.substring(i, i + popDigitCount), 10); popCount > 0; popCount--) {
-            stack.pop();
-          }
-          i += popDigitCount;
-        } else {
-          stack.push(encoded[i]); // drop down a level into the trie
-          i++;
-        }
-      }
-      return words;
-    }
-
-    /**
-     * An object where each key is a valid DOM Event Name such as `click` or `focus`
-     * and each value is an event handler function.
-     *
-     * https://developer.mozilla.org/en-US/docs/Web/API/Element#events
-     * @typedef {?{ [event: string]: Function }} EventListeners
-     */
-
-    /**
-     * All formatted properties required to render a link, including `tagName`,
-     * `attributes`, `content` and `eventListeners`.
-     * @typedef {{ tagName: any, attributes: {[attr: string]: any}, content: string,
-     * eventListeners: EventListeners }} IntermediateRepresentation
-     */
-
-    /**
-     * Specify either an object described by the template type `O` or a function.
-     *
-     * The function takes a string value (usually the link's href attribute), the
-     * link type (`'url'`, `'hashtag`', etc.) and an internal token representation
-     * of the link. It should return an object of the template type `O`
-     * @template O
-     * @typedef {O | ((value: string, type: string, token: MultiToken) => O)} OptObj
-     */
-
-    /**
-     * Specify either a function described by template type `F` or an object.
-     *
-     * Each key in the object should be a link type (`'url'`, `'hashtag`', etc.). Each
-     * value should be a function with template type `F` that is called when the
-     * corresponding link type is encountered.
-     * @template F
-     * @typedef {F | { [type: string]: F}} OptFn
-     */
-
-    /**
-     * Specify either a value with template type `V`, a function that returns `V` or
-     * an object where each value resolves to `V`.
-     *
-     * The function takes a string value (usually the link's href attribute), the
-     * link type (`'url'`, `'hashtag`', etc.) and an internal token representation
-     * of the link. It should return an object of the template type `V`
-     *
-     * For the object, each key should be a link type (`'url'`, `'hashtag`', etc.).
-     * Each value should either have type `V` or a function that returns V. This
-     * function similarly takes a string value and a token.
-     *
-     * Example valid types for `Opt<string>`:
-     *
-     * ```js
-     * 'hello'
-     * (value, type, token) => 'world'
-     * { url: 'hello', email: (value, token) => 'world'}
-     * ```
-     * @template V
-     * @typedef {V | ((value: string, type: string, token: MultiToken) => V) | { [type: string]: V | ((value: string, token: MultiToken) => V) }} Opt
-     */
-
-    /**
-     * See available options: https://linkify.js.org/docs/options.html
-     * @typedef {{
-     * 	defaultProtocol?: string,
-     *  events?: OptObj<EventListeners>,
-     * 	format?: Opt<string>,
-     * 	formatHref?: Opt<string>,
-     * 	nl2br?: boolean,
-     * 	tagName?: Opt<any>,
-     * 	target?: Opt<string>,
-     * 	rel?: Opt<string>,
-     * 	validate?: Opt<boolean>,
-     * 	truncate?: Opt<number>,
-     * 	className?: Opt<string>,
-     * 	attributes?: OptObj<({ [attr: string]: any })>,
-     *  ignoreTags?: string[],
-     * 	render?: OptFn<((ir: IntermediateRepresentation) => any)>
-     * }} Opts
-     */
-
-    /**
-     * @type Required<Opts>
-     */
-    const defaults$1 = {
-      defaultProtocol: 'http',
-      events: null,
-      format: noop,
-      formatHref: noop,
-      nl2br: false,
-      tagName: 'a',
-      target: null,
-      rel: null,
-      validate: true,
-      truncate: Infinity,
-      className: null,
-      attributes: null,
-      ignoreTags: [],
-      render: null
-    };
-
-    /**
-     * Utility class for linkify interfaces to apply specified
-     * {@link Opts formatting and rendering options}.
-     *
-     * @param {Opts | Options} [opts] Option value overrides.
-     * @param {(ir: IntermediateRepresentation) => any} [defaultRender] (For
-     *   internal use) default render function that determines how to generate an
-     *   HTML element based on a link token's derived tagName, attributes and HTML.
-     *   Similar to render option
-     */
-    function Options(opts, defaultRender) {
-      if (defaultRender === void 0) {
-        defaultRender = null;
-      }
-      let o = assign({}, defaults$1);
-      if (opts) {
-        o = assign(o, opts instanceof Options ? opts.o : opts);
-      }
-
-      // Ensure all ignored tags are uppercase
-      const ignoredTags = o.ignoreTags;
-      const uppercaseIgnoredTags = [];
-      for (let i = 0; i < ignoredTags.length; i++) {
-        uppercaseIgnoredTags.push(ignoredTags[i].toUpperCase());
-      }
-      /** @protected */
-      this.o = o;
-      if (defaultRender) {
-        this.defaultRender = defaultRender;
-      }
-      this.ignoreTags = uppercaseIgnoredTags;
-    }
-    Options.prototype = {
-      o: defaults$1,
-      /**
-       * @type string[]
-       */
-      ignoreTags: [],
-      /**
-       * @param {IntermediateRepresentation} ir
-       * @returns {any}
-       */
-      defaultRender(ir) {
-        return ir;
-      },
-      /**
-       * Returns true or false based on whether a token should be displayed as a
-       * link based on the user options.
-       * @param {MultiToken} token
-       * @returns {boolean}
-       */
-      check(token) {
-        return this.get('validate', token.toString(), token);
-      },
-      // Private methods
-
-      /**
-       * Resolve an option's value based on the value of the option and the given
-       * params. If operator and token are specified and the target option is
-       * callable, automatically calls the function with the given argument.
-       * @template {keyof Opts} K
-       * @param {K} key Name of option to use
-       * @param {string} [operator] will be passed to the target option if it's a
-       * function. If not specified, RAW function value gets returned
-       * @param {MultiToken} [token] The token from linkify.tokenize
-       * @returns {Opts[K] | any}
-       */
-      get(key, operator, token) {
-        const isCallable = operator != null;
-        let option = this.o[key];
-        if (!option) {
-          return option;
-        }
-        if (typeof option === 'object') {
-          option = token.t in option ? option[token.t] : defaults$1[key];
-          if (typeof option === 'function' && isCallable) {
-            option = option(operator, token);
-          }
-        } else if (typeof option === 'function' && isCallable) {
-          option = option(operator, token.t, token);
-        }
-        return option;
-      },
-      /**
-       * @template {keyof Opts} L
-       * @param {L} key Name of options object to use
-       * @param {string} [operator]
-       * @param {MultiToken} [token]
-       * @returns {Opts[L] | any}
-       */
-      getObj(key, operator, token) {
-        let obj = this.o[key];
-        if (typeof obj === 'function' && operator != null) {
-          obj = obj(operator, token.t, token);
-        }
-        return obj;
-      },
-      /**
-       * Convert the given token to a rendered element that may be added to the
-       * calling-interface's DOM
-       * @param {MultiToken} token Token to render to an HTML element
-       * @returns {any} Render result; e.g., HTML string, DOM element, React
-       *   Component, etc.
-       */
-      render(token) {
-        const ir = token.render(this); // intermediate representation
-        const renderFn = this.get('render', null, token) || this.defaultRender;
-        return renderFn(ir, token.t, token);
-      }
-    };
-    function noop(val) {
-      return val;
-    }
-
-    /******************************************************************************
-    	Multi-Tokens
-    	Tokens composed of arrays of TextTokens
-    ******************************************************************************/
-
-    /**
-     * @param {string} value
-     * @param {Token[]} tokens
-     */
-    function MultiToken(value, tokens) {
-      this.t = 'token';
-      this.v = value;
-      this.tk = tokens;
-    }
-
-    /**
-     * Abstract class used for manufacturing tokens of text tokens. That is rather
-     * than the value for a token being a small string of text, it's value an array
-     * of text tokens.
-     *
-     * Used for grouping together URLs, emails, hashtags, and other potential
-     * creations.
-     * @class MultiToken
-     * @property {string} t
-     * @property {string} v
-     * @property {Token[]} tk
-     * @abstract
-     */
-    MultiToken.prototype = {
-      isLink: false,
-      /**
-       * Return the string this token represents.
-       * @return {string}
-       */
-      toString() {
-        return this.v;
-      },
-      /**
-       * What should the value for this token be in the `href` HTML attribute?
-       * Returns the `.toString` value by default.
-       * @param {string} [scheme]
-       * @return {string}
-      */
-      toHref(scheme) {
-        return this.toString();
-      },
-      /**
-       * @param {Options} options Formatting options
-       * @returns {string}
-       */
-      toFormattedString(options) {
-        const val = this.toString();
-        const truncate = options.get('truncate', val, this);
-        const formatted = options.get('format', val, this);
-        return truncate && formatted.length > truncate ? formatted.substring(0, truncate) + '…' : formatted;
-      },
-      /**
-       *
-       * @param {Options} options
-       * @returns {string}
-       */
-      toFormattedHref(options) {
-        return options.get('formatHref', this.toHref(options.get('defaultProtocol')), this);
-      },
-      /**
-       * The start index of this token in the original input string
-       * @returns {number}
-       */
-      startIndex() {
-        return this.tk[0].s;
-      },
-      /**
-       * The end index of this token in the original input string (up to this
-       * index but not including it)
-       * @returns {number}
-       */
-      endIndex() {
-        return this.tk[this.tk.length - 1].e;
-      },
-      /**
-      	Returns an object  of relevant values for this token, which includes keys
-      	* type - Kind of token ('url', 'email', etc.)
-      	* value - Original text
-      	* href - The value that should be added to the anchor tag's href
-      		attribute
-      		@method toObject
-      	@param {string} [protocol] `'http'` by default
-      */
-      toObject(protocol) {
-        if (protocol === void 0) {
-          protocol = defaults$1.defaultProtocol;
-        }
-        return {
-          type: this.t,
-          value: this.toString(),
-          isLink: this.isLink,
-          href: this.toHref(protocol),
-          start: this.startIndex(),
-          end: this.endIndex()
-        };
-      },
-      /**
-       *
-       * @param {Options} options Formatting option
-       */
-      toFormattedObject(options) {
-        return {
-          type: this.t,
-          value: this.toFormattedString(options),
-          isLink: this.isLink,
-          href: this.toFormattedHref(options),
-          start: this.startIndex(),
-          end: this.endIndex()
-        };
-      },
-      /**
-       * Whether this token should be rendered as a link according to the given options
-       * @param {Options} options
-       * @returns {boolean}
-       */
-      validate(options) {
-        return options.get('validate', this.toString(), this);
-      },
-      /**
-       * Return an object that represents how this link should be rendered.
-       * @param {Options} options Formattinng options
-       */
-      render(options) {
-        const token = this;
-        const href = this.toHref(options.get('defaultProtocol'));
-        const formattedHref = options.get('formatHref', href, this);
-        const tagName = options.get('tagName', href, token);
-        const content = this.toFormattedString(options);
-        const attributes = {};
-        const className = options.get('className', href, token);
-        const target = options.get('target', href, token);
-        const rel = options.get('rel', href, token);
-        const attrs = options.getObj('attributes', href, token);
-        const eventListeners = options.getObj('events', href, token);
-        attributes.href = formattedHref;
-        if (className) {
-          attributes.class = className;
-        }
-        if (target) {
-          attributes.target = target;
-        }
-        if (rel) {
-          attributes.rel = rel;
-        }
-        if (attrs) {
-          assign(attributes, attrs);
-        }
-        return {
-          tagName,
-          attributes,
-          content,
-          eventListeners
-        };
-      }
-    };
-
-    /**
-     * Create a new token that can be emitted by the parser state machine
-     * @param {string} type readable type of the token
-     * @param {object} props properties to assign or override, including isLink = true or false
-     * @returns {new (value: string, tokens: Token[]) => MultiToken} new token class
-     */
-    function createTokenClass(type, props) {
-      class Token extends MultiToken {
-        constructor(value, tokens) {
-          super(value, tokens);
-          this.t = type;
-        }
-      }
-      for (const p in props) {
-        Token.prototype[p] = props[p];
-      }
-      Token.t = type;
-      return Token;
-    }
-
-    /**
-    	Represents a list of tokens making up a valid email address
-    */
-    const Email = createTokenClass('email', {
-      isLink: true,
-      toHref() {
-        return 'mailto:' + this.toString();
-      }
-    });
-
-    /**
-    	Represents some plain text
-    */
-    const Text = createTokenClass('text');
-
-    /**
-    	Multi-linebreak token - represents a line break
-    	@class Nl
-    */
-    const Nl = createTokenClass('nl');
-
-    /**
-    	Represents a list of text tokens making up a valid URL
-    	@class Url
-    */
-    const Url = createTokenClass('url', {
-      isLink: true,
-      /**
-      	Lowercases relevant parts of the domain and adds the protocol if
-      	required. Note that this will not escape unsafe HTML characters in the
-      	URL.
-      		@param {string} [scheme] default scheme (e.g., 'https')
-      	@return {string} the full href
-      */
-      toHref(scheme) {
-        if (scheme === void 0) {
-          scheme = defaults$1.defaultProtocol;
-        }
-        // Check if already has a prefix scheme
-        return this.hasProtocol() ? this.v : `${scheme}://${this.v}`;
-      },
-      /**
-       * Check whether this URL token has a protocol
-       * @return {boolean}
-       */
-      hasProtocol() {
-        const tokens = this.tk;
-        return tokens.length >= 2 && tokens[0].t !== LOCALHOST && tokens[1].t === COLON;
-      }
-    });
-
-    /**
-    	Not exactly parser, more like the second-stage scanner (although we can
-    	theoretically hotswap the code here with a real parser in the future... but
-    	for a little URL-finding utility abstract syntax trees may be a little
-    	overkill).
-
-    	URL format: http://en.wikipedia.org/wiki/URI_scheme
-    	Email format: http://en.wikipedia.org/wiki/EmailAddress (links to RFC in
-    	reference)
-
-    	@module linkify
-    	@submodule parser
-    	@main run
-    */
-    const makeState = arg => new State$1(arg);
-
-    /**
-     * Generate the parser multi token-based state machine
-     * @param {{ groups: Collections<string> }} tokens
-     */
-    function init$1(_ref) {
-      let {
-        groups
-      } = _ref;
-      // Types of characters the URL can definitely end in
-      const qsAccepting = groups.domain.concat([AMPERSAND, ASTERISK, AT, BACKSLASH, BACKTICK, CARET, DOLLAR, EQUALS, HYPHEN, NUM, PERCENT, PIPE, PLUS, POUND, SLASH, SYM, TILDE, UNDERSCORE]);
-
-      // Types of tokens that can follow a URL and be part of the query string
-      // but cannot be the very last characters
-      // Characters that cannot appear in the URL at all should be excluded
-      const qsNonAccepting = [APOSTROPHE, COLON, COMMA, DOT, EXCLAMATION, QUERY, QUOTE, SEMI, OPENANGLEBRACKET, CLOSEANGLEBRACKET, OPENBRACE, CLOSEBRACE, CLOSEBRACKET, OPENBRACKET, OPENPAREN, CLOSEPAREN, FULLWIDTHLEFTPAREN, FULLWIDTHRIGHTPAREN, LEFTCORNERBRACKET, RIGHTCORNERBRACKET, LEFTWHITECORNERBRACKET, RIGHTWHITECORNERBRACKET, FULLWIDTHLESSTHAN, FULLWIDTHGREATERTHAN];
-
-      // For addresses without the mailto prefix
-      // Tokens allowed in the localpart of the email
-      const localpartAccepting = [AMPERSAND, APOSTROPHE, ASTERISK, BACKSLASH, BACKTICK, CARET, DOLLAR, EQUALS, HYPHEN, OPENBRACE, CLOSEBRACE, PERCENT, PIPE, PLUS, POUND, QUERY, SLASH, SYM, TILDE, UNDERSCORE];
-
-      // The universal starting state.
-      /**
-       * @type State<Token>
-       */
-      const Start = makeState();
-      const Localpart = tt(Start, TILDE); // Local part of the email address
-      ta(Localpart, localpartAccepting, Localpart);
-      ta(Localpart, groups.domain, Localpart);
-      const Domain = makeState(),
-        Scheme = makeState(),
-        SlashScheme = makeState();
-      ta(Start, groups.domain, Domain); // parsed string ends with a potential domain name (A)
-      ta(Start, groups.scheme, Scheme); // e.g., 'mailto'
-      ta(Start, groups.slashscheme, SlashScheme); // e.g., 'http'
-
-      ta(Domain, localpartAccepting, Localpart);
-      ta(Domain, groups.domain, Domain);
-      const LocalpartAt = tt(Domain, AT); // Local part of the email address plus @
-
-      tt(Localpart, AT, LocalpartAt); // close to an email address now
-
-      // Local part of an email address can be e.g. 'http' or 'mailto'
-      tt(Scheme, AT, LocalpartAt);
-      tt(SlashScheme, AT, LocalpartAt);
-      const LocalpartDot = tt(Localpart, DOT); // Local part of the email address plus '.' (localpart cannot end in .)
-      ta(LocalpartDot, localpartAccepting, Localpart);
-      ta(LocalpartDot, groups.domain, Localpart);
-      const EmailDomain = makeState();
-      ta(LocalpartAt, groups.domain, EmailDomain); // parsed string starts with local email info + @ with a potential domain name
-      ta(EmailDomain, groups.domain, EmailDomain);
-      const EmailDomainDot = tt(EmailDomain, DOT); // domain followed by DOT
-      ta(EmailDomainDot, groups.domain, EmailDomain);
-      const Email$1 = makeState(Email); // Possible email address (could have more tlds)
-      ta(EmailDomainDot, groups.tld, Email$1);
-      ta(EmailDomainDot, groups.utld, Email$1);
-      tt(LocalpartAt, LOCALHOST, Email$1);
-
-      // Hyphen can jump back to a domain name
-      const EmailDomainHyphen = tt(EmailDomain, HYPHEN); // parsed string starts with local email info + @ with a potential domain name
-      ta(EmailDomainHyphen, groups.domain, EmailDomain);
-      ta(Email$1, groups.domain, EmailDomain);
-      tt(Email$1, DOT, EmailDomainDot);
-      tt(Email$1, HYPHEN, EmailDomainHyphen);
-
-      // Final possible email states
-      const EmailColon = tt(Email$1, COLON); // URL followed by colon (potential port number here)
-      /*const EmailColonPort = */
-      ta(EmailColon, groups.numeric, Email); // URL followed by colon and port number
-
-      // Account for dots and hyphens. Hyphens are usually parts of domain names
-      // (but not TLDs)
-      const DomainHyphen = tt(Domain, HYPHEN); // domain followed by hyphen
-      const DomainDot = tt(Domain, DOT); // domain followed by DOT
-      ta(DomainHyphen, groups.domain, Domain);
-      ta(DomainDot, localpartAccepting, Localpart);
-      ta(DomainDot, groups.domain, Domain);
-      const DomainDotTld = makeState(Url); // Simplest possible URL with no query string
-      ta(DomainDot, groups.tld, DomainDotTld);
-      ta(DomainDot, groups.utld, DomainDotTld);
-      ta(DomainDotTld, groups.domain, Domain);
-      ta(DomainDotTld, localpartAccepting, Localpart);
-      tt(DomainDotTld, DOT, DomainDot);
-      tt(DomainDotTld, HYPHEN, DomainHyphen);
-      tt(DomainDotTld, AT, LocalpartAt);
-      const DomainDotTldColon = tt(DomainDotTld, COLON); // URL followed by colon (potential port number here)
-      const DomainDotTldColonPort = makeState(Url); // TLD followed by a port number
-      ta(DomainDotTldColon, groups.numeric, DomainDotTldColonPort);
-
-      // Long URL with optional port and maybe query string
-      const Url$1 = makeState(Url);
-
-      // URL with extra symbols at the end, followed by an opening bracket
-      const UrlNonaccept = makeState(); // URL followed by some symbols (will not be part of the final URL)
-
-      // Query strings
-      ta(Url$1, qsAccepting, Url$1);
-      ta(Url$1, qsNonAccepting, UrlNonaccept);
-      ta(UrlNonaccept, qsAccepting, Url$1);
-      ta(UrlNonaccept, qsNonAccepting, UrlNonaccept);
-
-      // Become real URLs after `SLASH` or `COLON NUM SLASH`
-      // Here works with or without scheme:// prefix
-      tt(DomainDotTld, SLASH, Url$1);
-      tt(DomainDotTldColonPort, SLASH, Url$1);
-
-      // Note that domains that begin with schemes are treated slighly differently
-      const SchemeColon = tt(Scheme, COLON); // e.g., 'mailto:'
-      const SlashSchemeColon = tt(SlashScheme, COLON); // e.g., 'http:'
-      const SlashSchemeColonSlash = tt(SlashSchemeColon, SLASH); // e.g., 'http:/'
-
-      const UriPrefix = tt(SlashSchemeColonSlash, SLASH); // e.g., 'http://'
-
-      // Scheme states can transition to domain states
-      ta(Scheme, groups.domain, Domain);
-      tt(Scheme, DOT, DomainDot);
-      tt(Scheme, HYPHEN, DomainHyphen);
-      ta(SlashScheme, groups.domain, Domain);
-      tt(SlashScheme, DOT, DomainDot);
-      tt(SlashScheme, HYPHEN, DomainHyphen);
-
-      // Force URL with scheme prefix followed by anything sane
-      ta(SchemeColon, groups.domain, Url$1);
-      tt(SchemeColon, SLASH, Url$1);
-      ta(UriPrefix, groups.domain, Url$1);
-      ta(UriPrefix, qsAccepting, Url$1);
-      tt(UriPrefix, SLASH, Url$1);
-      const bracketPairs = [[OPENBRACE, CLOSEBRACE],
-      // {}
-      [OPENBRACKET, CLOSEBRACKET],
-      // []
-      [OPENPAREN, CLOSEPAREN],
-      // ()
-      [OPENANGLEBRACKET, CLOSEANGLEBRACKET],
-      // <>
-      [FULLWIDTHLEFTPAREN, FULLWIDTHRIGHTPAREN],
-      // （）
-      [LEFTCORNERBRACKET, RIGHTCORNERBRACKET],
-      // 「」
-      [LEFTWHITECORNERBRACKET, RIGHTWHITECORNERBRACKET],
-      // 『』
-      [FULLWIDTHLESSTHAN, FULLWIDTHGREATERTHAN] // ＜＞
-      ];
-
-      for (let i = 0; i < bracketPairs.length; i++) {
-        const [OPEN, CLOSE] = bracketPairs[i];
-        const UrlOpen = tt(Url$1, OPEN); // URL followed by open bracket
-
-        // Continue not accepting for open brackets
-        tt(UrlNonaccept, OPEN, UrlOpen);
-
-        // Closing bracket component. This character WILL be included in the URL
-        tt(UrlOpen, CLOSE, Url$1);
-
-        // URL that beings with an opening bracket, followed by a symbols.
-        // Note that the final state can still be `UrlOpen` (if the URL has a
-        // single opening bracket for some reason).
-        const UrlOpenQ = makeState(Url);
-        ta(UrlOpen, qsAccepting, UrlOpenQ);
-        const UrlOpenSyms = makeState(); // UrlOpen followed by some symbols it cannot end it
-        ta(UrlOpen, qsNonAccepting);
-
-        // URL that begins with an opening bracket, followed by some symbols
-        ta(UrlOpenQ, qsAccepting, UrlOpenQ);
-        ta(UrlOpenQ, qsNonAccepting, UrlOpenSyms);
-        ta(UrlOpenSyms, qsAccepting, UrlOpenQ);
-        ta(UrlOpenSyms, qsNonAccepting, UrlOpenSyms);
-
-        // Close brace/bracket to become regular URL
-        tt(UrlOpenQ, CLOSE, Url$1);
-        tt(UrlOpenSyms, CLOSE, Url$1);
-      }
-      tt(Start, LOCALHOST, DomainDotTld); // localhost is a valid URL state
-      tt(Start, NL$1, Nl); // single new line
-
-      return {
-        start: Start,
-        tokens: tk
-      };
-    }
-
-    /**
-     * Run the parser state machine on a list of scanned string-based tokens to
-     * create a list of multi tokens, each of which represents a URL, email address,
-     * plain text, etc.
-     *
-     * @param {State<MultiToken>} start parser start state
-     * @param {string} input the original input used to generate the given tokens
-     * @param {Token[]} tokens list of scanned tokens
-     * @returns {MultiToken[]}
-     */
-    function run(start, input, tokens) {
-      let len = tokens.length;
-      let cursor = 0;
-      let multis = [];
-      let textTokens = [];
-      while (cursor < len) {
-        let state = start;
-        let secondState = null;
-        let nextState = null;
-        let multiLength = 0;
-        let latestAccepting = null;
-        let sinceAccepts = -1;
-        while (cursor < len && !(secondState = state.go(tokens[cursor].t))) {
-          // Starting tokens with nowhere to jump to.
-          // Consider these to be just plain text
-          textTokens.push(tokens[cursor++]);
-        }
-        while (cursor < len && (nextState = secondState || state.go(tokens[cursor].t))) {
-          // Get the next state
-          secondState = null;
-          state = nextState;
-
-          // Keep track of the latest accepting state
-          if (state.accepts()) {
-            sinceAccepts = 0;
-            latestAccepting = state;
-          } else if (sinceAccepts >= 0) {
-            sinceAccepts++;
-          }
-          cursor++;
-          multiLength++;
-        }
-        if (sinceAccepts < 0) {
-          // No accepting state was found, part of a regular text token add
-          // the first text token to the text tokens array and try again from
-          // the next
-          cursor -= multiLength;
-          if (cursor < len) {
-            textTokens.push(tokens[cursor]);
-            cursor++;
-          }
-        } else {
-          // Accepting state!
-          // First close off the textTokens (if available)
-          if (textTokens.length > 0) {
-            multis.push(initMultiToken(Text, input, textTokens));
-            textTokens = [];
-          }
-
-          // Roll back to the latest accepting state
-          cursor -= sinceAccepts;
-          multiLength -= sinceAccepts;
-
-          // Create a new multitoken
-          const Multi = latestAccepting.t;
-          const subtokens = tokens.slice(cursor - multiLength, cursor);
-          multis.push(initMultiToken(Multi, input, subtokens));
-        }
-      }
-
-      // Finally close off the textTokens (if available)
-      if (textTokens.length > 0) {
-        multis.push(initMultiToken(Text, input, textTokens));
-      }
-      return multis;
-    }
-
-    /**
-     * Utility function for instantiating a new multitoken with all the relevant
-     * fields during parsing.
-     * @param {new (value: string, tokens: Token[]) => MultiToken} Multi class to instantiate
-     * @param {string} input original input string
-     * @param {Token[]} tokens consecutive tokens scanned from input string
-     * @returns {MultiToken}
-     */
-    function initMultiToken(Multi, input, tokens) {
-      const startIdx = tokens[0].s;
-      const endIdx = tokens[tokens.length - 1].e;
-      const value = input.slice(startIdx, endIdx);
-      return new Multi(value, tokens);
-    }
-
-    const warn = typeof console !== 'undefined' && console && console.warn || (() => {});
-    const warnAdvice = 'until manual call of linkify.init(). Register all schemes and plugins before invoking linkify the first time.';
-
-    // Side-effect initialization state
-    const INIT = {
-      scanner: null,
-      parser: null,
-      tokenQueue: [],
-      pluginQueue: [],
-      customSchemes: [],
-      initialized: false
-    };
-
-    /**
-     * @typedef {{
-     * 	start: State<string>,
-     * 	tokens: { groups: Collections<string> } & typeof tk
-     * }} ScannerInit
-     */
-
-    /**
-     * @typedef {{
-     * 	start: State<MultiToken>,
-     * 	tokens: typeof multi
-     * }} ParserInit
-     */
-
-    /**
-     * @typedef {(arg: { scanner: ScannerInit }) => void} TokenPlugin
-     */
-
-    /**
-     * @typedef {(arg: { scanner: ScannerInit, parser: ParserInit }) => void} Plugin
-     */
-
-    /**
-     * De-register all plugins and reset the internal state-machine. Used for
-     * testing; not required in practice.
-     * @private
-     */
-    function reset() {
-      State$1.groups = {};
-      INIT.scanner = null;
-      INIT.parser = null;
-      INIT.tokenQueue = [];
-      INIT.pluginQueue = [];
-      INIT.customSchemes = [];
-      INIT.initialized = false;
-    }
-
-    /**
-     * Detect URLs with the following additional protocol. Anything with format
-     * "protocol://..." will be considered a link. If `optionalSlashSlash` is set to
-     * `true`, anything with format "protocol:..." will be considered a link.
-     * @param {string} protocol
-     * @param {boolean} [optionalSlashSlash]
-     */
-    function registerCustomProtocol(scheme, optionalSlashSlash) {
-      if (optionalSlashSlash === void 0) {
-        optionalSlashSlash = false;
-      }
-      if (INIT.initialized) {
-        warn(`linkifyjs: already initialized - will not register custom scheme "${scheme}" ${warnAdvice}`);
-      }
-      if (!/^[0-9a-z]+(-[0-9a-z]+)*$/.test(scheme)) {
-        throw new Error(`linkifyjs: incorrect scheme format.
-1. Must only contain digits, lowercase ASCII letters or "-"
-2. Cannot start or end with "-"
-3. "-" cannot repeat`);
-      }
-      INIT.customSchemes.push([scheme, optionalSlashSlash]);
-    }
-
-    /**
-     * Initialize the linkify state machine. Called automatically the first time
-     * linkify is called on a string, but may be called manually as well.
-     */
-    function init() {
-      // Initialize scanner state machine and plugins
-      INIT.scanner = init$2(INIT.customSchemes);
-      for (let i = 0; i < INIT.tokenQueue.length; i++) {
-        INIT.tokenQueue[i][1]({
-          scanner: INIT.scanner
-        });
-      }
-
-      // Initialize parser state machine and plugins
-      INIT.parser = init$1(INIT.scanner.tokens);
-      for (let i = 0; i < INIT.pluginQueue.length; i++) {
-        INIT.pluginQueue[i][1]({
-          scanner: INIT.scanner,
-          parser: INIT.parser
-        });
-      }
-      INIT.initialized = true;
-    }
-
-    /**
-     * Parse a string into tokens that represent linkable and non-linkable sub-components
-     * @param {string} str
-     * @return {MultiToken[]} tokens
-     */
-    function tokenize(str) {
-      if (!INIT.initialized) {
-        init();
-      }
-      return run(INIT.parser.start, str, run$1(INIT.scanner.start, str));
-    }
-
-    /**
-     * Find a list of linkable items in the given string.
-     * @param {string} str string to find links in
-     * @param {string | Opts} [type] either formatting options or specific type of
-     * links to find, e.g., 'url' or 'email'
-     * @param {Opts} [opts] formatting options for final output. Cannot be specified
-     * if opts already provided in `type` argument
-     */
-    function find$1(str, type, opts) {
-      if (type === void 0) {
-        type = null;
-      }
-      if (opts === void 0) {
-        opts = null;
-      }
-      if (type && typeof type === 'object') {
-        if (opts) {
-          throw Error(`linkifyjs: Invalid link type ${type}; must be a string`);
-        }
-        opts = type;
-        type = null;
-      }
-      const options = new Options(opts);
-      const tokens = tokenize(str);
-      const filtered = [];
-      for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
-        if (token.isLink && (!type || token.t === type) && options.check(token)) {
-          filtered.push(token.toFormattedObject(options));
-        }
-      }
-      return filtered;
-    }
-
-    /**
-     * Check if the provided tokens form a valid link structure, which can either be a single link token
-     * or a link token surrounded by parentheses or square brackets.
-     *
-     * This ensures that only complete and valid text is hyperlinked, preventing cases where a valid
-     * top-level domain (TLD) is immediately followed by an invalid character, like a number. For
-     * example, with the `find` method from Linkify, entering `example.com1` would result in
-     * `example.com` being linked and the trailing `1` left as plain text. By using the `tokenize`
-     * method, we can perform more comprehensive validation on the input text.
-     */
-    function isValidLinkStructure(tokens) {
-        if (tokens.length === 1) {
-            return tokens[0].isLink;
-        }
-        if (tokens.length === 3 && tokens[1].isLink) {
-            return ['()', '[]'].includes(tokens[0].value + tokens[2].value);
-        }
-        return false;
-    }
-    /**
-     * This plugin allows you to automatically add links to your editor.
-     * @param options The plugin options
-     * @returns The plugin instance
-     */
-    function autolink$1(options) {
-        return new Plugin({
-            key: new PluginKey('autolink'),
-            appendTransaction: function (transactions, oldState, newState) {
-                /**
-                 * Does the transaction change the document?
-                 */
-                var docChanges = transactions.some(function (transaction) { return transaction.docChanged; }) &&
-                    !oldState.doc.eq(newState.doc);
-                /**
-                 * Prevent autolink if the transaction is not a document change or if the transaction has the meta `preventAutolink`.
-                 */
-                var preventAutolink = transactions.some(function (transaction) {
-                    return transaction.getMeta('preventAutolink');
-                });
-                /**
-                 * Prevent autolink if the transaction is not a document change
-                 * or if the transaction has the meta `preventAutolink`.
-                 */
-                if (!docChanges || preventAutolink) {
-                    return;
-                }
-                var tr = newState.tr;
-                var transform = combineTransactionSteps(oldState.doc, __spreadArray([], transactions, true));
-                var changes = getChangedRanges(transform);
-                changes.forEach(function (_a) {
-                    var newRange = _a.newRange;
-                    // Now let’s see if we can add new links.
-                    var nodesInChangedRanges = findChildrenInRange(newState.doc, newRange, function (node) { return node.isTextblock; });
-                    var textBlock;
-                    var textBeforeWhitespace;
-                    if (nodesInChangedRanges.length > 1) {
-                        // Grab the first node within the changed ranges (ex. the first of two paragraphs when hitting enter).
-                        textBlock = nodesInChangedRanges[0];
-                        textBeforeWhitespace = newState.doc.textBetween(textBlock.pos, textBlock.pos + textBlock.node.nodeSize, undefined, ' ');
-                    }
-                    else if (nodesInChangedRanges.length &&
-                        // We want to make sure to include the block seperator argument to treat hard breaks like spaces.
-                        newState.doc
-                            .textBetween(newRange.from, newRange.to, ' ', ' ')
-                            .endsWith(' ')) {
-                        textBlock = nodesInChangedRanges[0];
-                        textBeforeWhitespace = newState.doc.textBetween(textBlock.pos, newRange.to, undefined, ' ');
-                    }
-                    if (textBlock && textBeforeWhitespace) {
-                        var wordsBeforeWhitespace = textBeforeWhitespace
-                            .split(' ')
-                            .filter(function (s) { return s !== ''; });
-                        if (wordsBeforeWhitespace.length <= 0) {
-                            return false;
-                        }
-                        var lastWordBeforeSpace = wordsBeforeWhitespace[wordsBeforeWhitespace.length - 1];
-                        var lastWordAndBlockOffset_1 = textBlock.pos +
-                            textBeforeWhitespace.lastIndexOf(lastWordBeforeSpace);
-                        if (!lastWordBeforeSpace) {
-                            return false;
-                        }
-                        var linksBeforeSpace = tokenize(lastWordBeforeSpace).map(function (t) {
-                            return t.toObject(options.defaultProtocol);
-                        });
-                        if (!isValidLinkStructure(linksBeforeSpace)) {
-                            return false;
-                        }
-                        linksBeforeSpace
-                            .filter(function (link) { return link.isLink; })
-                            // Calculate link position.
-                            .map(function (link) { return (__assign$2(__assign$2({}, link), { from: lastWordAndBlockOffset_1 + link.start + 1, to: lastWordAndBlockOffset_1 + link.end + 1 })); })
-                            // ignore link inside code mark
-                            .filter(function (link) {
-                            if (!newState.schema.marks.code) {
-                                return true;
-                            }
-                            return !newState.doc.rangeHasMark(link.from, link.to, newState.schema.marks.code);
-                        })
-                            // validate link
-                            .filter(function (link) { return options.validate(link.value); })
-                            // Add link mark.
-                            .forEach(function (link) {
-                            if (getMarksBetween(link.from, link.to, newState.doc).some(function (item) { return item.mark.type === options.type; })) {
-                                return;
-                            }
-                            tr.addMark(link.from, link.to, options.type.create({
-                                href: link.href,
-                            }));
-                        });
-                    }
-                });
-                if (!tr.steps.length) {
-                    return;
-                }
-                return tr;
-            },
-        });
-    }
-
-    function clickHandler(options) {
-        return new Plugin({
-            key: new PluginKey('handleClickLink'),
-            props: {
-                handleClick: function (view, pos, event) {
-                    var _a, _b;
-                    if (event.button !== 0) {
-                        return false;
-                    }
-                    var a = event.target;
-                    var els = [];
-                    while (a.nodeName !== 'DIV') {
-                        els.push(a);
-                        a = a.parentNode;
-                    }
-                    if (!els.find(function (value) { return value.nodeName === 'A'; })) {
-                        return false;
-                    }
-                    var attrs = getAttributes(view.state, options.type.name);
-                    var link = event.target;
-                    var href = (_a = link === null || link === void 0 ? void 0 : link.href) !== null && _a !== void 0 ? _a : attrs.href;
-                    var target = (_b = link === null || link === void 0 ? void 0 : link.target) !== null && _b !== void 0 ? _b : attrs.target;
-                    if (link && href) {
-                        window.open(href, target);
-                        return true;
-                    }
-                    return false;
-                },
-            },
-        });
-    }
-
-    function pasteHandler(options) {
-        return new Plugin({
-            key: new PluginKey('handlePasteLink'),
-            props: {
-                handlePaste: function (view, event, slice) {
-                    var state = view.state;
-                    var selection = state.selection;
-                    var empty = selection.empty;
-                    if (empty) {
-                        return false;
-                    }
-                    var textContent = '';
-                    slice.content.forEach(function (node) {
-                        textContent += node.textContent;
-                    });
-                    var link = find$1(textContent, {
-                        defaultProtocol: options.defaultProtocol,
-                    }).find(function (item) { return item.isLink && item.value === textContent; });
-                    if (!textContent || !link) {
-                        return false;
-                    }
-                    options.editor.commands.setMark(options.type, {
-                        href: link.href,
-                    });
-                    return true;
-                },
-            },
-        });
-    }
-
-    // From DOMPurify
-    // https://github.com/cure53/DOMPurify/blob/main/src/regexp.js
-    var ATTR_WHITESPACE = /[\u0000-\u0020\u00A0\u1680\u180E\u2000-\u2029\u205F\u3000]/g; // eslint-disable-line no-control-regex
-    var IS_ALLOWED_URI = /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i; // eslint-disable-line no-useless-escape
-    function isAllowedUri(uri) {
-        return !uri || uri.replace(ATTR_WHITESPACE, '').match(IS_ALLOWED_URI);
-    }
-    /**
-     * This extension allows you to create links.
-     * @see https://www.tiptap.dev/api/marks/link
-     */
-    var Link = Mark.create({
-        name: 'link',
-        priority: 1000,
-        keepOnSplit: false,
-        exitable: true,
-        onCreate: function () {
-            this.options.protocols.forEach(function (protocol) {
-                if (typeof protocol === 'string') {
-                    registerCustomProtocol(protocol);
-                    return;
-                }
-                registerCustomProtocol(protocol.scheme, protocol.optionalSlashes);
-            });
-        },
-        onDestroy: function () {
-            reset();
-        },
-        inclusive: function () {
-            return this.options.autolink;
-        },
-        addOptions: function () {
-            return {
-                openOnClick: true,
-                linkOnPaste: true,
-                autolink: true,
-                protocols: [],
-                defaultProtocol: 'http',
-                HTMLAttributes: {
-                    target: '_blank',
-                    rel: 'noopener noreferrer nofollow',
-                    class: null,
-                },
-                validate: function (url) { return !!url; },
-            };
-        },
-        addAttributes: function () {
-            return {
-                href: {
-                    default: null,
-                },
-                target: {
-                    default: this.options.HTMLAttributes.target,
-                },
-                rel: {
-                    default: this.options.HTMLAttributes.rel,
-                },
-                class: {
-                    default: this.options.HTMLAttributes.class,
-                },
-            };
-        },
-        parseHTML: function () {
-            return [
-                {
-                    tag: 'a[href]:not([class="mention"])',
-                    getAttrs: function (dom) {
-                        var href = dom.getAttribute('href');
-                        // prevent XSS attacks
-                        if (!href || !isAllowedUri(href)) {
-                            return false;
-                        }
-                        return { href: href };
-                    },
-                },
-            ];
-        },
-        renderHTML: function (_a) {
-            var HTMLAttributes = _a.HTMLAttributes;
-            // prevent XSS attacks
-            if (!isAllowedUri(HTMLAttributes.href)) {
-                // strip out the href
-                return [
-                    'a',
-                    mergeAttributes(this.options.HTMLAttributes, __assign$2(__assign$2({}, HTMLAttributes), { href: '' })),
-                    0,
-                ];
-            }
-            return [
-                'a',
-                mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-                0,
-            ];
-        },
-        addCommands: function () {
-            var _this = this;
-            return {
-                setLink: function (attributes) {
-                    return function (_a) {
-                        var chain = _a.chain;
-                        return chain()
-                            .setMark(_this.name, attributes)
-                            .setMeta('preventAutolink', true)
-                            .run();
-                    };
-                },
-                toggleLink: function (attributes) {
-                    return function (_a) {
-                        var chain = _a.chain;
-                        return chain()
-                            .toggleMark(_this.name, attributes, { extendEmptyMarkRange: true })
-                            .setMeta('preventAutolink', true)
-                            .run();
-                    };
-                },
-                unsetLink: function () {
-                    return function (_a) {
-                        var chain = _a.chain;
-                        return chain()
-                            .unsetMark(_this.name, { extendEmptyMarkRange: true })
-                            .setMeta('preventAutolink', true)
-                            .run();
-                    };
-                },
-            };
-        },
-        addPasteRules: function () {
-            var _this = this;
-            return [
-                markPasteRule({
-                    find: function (text) {
-                        var foundLinks = [];
-                        if (text) {
-                            var validate_1 = _this.options.validate;
-                            var links = find$1(text).filter(function (item) { return item.isLink && validate_1(item.value); });
-                            if (links.length) {
-                                links.forEach(function (link) {
-                                    return foundLinks.push({
-                                        // remove non-ASCII characters
-                                        text: link.value.replace(/[^ -~]/g, ''),
-                                        data: {
-                                            href: link.href.replace(/[^ -~]/g, ''),
-                                        },
-                                        index: link.start,
-                                    });
-                                });
-                            }
-                        }
-                        return foundLinks;
-                    },
-                    type: this.type,
-                    getAttributes: function (match) {
-                        var _a;
-                        return {
-                            href: (_a = match.data) === null || _a === void 0 ? void 0 : _a.href,
-                        };
-                    },
-                }),
-            ];
-        },
-        addProseMirrorPlugins: function () {
-            var plugins = [];
-            if (this.options.autolink) {
-                plugins.push(autolink$1({
-                    type: this.type,
-                    defaultProtocol: this.options.defaultProtocol,
-                    validate: this.options.validate,
-                }));
-            }
-            if (this.options.openOnClick) {
-                plugins.push(clickHandler({
-                    type: this.type,
-                }));
-            }
-            if (this.options.linkOnPaste) {
-                plugins.push(pasteHandler({
-                    editor: this.editor,
-                    defaultProtocol: this.options.defaultProtocol,
-                    type: this.type,
-                }));
-            }
-            return plugins;
-        },
-    });
-
-    function findSuggestionMatch(config) {
-        var _a;
-        const { char, allowSpaces, allowedPrefixes, startOfLine, $position, } = config;
-        const escapedChar = escapeForRegEx(char);
-        const suffix = new RegExp(`\\s${escapedChar}$`);
-        const prefix = startOfLine ? '^' : '';
-        const regexp = allowSpaces
-            ? new RegExp(`${prefix}${escapedChar}.*?(?=\\s${escapedChar}|$)`, 'gm')
-            : new RegExp(`${prefix}(?:^)?${escapedChar}[^\\s${escapedChar}]*`, 'gm');
-        const text = ((_a = $position.nodeBefore) === null || _a === void 0 ? void 0 : _a.isText) && $position.nodeBefore.text;
-        if (!text) {
-            return null;
-        }
-        const textFrom = $position.pos - text.length;
-        const match = Array.from(text.matchAll(regexp)).pop();
-        if (!match || match.input === undefined || match.index === undefined) {
-            return null;
-        }
-        // JavaScript doesn't have lookbehinds. This hacks a check that first character
-        // is a space or the start of the line
-        const matchPrefix = match.input.slice(Math.max(0, match.index - 1), match.index);
-        const matchPrefixIsAllowed = new RegExp(`^[${allowedPrefixes === null || allowedPrefixes === void 0 ? void 0 : allowedPrefixes.join('')}\0]?$`).test(matchPrefix);
-        if (allowedPrefixes !== null && !matchPrefixIsAllowed) {
-            return null;
-        }
-        // The absolute position of the match in the document
-        const from = textFrom + match.index;
-        let to = from + match[0].length;
-        // Edge case handling; if spaces are allowed and we're directly in between
-        // two triggers
-        if (allowSpaces && suffix.test(text.slice(to - 1, to + 1))) {
-            match[0] += ' ';
-            to += 1;
-        }
-        // If the $position is located within the matched substring, return that range
-        if (from < $position.pos && to >= $position.pos) {
-            return {
-                range: {
-                    from,
-                    to,
-                },
-                query: match[0].slice(char.length),
-                text: match[0],
-            };
-        }
-        return null;
-    }
-
-    const SuggestionPluginKey = new PluginKey('suggestion');
-    /**
-     * This utility allows you to create suggestions.
-     * @see https://tiptap.dev/api/utilities/suggestion
-     */
-    function Suggestion({ pluginKey = SuggestionPluginKey, editor, char = '@', allowSpaces = false, allowedPrefixes = [' '], startOfLine = false, decorationTag = 'span', decorationClass = 'suggestion', command = () => null, items = () => [], render = () => ({}), allow = () => true, findSuggestionMatch: findSuggestionMatch$1 = findSuggestionMatch, }) {
-        let props;
-        const renderer = render === null || render === void 0 ? void 0 : render();
-        const plugin = new Plugin({
-            key: pluginKey,
-            view() {
-                return {
-                    update: async (view, prevState) => {
-                        var _a, _b, _c, _d, _e, _f, _g;
-                        const prev = (_a = this.key) === null || _a === void 0 ? void 0 : _a.getState(prevState);
-                        const next = (_b = this.key) === null || _b === void 0 ? void 0 : _b.getState(view.state);
-                        // See how the state changed
-                        const moved = prev.active && next.active && prev.range.from !== next.range.from;
-                        const started = !prev.active && next.active;
-                        const stopped = prev.active && !next.active;
-                        const changed = !started && !stopped && prev.query !== next.query;
-                        const handleStart = started || moved;
-                        const handleChange = changed && !moved;
-                        const handleExit = stopped || moved;
-                        // Cancel when suggestion isn't active
-                        if (!handleStart && !handleChange && !handleExit) {
-                            return;
-                        }
-                        const state = handleExit && !handleStart ? prev : next;
-                        const decorationNode = view.dom.querySelector(`[data-decoration-id="${state.decorationId}"]`);
-                        props = {
-                            editor,
-                            range: state.range,
-                            query: state.query,
-                            text: state.text,
-                            items: [],
-                            command: commandProps => {
-                                return command({
-                                    editor,
-                                    range: state.range,
-                                    props: commandProps,
-                                });
-                            },
-                            decorationNode,
-                            // virtual node for popper.js or tippy.js
-                            // this can be used for building popups without a DOM node
-                            clientRect: decorationNode
-                                ? () => {
-                                    var _a;
-                                    // because of `items` can be asynchrounous we’ll search for the current decoration node
-                                    const { decorationId } = (_a = this.key) === null || _a === void 0 ? void 0 : _a.getState(editor.state); // eslint-disable-line
-                                    const currentDecorationNode = view.dom.querySelector(`[data-decoration-id="${decorationId}"]`);
-                                    return (currentDecorationNode === null || currentDecorationNode === void 0 ? void 0 : currentDecorationNode.getBoundingClientRect()) || null;
-                                }
-                                : null,
-                        };
-                        if (handleStart) {
-                            (_c = renderer === null || renderer === void 0 ? void 0 : renderer.onBeforeStart) === null || _c === void 0 ? void 0 : _c.call(renderer, props);
-                        }
-                        if (handleChange) {
-                            (_d = renderer === null || renderer === void 0 ? void 0 : renderer.onBeforeUpdate) === null || _d === void 0 ? void 0 : _d.call(renderer, props);
-                        }
-                        if (handleChange || handleStart) {
-                            props.items = await items({
-                                editor,
-                                query: state.query,
-                            });
-                        }
-                        if (handleExit) {
-                            (_e = renderer === null || renderer === void 0 ? void 0 : renderer.onExit) === null || _e === void 0 ? void 0 : _e.call(renderer, props);
-                        }
-                        if (handleChange) {
-                            (_f = renderer === null || renderer === void 0 ? void 0 : renderer.onUpdate) === null || _f === void 0 ? void 0 : _f.call(renderer, props);
-                        }
-                        if (handleStart) {
-                            (_g = renderer === null || renderer === void 0 ? void 0 : renderer.onStart) === null || _g === void 0 ? void 0 : _g.call(renderer, props);
-                        }
-                    },
-                    destroy: () => {
-                        var _a;
-                        if (!props) {
-                            return;
-                        }
-                        (_a = renderer === null || renderer === void 0 ? void 0 : renderer.onExit) === null || _a === void 0 ? void 0 : _a.call(renderer, props);
-                    },
-                };
-            },
-            state: {
-                // Initialize the plugin's internal state.
-                init() {
-                    const state = {
-                        active: false,
-                        range: {
-                            from: 0,
-                            to: 0,
-                        },
-                        query: null,
-                        text: null,
-                        composing: false,
-                    };
-                    return state;
-                },
-                // Apply changes to the plugin state from a view transaction.
-                apply(transaction, prev, oldState, state) {
-                    const { isEditable } = editor;
-                    const { composing } = editor.view;
-                    const { selection } = transaction;
-                    const { empty, from } = selection;
-                    const next = { ...prev };
-                    next.composing = composing;
-                    // We can only be suggesting if the view is editable, and:
-                    //   * there is no selection, or
-                    //   * a composition is active (see: https://github.com/ueberdosis/tiptap/issues/1449)
-                    if (isEditable && (empty || editor.view.composing)) {
-                        // Reset active state if we just left the previous suggestion range
-                        if ((from < prev.range.from || from > prev.range.to) && !composing && !prev.composing) {
-                            next.active = false;
-                        }
-                        // Try to match against where our cursor currently is
-                        const match = findSuggestionMatch$1({
-                            char,
-                            allowSpaces,
-                            allowedPrefixes,
-                            startOfLine,
-                            $position: selection.$from,
-                        });
-                        const decorationId = `id_${Math.floor(Math.random() * 0xffffffff)}`;
-                        // If we found a match, update the current state to show it
-                        if (match && allow({ editor, state, range: match.range })) {
-                            next.active = true;
-                            next.decorationId = prev.decorationId ? prev.decorationId : decorationId;
-                            next.range = match.range;
-                            next.query = match.query;
-                            next.text = match.text;
-                        }
-                        else {
-                            next.active = false;
-                        }
-                    }
-                    else {
-                        next.active = false;
-                    }
-                    // Make sure to empty the range if suggestion is inactive
-                    if (!next.active) {
-                        next.decorationId = null;
-                        next.range = { from: 0, to: 0 };
-                        next.query = null;
-                        next.text = null;
-                    }
-                    return next;
-                },
-            },
-            props: {
-                // Call the keydown hook if suggestion is active.
-                handleKeyDown(view, event) {
-                    var _a;
-                    const { active, range } = plugin.getState(view.state);
-                    if (!active) {
-                        return false;
-                    }
-                    return ((_a = renderer === null || renderer === void 0 ? void 0 : renderer.onKeyDown) === null || _a === void 0 ? void 0 : _a.call(renderer, { view, event, range })) || false;
-                },
-                // Setup decorator on the currently active suggestion.
-                decorations(state) {
-                    const { active, range, decorationId } = plugin.getState(state);
-                    if (!active) {
-                        return null;
-                    }
-                    return DecorationSet.create(state.doc, [
-                        Decoration.inline(range.from, range.to, {
-                            nodeName: decorationTag,
-                            class: decorationClass,
-                            'data-decoration-id': decorationId,
-                        }),
-                    ]);
-                },
-            },
-        });
-        return plugin;
-    }
-
-    var MentionPluginKey = new PluginKey('mention');
-    var Mention = Node.create({
-        name: 'mention',
-        group: 'inline',
-        inline: true,
-        selectable: false,
-        atom: true,
-        addOptions: function () {
-            var _this = this;
-            return {
-                suggestion: {
-                    char: '@',
-                    allowedPrefixes: null,
-                    pluginKey: MentionPluginKey,
-                    command: function (_a) {
-                        var _b, _c;
-                        var editor = _a.editor, range = _a.range, props = _a.props;
-                        // FIXME: fix incorrect `range.to`
-                        range.to = editor.state.selection.to;
-                        // increase range.to by one when the next node is of type "text"
-                        // and starts with a space character
-                        var nodeAfter = editor.view.state.selection.$to.nodeAfter;
-                        var overrideSpace = (_b = nodeAfter === null || nodeAfter === void 0 ? void 0 : nodeAfter.text) === null || _b === void 0 ? void 0 : _b.startsWith(' ');
-                        if (overrideSpace) {
-                            range.to += 1;
-                        }
-                        editor
-                            .chain()
-                            .focus()
-                            .insertContentAt(range, [
-                            {
-                                type: _this.name,
-                                attrs: props,
-                            },
-                            {
-                                type: 'text',
-                                text: ' ',
-                            },
-                        ])
-                            .run();
-                        (_c = window.getSelection()) === null || _c === void 0 ? void 0 : _c.collapseToEnd();
-                    },
-                    allow: function (_a) {
-                        var state = _a.state, range = _a.range;
-                        var $from = state.doc.resolve(range.from);
-                        var type = state.schema.nodes[_this.name];
-                        var allow = !!$from.parent.type.contentMatch.matchType(type);
-                        return allow;
-                    },
-                },
-            };
-        },
-        addAttributes: function () {
-            return {
-                id: {
-                    default: null,
-                    parseHTML: function (element) { return element.getAttribute('data-id'); },
-                },
-                userName: {
-                    default: null,
-                    parseHTML: function (element) { return element.getAttribute('data-user-name'); },
-                },
-                displayName: {
-                    default: null,
-                    parseHTML: function (element) { return element.getAttribute('data-display-name'); },
-                },
-            };
-        },
-        parseHTML: function () {
-            return [
-                {
-                    tag: 'a[class="mention"]',
-                },
-            ];
-        },
-        renderHTML: function (_a) {
-            var _b;
-            var node = _a.node;
-            return [
-                'a',
-                {
-                    class: 'mention',
-                    href: '/' + this.options.suggestion.char + node.attrs.userName,
-                    'data-id': node.attrs.id,
-                    'data-user-name': node.attrs.userName,
-                    'data-display-name': node.attrs.displayName,
-                    rel: 'noopener noreferrer nofollow',
-                },
-                ['span', "@".concat((_b = node.attrs.displayName) !== null && _b !== void 0 ? _b : node.attrs.userName)],
-            ];
-        },
-        addKeyboardShortcuts: function () {
-            var _this = this;
-            return {
-                Backspace: function () {
-                    return _this.editor.commands.command(function (_a) {
-                        var tr = _a.tr, state = _a.state;
-                        var isMention = false;
-                        var selection = state.selection;
-                        var empty = selection.empty, anchor = selection.anchor;
-                        if (!empty) {
-                            return false;
-                        }
-                        state.doc.nodesBetween(anchor - 1, anchor, function (node, pos) {
-                            var _a;
-                            if (node.type.name === _this.name) {
-                                isMention = true;
-                                tr.insertText((_a = _this.options.suggestion.char) !== null && _a !== void 0 ? _a : '', pos, pos + node.nodeSize);
-                                return false;
-                            }
-                        });
-                        return isMention;
-                    });
-                },
-            };
-        },
-        addProseMirrorPlugins: function () {
-            return [
-                Suggestion(__assign$2({ editor: this.editor }, this.options.suggestion)),
-            ];
-        },
-    });
-
-    var baseExtensions = function (placeholder) { return [
-        Document,
-        History,
-        Placeholder.configure({
-            placeholder: placeholder,
-        }),
-        // Basic Formats
-        Text$1,
-        Paragraph,
-        HardBreak.configure({
-            HTMLAttributes: {
-                class: 'smart',
-            },
-        }),
-        // Custom Formats
-        Link,
-        Blockquote,
-    ]; };
-    var baseArticleExtensions = function (placeholder) { return __spreadArray(__spreadArray([], baseExtensions(placeholder), true), [
-        Gapcursor,
-        Bold,
-        Strike,
-        CodeBlock,
-        HorizontalRule,
-        OrderedList,
-        ListItem$1,
-        BulletList,
-        Heading.configure({
-            levels: [2, 3],
-        }),
-    ], false); };
-    var makeArticleEditorExtensions = function (_a) {
-        var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
-        var extensions = __spreadArray(__spreadArray([], baseArticleExtensions(placeholder), true), [
-            FigureImage,
-            FigureAudio,
-            FigureEmbed,
-        ], false);
-        if (mentionSuggestion) {
-            extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
-        }
-        return extensions;
-    };
-    var makeCommentEditorExtensions = function (_a) {
-        var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
-        var extensions = __spreadArray([], baseExtensions(placeholder), true);
-        if (mentionSuggestion) {
-            extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
-        }
-        return extensions;
-    };
-    var makeMomentEditorExtensions = function (_a) {
-        var placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion;
-        var extensions = __spreadArray([], baseExtensions(placeholder), true);
-        if (mentionSuggestion) {
-            extensions.push(Mention.configure({ suggestion: mentionSuggestion }));
-        }
-        return extensions;
-    };
-    var makeCampaignEditorExtensions = function (_a) {
-        var placeholder = _a.placeholder;
-        return [
-            Document,
-            History,
-            Placeholder.configure({
-                placeholder: placeholder,
-            }),
-            // Basic Formats
-            Text$1,
-            Paragraph,
-            HardBreak.configure({
-                HTMLAttributes: {
-                    class: 'smart',
-                },
-            }),
-        ];
-    };
-
-    var useArticleEdtor = function (_a) {
-        var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
-        var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
-        var editor = useEditor(__assign$2({ extensions: __spreadArray(__spreadArray([], makeArticleEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions !== null && extensions !== void 0 ? extensions : []), true), content: content }, restProps));
-        return editor;
-    };
-
-    var useCampaignEditor = function (_a) {
-        var content = _a.content, placeholder = _a.placeholder, editorProps = __rest(_a, ["content", "placeholder"]);
-        var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
-        var editor = useEditor(__assign$2({ extensions: __spreadArray(__spreadArray([], makeCampaignEditorExtensions({ placeholder: placeholder }), true), (extensions !== null && extensions !== void 0 ? extensions : []), true), content: content }, restProps));
-        return editor;
-    };
-
-    var useCommentEditor = function (_a) {
-        var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
-        var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
-        var editor = useEditor(__assign$2({ extensions: __spreadArray(__spreadArray([], makeCommentEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions !== null && extensions !== void 0 ? extensions : []), true), content: content }, restProps));
-        return editor;
-    };
-
-    var useMomentEditor = function (_a) {
-        var content = _a.content, placeholder = _a.placeholder, mentionSuggestion = _a.mentionSuggestion, editorProps = __rest(_a, ["content", "placeholder", "mentionSuggestion"]);
-        var extensions = editorProps.extensions, restProps = __rest(editorProps, ["extensions"]);
-        var editor = useEditor(__assign$2({ extensions: __spreadArray(__spreadArray([], makeMomentEditorExtensions({ placeholder: placeholder, mentionSuggestion: mentionSuggestion }), true), (extensions !== null && extensions !== void 0 ? extensions : []), true), content: content }, restProps));
-        return editor;
-    };
 
     function ok$1() {}
 
@@ -51720,20 +52370,25 @@ img.ProseMirror-separator {
               // type-coverage:ignore-next-line
               constr.prototype
             );
-            const func = proto[property];
+            const value = proto[property];
             /** @type {(...parameters: Array<unknown>) => unknown} */
             const apply = function () {
-              return func.apply(apply, arguments)
+              return value.apply(apply, arguments)
             };
 
             Object.setPrototypeOf(apply, proto);
 
-            const names = Object.getOwnPropertyNames(func);
-
-            for (const p of names) {
-              const descriptor = Object.getOwnPropertyDescriptor(func, p);
-              if (descriptor) Object.defineProperty(apply, p, descriptor);
-            }
+            // Not needed for us in `unified`: we only call this on the `copy`
+            // function,
+            // and we don't need to add its fields (`length`, `name`)
+            // over.
+            // See also: GH-246.
+            // const names = Object.getOwnPropertyNames(value)
+            //
+            // for (const p of names) {
+            //   const descriptor = Object.getOwnPropertyDescriptor(value, p)
+            //   if (descriptor) Object.defineProperty(apply, p, descriptor)
+            // }
 
             return apply
           }
@@ -51889,7 +52544,7 @@ img.ProseMirror-separator {
        * @deprecated
        *   This is a private internal method and should not be used.
        * @returns {Processor<ParseTree, HeadTree, TailTree, CompileTree, CompileResult>}
-       *   New *unfrozen* processor ({@link Processor `Processor`}) that is
+       *   New *unfrozen* processor ({@linkcode Processor}) that is
        *   configured to work the same as its ancestor.
        *   When the descendant processor is configured in the future it does not
        *   affect the ancestral processor.
@@ -51921,11 +52576,11 @@ img.ProseMirror-separator {
        * For example, a list of HTML elements that are self-closing, which is
        * needed during all phases.
        *
-       * > 👉 **Note**: setting information cannot occur on *frozen* processors.
+       * > **Note**: setting information cannot occur on *frozen* processors.
        * > Call the processor first to create a new unfrozen processor.
        *
-       * > 👉 **Note**: to register custom data in TypeScript, augment the
-       * > {@link Data `Data`} interface.
+       * > **Note**: to register custom data in TypeScript, augment the
+       * > {@linkcode Data} interface.
        *
        * @example
        *   This example show how to get and set info:
@@ -52049,9 +52704,9 @@ img.ProseMirror-separator {
       /**
        * Parse text to a syntax tree.
        *
-       * > 👉 **Note**: `parse` freezes the processor if not already *frozen*.
+       * > **Note**: `parse` freezes the processor if not already *frozen*.
        *
-       * > 👉 **Note**: `parse` performs the parse phase, not the run phase or other
+       * > **Note**: `parse` performs the parse phase, not the run phase or other
        * > phases.
        *
        * @param {Compatible | undefined} [file]
@@ -52071,9 +52726,9 @@ img.ProseMirror-separator {
       /**
        * Process the given file as configured on the processor.
        *
-       * > 👉 **Note**: `process` freezes the processor if not already *frozen*.
+       * > **Note**: `process` freezes the processor if not already *frozen*.
        *
-       * > 👉 **Note**: `process` performs the parse, run, and stringify phases.
+       * > **Note**: `process` performs the parse, run, and stringify phases.
        *
        * @overload
        * @param {Compatible | undefined} file
@@ -52097,7 +52752,7 @@ img.ProseMirror-separator {
        *   The parsed, transformed, and compiled value is available at
        *   `file.value` (see note).
        *
-       *   > 👉 **Note**: unified typically compiles by serializing: most
+       *   > **Note**: unified typically compiles by serializing: most
        *   > compilers return `string` (or `Uint8Array`).
        *   > Some compilers, such as the one configured with
        *   > [`rehype-react`][rehype-react], return other values (in this case, a
@@ -52106,7 +52761,7 @@ img.ProseMirror-separator {
        *   > result values.
        *   >
        *   > To register custom results in TypeScript, add them to
-       *   > {@link CompileResultMap `CompileResultMap`}.
+       *   > {@linkcode CompileResultMap}.
        *
        *   [rehype-react]: https://github.com/rehypejs/rehype-react
        */
@@ -52179,9 +52834,9 @@ img.ProseMirror-separator {
        *
        * An error is thrown if asynchronous transforms are configured.
        *
-       * > 👉 **Note**: `processSync` freezes the processor if not already *frozen*.
+       * > **Note**: `processSync` freezes the processor if not already *frozen*.
        *
-       * > 👉 **Note**: `processSync` performs the parse, run, and stringify phases.
+       * > **Note**: `processSync` performs the parse, run, and stringify phases.
        *
        * @param {Compatible | undefined} [file]
        *   File (optional); typically `string` or `VFile`; any value accepted as
@@ -52192,7 +52847,7 @@ img.ProseMirror-separator {
        *   The parsed, transformed, and compiled value is available at
        *   `file.value` (see note).
        *
-       *   > 👉 **Note**: unified typically compiles by serializing: most
+       *   > **Note**: unified typically compiles by serializing: most
        *   > compilers return `string` (or `Uint8Array`).
        *   > Some compilers, such as the one configured with
        *   > [`rehype-react`][rehype-react], return other values (in this case, a
@@ -52201,7 +52856,7 @@ img.ProseMirror-separator {
        *   > result values.
        *   >
        *   > To register custom results in TypeScript, add them to
-       *   > {@link CompileResultMap `CompileResultMap`}.
+       *   > {@linkcode CompileResultMap}.
        *
        *   [rehype-react]: https://github.com/rehypejs/rehype-react
        */
@@ -52233,9 +52888,9 @@ img.ProseMirror-separator {
       /**
        * Run *transformers* on a syntax tree.
        *
-       * > 👉 **Note**: `run` freezes the processor if not already *frozen*.
+       * > **Note**: `run` freezes the processor if not already *frozen*.
        *
-       * > 👉 **Note**: `run` performs the run phase, not other phases.
+       * > **Note**: `run` performs the run phase, not other phases.
        *
        * @overload
        * @param {HeadTree extends undefined ? Node : HeadTree} tree
@@ -52322,9 +52977,9 @@ img.ProseMirror-separator {
        *
        * An error is thrown if asynchronous transforms are configured.
        *
-       * > 👉 **Note**: `runSync` freezes the processor if not already *frozen*.
+       * > **Note**: `runSync` freezes the processor if not already *frozen*.
        *
-       * > 👉 **Note**: `runSync` performs the run phase, not other phases.
+       * > **Note**: `runSync` performs the run phase, not other phases.
        *
        * @param {HeadTree extends undefined ? Node : HeadTree} tree
        *   Tree to transform and inspect.
@@ -52358,9 +53013,9 @@ img.ProseMirror-separator {
       /**
        * Compile a syntax tree.
        *
-       * > 👉 **Note**: `stringify` freezes the processor if not already *frozen*.
+       * > **Note**: `stringify` freezes the processor if not already *frozen*.
        *
-       * > 👉 **Note**: `stringify` performs the stringify phase, not the run phase
+       * > **Note**: `stringify` performs the stringify phase, not the run phase
        * > or other phases.
        *
        * @param {CompileTree extends undefined ? Node : CompileTree} tree
@@ -52371,7 +53026,7 @@ img.ProseMirror-separator {
        * @returns {CompileResult extends undefined ? Value : CompileResult}
        *   Textual representation of the tree (see note).
        *
-       *   > 👉 **Note**: unified typically compiles by serializing: most compilers
+       *   > **Note**: unified typically compiles by serializing: most compilers
        *   > return `string` (or `Uint8Array`).
        *   > Some compilers, such as the one configured with
        *   > [`rehype-react`][rehype-react], return other values (in this case, a
@@ -52380,7 +53035,7 @@ img.ProseMirror-separator {
        *   > result values.
        *   >
        *   > To register custom results in TypeScript, add them to
-       *   > {@link CompileResultMap `CompileResultMap`}.
+       *   > {@linkcode CompileResultMap}.
        *
        *   [rehype-react]: https://github.com/rehypejs/rehype-react
        */
@@ -52402,7 +53057,7 @@ img.ProseMirror-separator {
        * configuration is changed based on the options that are passed in.
        * In other words, the plugin is not added a second time.
        *
-       * > 👉 **Note**: `use` cannot be called on *frozen* processors.
+       * > **Note**: `use` cannot be called on *frozen* processors.
        * > Call the processor first to create a new unfrozen processor.
        *
        * @example
@@ -56057,21 +56712,8 @@ img.ProseMirror-separator {
     }
 
     /**
-     * @typedef {import('micromark-util-types').Event} Event
-     * @typedef {import('micromark-util-types').Extension} Extension
-     * @typedef {import('micromark-util-types').Resolver} Resolver
-     * @typedef {import('micromark-util-types').State} State
-     * @typedef {import('micromark-util-types').Token} Token
-     * @typedef {import('micromark-util-types').TokenizeContext} TokenizeContext
-     * @typedef {import('micromark-util-types').Tokenizer} Tokenizer
-     *
-     * @typedef Options
-     *   Configuration (optional).
-     * @property {boolean | null | undefined} [singleTilde=true]
-     *   Whether to support strikethrough with a single tilde (default: `true`).
-     *
-     *   Single tildes work on github.com, but are technically prohibited by the
-     *   GFM spec.
+     * @import {Options} from 'micromark-extension-gfm-strikethrough'
+     * @import {Event, Extension, Resolver, State, Token, TokenizeContext, Tokenizer} from 'micromark-util-types'
      */
 
     /**
@@ -56087,6 +56729,7 @@ img.ProseMirror-separator {
       const options_ = options || {};
       let single = options_.singleTilde;
       const tokenizer = {
+        name: 'strikethrough',
         tokenize: tokenizeStrikethrough,
         resolveAll: resolveAllStrikethrough
       };
@@ -56103,7 +56746,7 @@ img.ProseMirror-separator {
         attentionMarkers: {
           null: [126]
         }
-      }
+      };
 
       /**
        * Take events and resolve strikethrough.
@@ -56116,24 +56759,15 @@ img.ProseMirror-separator {
         // Walk through all events.
         while (++index < events.length) {
           // Find a token that can close.
-          if (
-            events[index][0] === 'enter' &&
-            events[index][1].type === 'strikethroughSequenceTemporary' &&
-            events[index][1]._close
-          ) {
+          if (events[index][0] === 'enter' && events[index][1].type === 'strikethroughSequenceTemporary' && events[index][1]._close) {
             let open = index;
 
             // Now walk back to find an opener.
             while (open--) {
               // Find a token that can open the closer.
-              if (
-                events[open][0] === 'exit' &&
-                events[open][1].type === 'strikethroughSequenceTemporary' &&
-                events[open][1]._open &&
-                // If the sizes are the same:
-                events[index][1].end.offset - events[index][1].start.offset ===
-                  events[open][1].end.offset - events[open][1].start.offset
-              ) {
+              if (events[open][0] === 'exit' && events[open][1].type === 'strikethroughSequenceTemporary' && events[open][1]._open &&
+              // If the sizes are the same:
+              events[index][1].end.offset - events[index][1].start.offset === events[open][1].end.offset - events[open][1].start.offset) {
                 events[index][1].type = 'strikethroughSequence';
                 events[open][1].type = 'strikethroughSequence';
 
@@ -56153,33 +56787,18 @@ img.ProseMirror-separator {
 
                 // Opening.
                 /** @type {Array<Event>} */
-                const nextEvents = [
-                  ['enter', strikethrough, context],
-                  ['enter', events[open][1], context],
-                  ['exit', events[open][1], context],
-                  ['enter', text, context]
-                ];
+                const nextEvents = [['enter', strikethrough, context], ['enter', events[open][1], context], ['exit', events[open][1], context], ['enter', text, context]];
                 const insideSpan = context.parser.constructs.insideSpan.null;
                 if (insideSpan) {
                   // Between.
-                  splice(
-                    nextEvents,
-                    nextEvents.length,
-                    0,
-                    resolveAll(insideSpan, events.slice(open + 1, index), context)
-                  );
+                  splice(nextEvents, nextEvents.length, 0, resolveAll(insideSpan, events.slice(open + 1, index), context));
                 }
 
                 // Closing.
-                splice(nextEvents, nextEvents.length, 0, [
-                  ['exit', text, context],
-                  ['enter', events[index][1], context],
-                  ['exit', events[index][1], context],
-                  ['exit', strikethrough, context]
-                ]);
+                splice(nextEvents, nextEvents.length, 0, [['exit', text, context], ['enter', events[index][1], context], ['exit', events[index][1], context], ['exit', strikethrough, context]]);
                 splice(events, open - 1, index - open + 3, nextEvents);
                 index = open + nextEvents.length - 2;
-                break
+                break;
               }
             }
           }
@@ -56187,10 +56806,10 @@ img.ProseMirror-separator {
         index = -1;
         while (++index < events.length) {
           if (events[index][1].type === 'strikethroughSequenceTemporary') {
-            events[index][1].type = 'data';
+            events[index][1].type = "data";
           }
         }
-        return events
+        return events;
       }
 
       /**
@@ -56201,18 +56820,15 @@ img.ProseMirror-separator {
         const previous = this.previous;
         const events = this.events;
         let size = 0;
-        return start
+        return start;
 
         /** @type {State} */
         function start(code) {
-          if (
-            previous === 126 &&
-            events[events.length - 1][1].type !== 'characterEscape'
-          ) {
-            return nok(code)
+          if (previous === 126 && events[events.length - 1][1].type !== "characterEscape") {
+            return nok(code);
           }
           effects.enter('strikethroughSequenceTemporary');
-          return more(code)
+          return more(code);
         }
 
         /** @type {State} */
@@ -56220,17 +56836,17 @@ img.ProseMirror-separator {
           const before = classifyCharacter(previous);
           if (code === 126) {
             // If this is the third marker, exit.
-            if (size > 1) return nok(code)
+            if (size > 1) return nok(code);
             effects.consume(code);
             size++;
-            return more
+            return more;
           }
-          if (size < 2 && !single) return nok(code)
+          if (size < 2 && !single) return nok(code);
           const token = effects.exit('strikethroughSequenceTemporary');
           const after = classifyCharacter(code);
-          token._open = !after || (after === 2 && Boolean(before));
-          token._close = !before || (before === 2 && Boolean(after));
-          return ok(code)
+          token._open = !after || after === 2 && Boolean(before);
+          token._close = !before || before === 2 && Boolean(after);
+          return ok(code);
         }
       }
     }
@@ -73493,8 +74109,7 @@ img.ProseMirror-separator {
         });
     };
     var normalizeArticleHTML = function (html, options) {
-        var extensions = makeArticleEditorExtensions({});
-        var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
+        var normalizer = makeNormalizer(__spreadArray(__spreadArray([], articleEditorExtensions, true), [Mention], false));
         var normalizedHtml = normalizer(html);
         if (options === null || options === void 0 ? void 0 : options.truncate) {
             normalizedHtml = truncateLinkText(normalizedHtml, options.truncate);
@@ -73502,8 +74117,7 @@ img.ProseMirror-separator {
         return normalizedHtml;
     };
     var normalizeCommentHTML = function (html, options) {
-        var extensions = makeCommentEditorExtensions({});
-        var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
+        var normalizer = makeNormalizer(__spreadArray(__spreadArray([], commentEditorExtensions, true), [Mention], false));
         var normalizedHtml = normalizer(html);
         if (options === null || options === void 0 ? void 0 : options.truncate) {
             normalizedHtml = truncateLinkText(normalizedHtml, options.truncate);
@@ -73511,8 +74125,7 @@ img.ProseMirror-separator {
         return normalizedHtml;
     };
     var normalizeMomentHTML = function (html, options) {
-        var extensions = makeMomentEditorExtensions({});
-        var normalizer = makeNormalizer(__spreadArray(__spreadArray([], extensions, true), [Mention], false));
+        var normalizer = makeNormalizer(__spreadArray(__spreadArray([], momentEditorExtensions, true), [Mention], false));
         var normalizedHtml = normalizer(html);
         if (options === null || options === void 0 ? void 0 : options.truncate) {
             normalizedHtml = truncateLinkText(normalizedHtml, options.truncate);
@@ -73520,8 +74133,7 @@ img.ProseMirror-separator {
         return normalizedHtml;
     };
     var normalizeCampaignHTML = function (html) {
-        var extensions = makeCampaignEditorExtensions({});
-        var normalizer = makeNormalizer(extensions);
+        var normalizer = makeNormalizer(campaignEditorExtensions);
         return normalizer(html);
     };
 
@@ -73670,30 +74282,51 @@ img.ProseMirror-separator {
         return String(result);
     };
 
+    exports.Blockquote = Blockquote;
+    exports.Bold = Bold;
     exports.BubbleMenu = BubbleMenu;
     exports.CommandManager = CommandManager;
+    exports.Dropcursor = Dropcursor;
     exports.Editor = Editor;
     exports.EditorConsumer = EditorConsumer;
     exports.EditorContent = EditorContent;
     exports.EditorContext = EditorContext;
     exports.EditorProvider = EditorProvider;
     exports.Extension = Extension;
+    exports.FigureAudio = FigureAudio;
+    exports.FigureEmbed = FigureEmbed;
+    exports.FigureImage = FigureImage;
     exports.FloatingMenu = FloatingMenu;
+    exports.HorizontalRule = HorizontalRule;
     exports.InputRule = InputRule;
+    exports.Link = Link;
     exports.Mark = Mark;
+    exports.Mention = Mention;
+    exports.MentionPluginKey = MentionPluginKey;
     exports.Node = Node;
     exports.NodePos = NodePos;
     exports.NodeView = NodeView;
     exports.NodeViewContent = NodeViewContent;
     exports.NodeViewWrapper = NodeViewWrapper;
+    exports.PasteDropFile = PasteDropFile;
     exports.PasteRule = PasteRule;
+    exports.Placeholder = Placeholder;
     exports.PureEditorContent = PureEditorContent;
     exports.ReactNodeViewContext = ReactNodeViewContext;
     exports.ReactNodeViewRenderer = ReactNodeViewRenderer;
     exports.ReactRenderer = ReactRenderer;
+    exports.Suggestion = Suggestion;
+    exports.SuggestionPluginKey = SuggestionPluginKey;
     exports.Tracker = Tracker;
+    exports.articleEditorExtensions = articleEditorExtensions;
+    exports.boldStarInputRegex = boldStarInputRegex;
+    exports.boldStarPasteRegex = boldStarPasteRegex;
+    exports.boldUnderscoreInputRegex = boldUnderscoreInputRegex;
+    exports.boldUnderscorePasteRegex = boldUnderscorePasteRegex;
     exports.callOrReturn = callOrReturn;
+    exports.campaignEditorExtensions = campaignEditorExtensions;
     exports.combineTransactionSteps = combineTransactionSteps;
+    exports.commentEditorExtensions = commentEditorExtensions;
     exports.createChainableState = createChainableState;
     exports.createDocument = createDocument$1;
     exports.createNodeFromContent = createNodeFromContent;
@@ -73708,6 +74341,7 @@ img.ProseMirror-separator {
     exports.findDuplicates = findDuplicates;
     exports.findParentNode = findParentNode;
     exports.findParentNodeClosestToPos = findParentNodeClosestToPos;
+    exports.findSuggestionMatch = findSuggestionMatch;
     exports.fromString = fromString;
     exports.generateHTML = generateHTML;
     exports.generateJSON = generateJSON;
@@ -73737,6 +74371,7 @@ img.ProseMirror-separator {
     exports.getTextSerializersFromSchema = getTextSerializersFromSchema;
     exports.html2md = html2md;
     exports.injectExtensionAttributesToParseRule = injectExtensionAttributesToParseRule;
+    exports.inputRegex = inputRegex$3;
     exports.inputRulesPlugin = inputRulesPlugin;
     exports.isActive = isActive;
     exports.isAtEndOfNode = isAtEndOfNode;
@@ -73756,6 +74391,10 @@ img.ProseMirror-separator {
     exports.isString = isString;
     exports.isTextSelection = isTextSelection;
     exports.isiOS = isiOS;
+    exports.italicStarInputRegex = italicStarInputRegex;
+    exports.italicStarPasteRegex = italicStarPasteRegex;
+    exports.italicUnderscoreInputRegex = italicUnderscoreInputRegex;
+    exports.italicUnderscorePasteRegex = italicUnderscorePasteRegex;
     exports.makeNormalizer = makeNormalizer;
     exports.markInputRule = markInputRule;
     exports.markPasteRule = markPasteRule;
@@ -73763,6 +74402,7 @@ img.ProseMirror-separator {
     exports.mergeAttributes = mergeAttributes;
     exports.mergeDeep = mergeDeep;
     exports.minMax = minMax;
+    exports.momentEditorExtensions = momentEditorExtensions;
     exports.nodeInputRule = nodeInputRule;
     exports.nodePasteRule = nodePasteRule;
     exports.normalizeArticleHTML = normalizeArticleHTML;
@@ -73770,6 +74410,7 @@ img.ProseMirror-separator {
     exports.normalizeCommentHTML = normalizeCommentHTML;
     exports.normalizeMomentHTML = normalizeMomentHTML;
     exports.objectIncludes = objectIncludes;
+    exports.pasteRegex = pasteRegex$1;
     exports.pasteRulesPlugin = pasteRulesPlugin;
     exports.posToDOMRect = posToDOMRect;
     exports.removeDuplicates = removeDuplicates;
@@ -73781,12 +74422,9 @@ img.ProseMirror-separator {
     exports.textPasteRule = textPasteRule;
     exports.textblockTypeInputRule = textblockTypeInputRule;
     exports.truncateLinkText = truncateLinkText;
-    exports.useArticleEdtor = useArticleEdtor;
-    exports.useCampaignEditor = useCampaignEditor;
-    exports.useCommentEditor = useCommentEditor;
     exports.useCurrentEditor = useCurrentEditor;
     exports.useEditor = useEditor;
-    exports.useMomentEditor = useMomentEditor;
+    exports.useEditorState = useEditorState;
     exports.useReactNodeView = useReactNodeView;
     exports.wrappingInputRule = wrappingInputRule;
 
