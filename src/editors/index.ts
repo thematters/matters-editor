@@ -1,5 +1,6 @@
 export * from './extensions'
 export * from '@tiptap/react'
+export * from '@tiptap/suggestion'
 
 import type { EditorOptions } from '@tiptap/react'
 import { useEditor } from '@tiptap/react'

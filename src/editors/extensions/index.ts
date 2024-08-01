@@ -7,6 +7,7 @@ export * from './horizontalRule'
 export * from './link'
 export * from './mention'
 export * from './pasteDropFile'
+export * from '@tiptap/extension-dropcursor'
 export * from '@tiptap/extension-placeholder'
 
 import BulletList from '@tiptap/extension-bullet-list'
