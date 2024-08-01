@@ -14,7 +14,7 @@ import {
 
 type UseEditorProps = EditorOptions
 
-export const useArticleEdtor = ({
+export const useArticleEditor = ({
   extensions,
   content,
   ...restProps
@@ -28,7 +28,7 @@ export const useArticleEdtor = ({
   return editor
 }
 
-export const useCommentEdtor = ({
+export const useCommentEditor = ({
   extensions,
   content,
   ...restProps
@@ -42,7 +42,7 @@ export const useCommentEdtor = ({
   return editor
 }
 
-export const useMomentEdtor = ({
+export const useMomentEditor = ({
   extensions,
   content,
   ...restProps
@@ -56,7 +56,7 @@ export const useMomentEdtor = ({
   return editor
 }
 
-export const useCampaignEdtor = ({
+export const useCampaignEditor = ({
   extensions,
   content,
   ...restProps

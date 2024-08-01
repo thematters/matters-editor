@@ -26,12 +26,12 @@ The editor core, built with [TipTap](https://tiptap.dev) & [ProseMirror](https:/
 ```tsx
 import {
   EditorContent,
-  useArticleEdtor,
+  useArticleEditor,
   useCommentEditor,
 } from '@matters/matters-editor'
 
 const Editor = () => {
-  const editor = useArticleEdtor({
+  const editor = useArticleEditor({
     editable: true,
     placeholder: 'Write your article here...',
     content: '', // initial content
