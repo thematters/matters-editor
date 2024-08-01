@@ -5,11 +5,11 @@ import isURL from 'validator/lib/isURL'
 import { createHTMLDocument, parseHTML, type VHTMLDocument } from 'zeed-dom'
 
 import {
-  makeArticleEditorExtensions,
-  makeCampaignEditorExtensions,
-  makeCommentEditorExtensions,
-  makeMomentEditorExtensions,
+  articleEditorExtensions,
+  campaignEditorExtensions,
+  commentEditorExtensions,
   Mention,
+  momentEditorExtensions,
 } from '../editors/extensions'
 
 export type NormalizeOptions = {
@@ -73,8 +73,7 @@ export const normalizeArticleHTML = (
   html: string,
   options?: NormalizeOptions,
 ): string => {
-  const extensions = makeArticleEditorExtensions({})
-  const normalizer = makeNormalizer([...extensions, Mention])
+  const normalizer = makeNormalizer([...articleEditorExtensions, Mention])
 
   let normalizedHtml = normalizer(html)
 
@@ -89,8 +88,7 @@ export const normalizeCommentHTML = (
   html: string,
   options?: NormalizeOptions,
 ): string => {
-  const extensions = makeCommentEditorExtensions({})
-  const normalizer = makeNormalizer([...extensions, Mention])
+  const normalizer = makeNormalizer([...commentEditorExtensions, Mention])
 
   let normalizedHtml = normalizer(html)
 
@@ -105,8 +103,7 @@ export const normalizeMomentHTML = (
   html: string,
   options?: NormalizeOptions,
 ): string => {
-  const extensions = makeMomentEditorExtensions({})
-  const normalizer = makeNormalizer([...extensions, Mention])
+  const normalizer = makeNormalizer([...momentEditorExtensions, Mention])
 
   let normalizedHtml = normalizer(html)
 
@@ -118,8 +115,6 @@ export const normalizeMomentHTML = (
 }
 
 export const normalizeCampaignHTML = (html: string): string => {
-  const extensions = makeCampaignEditorExtensions({})
-  const normalizer = makeNormalizer(extensions)
-
+  const normalizer = makeNormalizer(campaignEditorExtensions)
   return normalizer(html)
 }

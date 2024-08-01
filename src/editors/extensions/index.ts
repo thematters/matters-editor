@@ -1,3 +1,14 @@
+export * from './blockquote'
+export * from './bold'
+export * from './figureAudio'
+export * from './figureEmbed'
+export * from './figureImage'
+export * from './horizontalRule'
+export * from './link'
+export * from './mention'
+export * from './pasteDropFile'
+export * from '@tiptap/extension-placeholder'
+
 import BulletList from '@tiptap/extension-bullet-list'
 import CodeBlock from '@tiptap/extension-code-block'
 import Document from '@tiptap/extension-document'
@@ -19,22 +30,11 @@ import { FigureEmbed } from './figureEmbed'
 import { FigureImage } from './figureImage'
 import { HorizontalRule } from './horizontalRule'
 import { Link } from './link'
-import { Mention, type MentionSuggestion } from './mention'
 
-export * from './bold'
-export * from './figureAudio'
-export * from './figureEmbed'
-export * from './figureImage'
-export * from './horizontalRule'
-export * from './link'
-export * from './mention'
-
-const baseExtensions = (placeholder?: string) => [
+const baseEditorExtensions = [
   Document,
   History,
-  Placeholder.configure({
-    placeholder,
-  }),
+  Placeholder,
   // Basic Formats
   Text,
   Paragraph,
@@ -48,8 +48,8 @@ const baseExtensions = (placeholder?: string) => [
   Blockquote,
 ]
 
-const baseArticleExtensions = (placeholder?: string) => [
-  ...baseExtensions(placeholder),
+export const articleEditorExtensions = [
+  ...baseEditorExtensions,
   Gapcursor,
   Bold,
   Strike,
@@ -61,99 +61,25 @@ const baseArticleExtensions = (placeholder?: string) => [
   Heading.configure({
     levels: [2, 3],
   }),
+  FigureImage,
+  FigureAudio,
+  FigureEmbed,
 ]
 
-/**
- * Article
- */
-export interface MakeArticleEditorExtensionsProps {
-  placeholder?: string
-  mentionSuggestion?: MentionSuggestion
-}
+export const commentEditorExtensions = [...baseEditorExtensions]
 
-export const makeArticleEditorExtensions = ({
-  placeholder,
-  mentionSuggestion,
-}: MakeArticleEditorExtensionsProps) => {
-  const extensions = [
-    ...baseArticleExtensions(placeholder),
-    FigureImage,
-    FigureAudio,
-    FigureEmbed,
-  ]
+export const momentEditorExtensions = [...baseEditorExtensions]
 
-  if (mentionSuggestion) {
-    extensions.push(Mention.configure({ suggestion: mentionSuggestion }))
-  }
-
-  return extensions
-}
-
-/**
- * Comment
- */
-export interface MakeCommentEditorExtensionsProps {
-  placeholder?: string
-  mentionSuggestion?: MentionSuggestion
-}
-
-export const makeCommentEditorExtensions = ({
-  placeholder,
-  mentionSuggestion,
-}: MakeCommentEditorExtensionsProps) => {
-  const extensions = [...baseExtensions(placeholder)]
-
-  if (mentionSuggestion) {
-    extensions.push(Mention.configure({ suggestion: mentionSuggestion }))
-  }
-
-  return extensions
-}
-
-/**
- * Moment
- */
-export interface MakeMomentEditorExtensionsProps {
-  placeholder?: string
-  mentionSuggestion?: MentionSuggestion
-}
-
-export const makeMomentEditorExtensions = ({
-  placeholder,
-  mentionSuggestion,
-}: MakeMomentEditorExtensionsProps) => {
-  const extensions = [...baseExtensions(placeholder)]
-
-  if (mentionSuggestion) {
-    extensions.push(Mention.configure({ suggestion: mentionSuggestion }))
-  }
-
-  return extensions
-}
-
-/**
- * Campaign
- */
-export interface MakeCampaignEditorExtensionsProps {
-  placeholder?: string
-}
-
-export const makeCampaignEditorExtensions = ({
-  placeholder,
-}: MakeCampaignEditorExtensionsProps) => {
-  return [
-    Document,
-    History,
-    Placeholder.configure({
-      placeholder,
-    }),
-    // Basic Formats
-    Text,
-    Paragraph,
-    HardBreak.configure({
-      HTMLAttributes: {
-        class: 'smart',
-      },
-    }),
-  ]
-}
+export const campaignEditorExtensions = [
+  Document,
+  History,
+  Placeholder,
+  // Basic Formats
+  Text,
+  Paragraph,
+  HardBreak.configure({
+    HTMLAttributes: {
+      class: 'smart',
+    },
+  }),
+]
