@@ -1,5 +1,3 @@
-export * from './Article'
-export * from './Campaign'
-export * from './Comment'
-export * from './Moment'
+export * from './extensions'
 export * from '@tiptap/react'
+export * from '@tiptap/suggestion'
