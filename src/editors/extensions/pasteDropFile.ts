@@ -63,6 +63,6 @@ export const PasteDropFile = Node.create<PasteDropFileOptions>({
   name: pluginName,
 
   addProseMirrorPlugins() {
-    return [makePlugin({ ...this.options, editor: this.editor as Editor })]
+    return [makePlugin({ ...this.options, editor: this.editor })]
   },
 })
