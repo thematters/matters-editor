@@ -154,7 +154,7 @@ export const FigureAudio = Node.create({
   addProseMirrorPlugins() {
     return [
       new Plugin({
-        key: new PluginKey('removePastedFigureImage'),
+        key: new PluginKey('removePastedFigureAudio'),
         props: {
           transformPastedHTML(html) {
             html = html
