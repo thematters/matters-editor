@@ -12,7 +12,7 @@ type PasteDropFileOptions = {
   // drop event handler
   onDrop: (editor: Editor, files: File[], pos: number) => void
   // accepted mime types
-  mimeTypes: string[]
+  mimeTypes?: string[]
 }
 
 const pluginName = 'pasteDropFile'
@@ -27,9 +27,11 @@ const makePlugin = ({
     key: new PluginKey(pluginName),
     props: {
       handleDrop(view, event) {
-        const files = Array.from(event.dataTransfer?.files || []).filter(
-          (file) => mimeTypes.includes(file.type),
-        )
+        let files = Array.from(event.dataTransfer?.files || [])
+
+        if (mimeTypes) {
+          files = files.filter((file) => mimeTypes.includes(file.type))
+        }
 
         if (files.length <= 0) return
 
@@ -44,9 +46,11 @@ const makePlugin = ({
         return true
       },
       handlePaste(view, event) {
-        const files = Array.from(event.clipboardData?.files || []).filter(
-          (file) => mimeTypes.includes(file.type),
-        )
+        let files = Array.from(event.clipboardData?.files || [])
+
+        if (mimeTypes) {
+          files = files.filter((file) => mimeTypes.includes(file.type))
+        }
 
         if (files.length <= 0) return
 
