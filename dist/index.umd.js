@@ -18728,6 +18728,7 @@ img.ProseMirror-separator {
     });
 
     var pluginName$4 = 'figcaptionKit';
+    var supportedFigureExtensions = ['figureAudio', 'figureEmbed', 'figureImage'];
     var makeFigcaptionEventHandlerPlugin = function (_a) {
         var editor = _a.editor;
         return new Plugin({
@@ -18753,9 +18754,9 @@ img.ProseMirror-separator {
                         return;
                     }
                     var anchorParent = view.state.selection.$anchor.parent;
-                    var isCurrentPlugin = anchorParent.type.name === pluginName$4;
+                    var isFigureExtensions = supportedFigureExtensions.includes(anchorParent.type.name);
                     var isEmptyFigcaption = anchorParent.content.size <= 0;
-                    if (!isCurrentPlugin) {
+                    if (!isFigureExtensions) {
                         return;
                     }
                     // backSpace to remove if the figcaption is empty
@@ -18791,11 +18792,14 @@ img.ProseMirror-separator {
         addOptions: function () {
             return {
                 maxCaptionLength: undefined,
+                emptyNodeClass: 'is-figure-empty',
+                placeholder: 'Write something …',
             };
         },
         addProseMirrorPlugins: function () {
             var _this = this;
             return [
+                /* figcaptionLimit */
                 new Plugin({
                     key: new PluginKey('figcaptionLimit'),
                     filterTransaction: function (transaction) {
@@ -18824,6 +18828,35 @@ img.ProseMirror-separator {
                         return true;
                     },
                 }),
+                /* figcaptionPlaceholder */
+                new Plugin({
+                    key: new PluginKey('figcaptionPlaceholder'),
+                    props: {
+                        decorations: function (_a) {
+                            var doc = _a.doc, selection = _a.selection;
+                            var decorations = [];
+                            doc.descendants(function (node, pos) {
+                                var isFigureExtensions = supportedFigureExtensions.includes(node.type.name);
+                                if (!isFigureExtensions)
+                                    return;
+                                var isEmpty = !node.isLeaf && !node.childCount;
+                                if (!isEmpty)
+                                    return;
+                                // focus on the figcaption node
+                                var isAtFigcaption = selection.$anchor.pos === pos + 1;
+                                if (isAtFigcaption)
+                                    return;
+                                var decoration = Decoration.node(pos, pos + node.nodeSize, {
+                                    class: _this.options.emptyNodeClass,
+                                    'data-figure-placeholder': _this.options.placeholder,
+                                });
+                                decorations.push(decoration);
+                            });
+                            return DecorationSet.create(doc, decorations);
+                        },
+                    },
+                }),
+                /* figcaptionEventHandler */
                 makeFigcaptionEventHandlerPlugin({ editor: this.editor }),
             ];
         },

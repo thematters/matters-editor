@@ -8,11 +8,14 @@ import { Plugin } from '@tiptap/pm/state';
  * - handle enter key event to insert a new paragraph
  * - handle backspace key event to remove the figcaption if it's empty
  * - handle click event to select the figcaption
+ * - customize the empty node class and placeholder
  *
  * @see {https://github.com/ueberdosis/tiptap/issues/629}
  */
 type FigcaptionKitOptions = {
     maxCaptionLength?: number;
+    emptyNodeClass?: string;
+    placeholder?: string;
 };
 export declare const makeFigcaptionEventHandlerPlugin: ({ editor, }: {
     editor: Editor;
