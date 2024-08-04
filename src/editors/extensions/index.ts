@@ -1,5 +1,6 @@
 export * from './blockquote'
 export * from './bold'
+export * from './figcaptionKit'
 export * from './figureAudio'
 export * from './figureEmbed'
 export * from './figureImage'
@@ -26,6 +27,7 @@ import Text from '@tiptap/extension-text'
 
 import { Blockquote } from './blockquote'
 import { Bold } from './bold'
+import { FigcaptionKit } from './figcaptionKit'
 import { FigureAudio } from './figureAudio'
 import { FigureEmbed } from './figureEmbed'
 import { FigureImage } from './figureImage'
@@ -65,6 +67,7 @@ export const articleEditorExtensions = [
   FigureImage,
   FigureAudio,
   FigureEmbed,
+  FigcaptionKit,
 ]
 
 export const commentEditorExtensions = [...baseEditorExtensions]

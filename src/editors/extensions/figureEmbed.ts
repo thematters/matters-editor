@@ -1,4 +1,4 @@
-import { type Editor, Node } from '@tiptap/core'
+import { Node } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 
 /**
@@ -255,6 +255,7 @@ export const FigureEmbed = Node.create({
   content: 'text*',
   draggable: true,
   isolating: true,
+  atom: true,
 
   // disallows all marks for figcaption
   marks: '',
@@ -359,56 +360,7 @@ export const FigureEmbed = Node.create({
       new Plugin({
         key: new PluginKey('removePastedFigureEmbed'),
         props: {
-          handleKeyDown(view, event) {
-            const isBackSpace = event.key.toLowerCase() === 'backspace'
-            const isEnter = event.key.toLowerCase() === 'enter'
-
-            if (!isBackSpace && !isEnter) {
-              return
-            }
-
-            const anchorParent = view.state.selection.$anchor.parent
-            const isCurrentPlugin = anchorParent.type.name === pluginName
-            const isEmptyFigcaption = anchorParent.content.size <= 0
-
-            if (!isCurrentPlugin) {
-              return
-            }
-
-            // @ts-expect-error
-            const editor = view.dom.editor as Editor
-
-            // backSpace to remove if the figcaption is empty
-            if (isBackSpace && isEmptyFigcaption) {
-              // FIXME: setTimeOut to avoid repetitive deletion
-              setTimeout(() => {
-                editor.commands.deleteNode(pluginName)
-              })
-              return
-            }
-
-            // insert a new paragraph
-            if (isEnter) {
-              const { $from, $to } = editor.state.selection
-              const isTextAfter = $to.nodeAfter?.type?.name === 'text'
-
-              // skip if figcaption text is selected
-              // or has text after current selection
-              if ($from !== $to || isTextAfter) {
-                return
-              }
-
-              // FIXME: setTimeOut to avoid repetitive paragraph insertion
-              setTimeout(() => {
-                editor.commands.insertContentAt($to.pos + 1, {
-                  type: 'paragraph',
-                })
-              })
-            }
-          },
-
           transformPastedHTML(html) {
-            // remove
             html = html
               .replace(/\n/g, '')
               .replace(/<figure.*class=.embed.*[\n]*.*?<\/figure>/g, '')
