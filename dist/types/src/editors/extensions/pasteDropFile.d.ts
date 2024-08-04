@@ -6,7 +6,7 @@ import { Editor } from '@tiptap/core';
 type PasteDropFileOptions = {
     onPaste: (editor: Editor, files: File[]) => void;
     onDrop: (editor: Editor, files: File[], pos: number) => void;
-    mimeTypes: string[];
+    mimeTypes?: string[];
 };
 export declare const PasteDropFile: Node<PasteDropFileOptions, any>;
 export {};

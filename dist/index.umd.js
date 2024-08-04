@@ -21874,7 +21874,10 @@ img.ProseMirror-separator {
             props: {
                 handleDrop: function (view, event) {
                     var _a;
-                    var files = Array.from(((_a = event.dataTransfer) === null || _a === void 0 ? void 0 : _a.files) || []).filter(function (file) { return mimeTypes.includes(file.type); });
+                    var files = Array.from(((_a = event.dataTransfer) === null || _a === void 0 ? void 0 : _a.files) || []);
+                    if (mimeTypes) {
+                        files = files.filter(function (file) { return mimeTypes.includes(file.type); });
+                    }
                     if (files.length <= 0)
                         return;
                     var position = view.posAtCoords({
@@ -21887,7 +21890,10 @@ img.ProseMirror-separator {
                 },
                 handlePaste: function (view, event) {
                     var _a;
-                    var files = Array.from(((_a = event.clipboardData) === null || _a === void 0 ? void 0 : _a.files) || []).filter(function (file) { return mimeTypes.includes(file.type); });
+                    var files = Array.from(((_a = event.clipboardData) === null || _a === void 0 ? void 0 : _a.files) || []);
+                    if (mimeTypes) {
+                        files = files.filter(function (file) { return mimeTypes.includes(file.type); });
+                    }
                     if (files.length <= 0)
                         return;
                     event.stopPropagation();
