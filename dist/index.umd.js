@@ -18727,6 +18727,108 @@ img.ProseMirror-separator {
         },
     });
 
+    var pluginName$4 = 'figcaptionKit';
+    var makeFigcaptionEventHandlerPlugin = function (_a) {
+        var editor = _a.editor;
+        return new Plugin({
+            key: new PluginKey('figcaptionEventHandler'),
+            props: {
+                handleClickOn: function (view, pos, node, nodePos, event) {
+                    var isFigcaption = event.target instanceof HTMLElement
+                        ? event.target.tagName.toUpperCase() === 'FIGCAPTION'
+                        : false;
+                    if (!isFigcaption)
+                        return;
+                    // set the selection to the figcaption node
+                    editor.commands.setTextSelection(pos);
+                    // to prevent the default behavior which is to select the whole node
+                    // @see {@url https://discuss.prosemirror.net/t/prevent-nodeview-selection-on-click/3193}
+                    return true;
+                },
+                handleKeyDown: function (view, event) {
+                    var _a, _b;
+                    var isBackSpace = event.key.toLowerCase() === 'backspace';
+                    var isEnter = event.key.toLowerCase() === 'enter';
+                    if (!isBackSpace && !isEnter) {
+                        return;
+                    }
+                    var anchorParent = view.state.selection.$anchor.parent;
+                    var isCurrentPlugin = anchorParent.type.name === pluginName$4;
+                    var isEmptyFigcaption = anchorParent.content.size <= 0;
+                    if (!isCurrentPlugin) {
+                        return;
+                    }
+                    // backSpace to remove if the figcaption is empty
+                    if (isBackSpace && isEmptyFigcaption) {
+                        // FIXME: setTimeOut to avoid repetitive deletion
+                        setTimeout(function () {
+                            editor.commands.deleteNode(pluginName$4);
+                        });
+                        return;
+                    }
+                    // insert a new paragraph
+                    if (isEnter) {
+                        var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
+                        var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
+                        // skip if figcaption text is selected
+                        // or has text after current selection
+                        if ($from !== $to_1 || isTextAfter) {
+                            return;
+                        }
+                        // FIXME: setTimeOut to avoid repetitive paragraph insertion
+                        setTimeout(function () {
+                            editor.commands.insertContentAt($to_1.pos + 1, {
+                                type: 'paragraph',
+                            });
+                        });
+                    }
+                },
+            },
+        });
+    };
+    var FigcaptionKit = Node.create({
+        name: pluginName$4,
+        addOptions: function () {
+            return {
+                maxCaptionLength: undefined,
+            };
+        },
+        addProseMirrorPlugins: function () {
+            var _this = this;
+            return [
+                new Plugin({
+                    key: new PluginKey('figcaptionLimit'),
+                    filterTransaction: function (transaction) {
+                        // Nothing has changed, ignore it.
+                        if (!transaction.docChanged || !_this.options.maxCaptionLength) {
+                            return true;
+                        }
+                        try {
+                            // skip if not in a figure
+                            var anchorParent = transaction.selection.$anchor.parent;
+                            var isFigure = anchorParent.type.name.includes('figure');
+                            if (!isFigure) {
+                                return true;
+                            }
+                            // limit figcaption length
+                            if (anchorParent.content.size <= 0)
+                                return true;
+                            var figcaptionText = anchorParent.content.child(0).text || '';
+                            if (figcaptionText.length > _this.options.maxCaptionLength) {
+                                return false;
+                            }
+                        }
+                        catch (e) {
+                            console.error(e);
+                        }
+                        return true;
+                    },
+                }),
+                makeFigcaptionEventHandlerPlugin({ editor: this.editor }),
+            ];
+        },
+    });
+
     var pluginName$3 = 'figureAudio';
     var FigureAudio = Node.create({
         name: pluginName$3,
@@ -18734,6 +18836,7 @@ img.ProseMirror-separator {
         content: 'text*',
         draggable: true,
         isolating: true,
+        atom: true,
         // disallows all marks for figcaption
         marks: '',
         addAttributes: function () {
@@ -18832,48 +18935,7 @@ img.ProseMirror-separator {
                 new Plugin({
                     key: new PluginKey('removePastedFigureAudio'),
                     props: {
-                        handleKeyDown: function (view, event) {
-                            var _a, _b;
-                            var isBackSpace = event.key.toLowerCase() === 'backspace';
-                            var isEnter = event.key.toLowerCase() === 'enter';
-                            if (!isBackSpace && !isEnter) {
-                                return;
-                            }
-                            var anchorParent = view.state.selection.$anchor.parent;
-                            var isCurrentPlugin = anchorParent.type.name === pluginName$3;
-                            var isEmptyFigcaption = anchorParent.content.size <= 0;
-                            if (!isCurrentPlugin) {
-                                return;
-                            }
-                            // @ts-expect-error
-                            var editor = view.dom.editor;
-                            // backSpace to remove if the figcaption is empty
-                            if (isBackSpace && isEmptyFigcaption) {
-                                // FIXME: setTimeOut to avoid repetitive deletion
-                                setTimeout(function () {
-                                    editor.commands.deleteNode(pluginName$3);
-                                });
-                                return;
-                            }
-                            // insert a new paragraph
-                            if (isEnter) {
-                                var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
-                                var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
-                                // skip if figcaption text is selected
-                                // or has text after current selection
-                                if ($from !== $to_1 || isTextAfter) {
-                                    return;
-                                }
-                                // FIXME: setTimeOut to avoid repetitive paragraph insertion
-                                setTimeout(function () {
-                                    editor.commands.insertContentAt($to_1.pos + 1, {
-                                        type: 'paragraph',
-                                    });
-                                });
-                            }
-                        },
                         transformPastedHTML: function (html) {
-                            // remove
                             html = html
                                 .replace(/\n/g, '')
                                 .replace(/<figure.*class=.audio.*[\n]*.*?<\/figure>/g, '');
@@ -19076,6 +19138,7 @@ img.ProseMirror-separator {
         content: 'text*',
         draggable: true,
         isolating: true,
+        atom: true,
         // disallows all marks for figcaption
         marks: '',
         addAttributes: function () {
@@ -19159,48 +19222,7 @@ img.ProseMirror-separator {
                 new Plugin({
                     key: new PluginKey('removePastedFigureEmbed'),
                     props: {
-                        handleKeyDown: function (view, event) {
-                            var _a, _b;
-                            var isBackSpace = event.key.toLowerCase() === 'backspace';
-                            var isEnter = event.key.toLowerCase() === 'enter';
-                            if (!isBackSpace && !isEnter) {
-                                return;
-                            }
-                            var anchorParent = view.state.selection.$anchor.parent;
-                            var isCurrentPlugin = anchorParent.type.name === pluginName$2;
-                            var isEmptyFigcaption = anchorParent.content.size <= 0;
-                            if (!isCurrentPlugin) {
-                                return;
-                            }
-                            // @ts-expect-error
-                            var editor = view.dom.editor;
-                            // backSpace to remove if the figcaption is empty
-                            if (isBackSpace && isEmptyFigcaption) {
-                                // FIXME: setTimeOut to avoid repetitive deletion
-                                setTimeout(function () {
-                                    editor.commands.deleteNode(pluginName$2);
-                                });
-                                return;
-                            }
-                            // insert a new paragraph
-                            if (isEnter) {
-                                var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
-                                var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
-                                // skip if figcaption text is selected
-                                // or has text after current selection
-                                if ($from !== $to_1 || isTextAfter) {
-                                    return;
-                                }
-                                // FIXME: setTimeOut to avoid repetitive paragraph insertion
-                                setTimeout(function () {
-                                    editor.commands.insertContentAt($to_1.pos + 1, {
-                                        type: 'paragraph',
-                                    });
-                                });
-                            }
-                        },
                         transformPastedHTML: function (html) {
-                            // remove
                             html = html
                                 .replace(/\n/g, '')
                                 .replace(/<figure.*class=.embed.*[\n]*.*?<\/figure>/g, '');
@@ -19219,6 +19241,8 @@ img.ProseMirror-separator {
         content: 'text*',
         draggable: true,
         isolating: true,
+        selectable: true,
+        atom: true,
         // disallows all marks for figcaption
         marks: '',
         addAttributes: function () {
@@ -19287,48 +19311,7 @@ img.ProseMirror-separator {
                 new Plugin({
                     key: new PluginKey('removePastedFigureImage'),
                     props: {
-                        handleKeyDown: function (view, event) {
-                            var _a, _b;
-                            var isBackSpace = event.key.toLowerCase() === 'backspace';
-                            var isEnter = event.key.toLowerCase() === 'enter';
-                            if (!isBackSpace && !isEnter) {
-                                return;
-                            }
-                            var anchorParent = view.state.selection.$anchor.parent;
-                            var isCurrentPlugin = anchorParent.type.name === pluginName$1;
-                            var isEmptyFigcaption = anchorParent.content.size <= 0;
-                            if (!isCurrentPlugin) {
-                                return;
-                            }
-                            // @ts-expect-error
-                            var editor = view.dom.editor;
-                            // backSpace to remove if the figcaption is empty
-                            if (isBackSpace && isEmptyFigcaption) {
-                                // FIXME: setTimeOut to avoid repetitive deletion
-                                setTimeout(function () {
-                                    editor.commands.deleteNode(pluginName$1);
-                                });
-                                return;
-                            }
-                            // insert a new paragraph
-                            if (isEnter) {
-                                var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
-                                var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
-                                // skip if figcaption text is selected
-                                // or has text after current selection
-                                if ($from !== $to_1 || isTextAfter) {
-                                    return;
-                                }
-                                // FIXME: setTimeOut to avoid repetitive paragraph insertion
-                                setTimeout(function () {
-                                    editor.commands.insertContentAt($to_1.pos + 1, {
-                                        type: 'paragraph',
-                                    });
-                                });
-                            }
-                        },
                         transformPastedHTML: function (html) {
-                            // remove
                             html = html
                                 .replace(/\n/g, '')
                                 .replace(/<figure.*class=.image.*[\n]*.*?<\/figure>/g, '');
@@ -23881,6 +23864,7 @@ img.ProseMirror-separator {
         FigureImage,
         FigureAudio,
         FigureEmbed,
+        FigcaptionKit,
     ], false);
     var commentEditorExtensions = __spreadArray([], baseEditorExtensions, true);
     var momentEditorExtensions = __spreadArray([], baseEditorExtensions, true);
@@ -74293,6 +74277,7 @@ img.ProseMirror-separator {
     exports.EditorContext = EditorContext;
     exports.EditorProvider = EditorProvider;
     exports.Extension = Extension;
+    exports.FigcaptionKit = FigcaptionKit;
     exports.FigureAudio = FigureAudio;
     exports.FigureEmbed = FigureEmbed;
     exports.FigureImage = FigureImage;
@@ -74395,6 +74380,7 @@ img.ProseMirror-separator {
     exports.italicStarPasteRegex = italicStarPasteRegex;
     exports.italicUnderscoreInputRegex = italicUnderscoreInputRegex;
     exports.italicUnderscorePasteRegex = italicUnderscorePasteRegex;
+    exports.makeFigcaptionEventHandlerPlugin = makeFigcaptionEventHandlerPlugin;
     exports.makeNormalizer = makeNormalizer;
     exports.markInputRule = markInputRule;
     exports.markPasteRule = markPasteRule;

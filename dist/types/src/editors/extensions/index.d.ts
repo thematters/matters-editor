@@ -1,5 +1,6 @@
 export * from './blockquote';
 export * from './bold';
+export * from './figcaptionKit';
 export * from './figureAudio';
 export * from './figureEmbed';
 export * from './figureImage';
