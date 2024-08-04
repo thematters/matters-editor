@@ -1,6 +1,7 @@
 import { type Editor } from '@tiptap/core'
 import { Node } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 
 /**
  * FigcaptionKit extension works with FigureAudio,
@@ -9,15 +10,20 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
  * - handle enter key event to insert a new paragraph
  * - handle backspace key event to remove the figcaption if it's empty
  * - handle click event to select the figcaption
+ * - customize the empty node class and placeholder
  *
  * @see {https://github.com/ueberdosis/tiptap/issues/629}
  */
 
 type FigcaptionKitOptions = {
   maxCaptionLength?: number
+  emptyNodeClass?: string
+  placeholder?: string
 }
 
 const pluginName = 'figcaptionKit'
+
+const supportedFigureExtensions = ['figureAudio', 'figureEmbed', 'figureImage']
 
 export const makeFigcaptionEventHandlerPlugin = ({
   editor,
@@ -51,10 +57,12 @@ export const makeFigcaptionEventHandlerPlugin = ({
         }
 
         const anchorParent = view.state.selection.$anchor.parent
-        const isCurrentPlugin = anchorParent.type.name === pluginName
+        const isFigureExtensions = supportedFigureExtensions.includes(
+          anchorParent.type.name,
+        )
         const isEmptyFigcaption = anchorParent.content.size <= 0
 
-        if (!isCurrentPlugin) {
+        if (!isFigureExtensions) {
           return
         }
 
@@ -96,11 +104,14 @@ export const FigcaptionKit = Node.create<FigcaptionKitOptions>({
   addOptions() {
     return {
       maxCaptionLength: undefined,
+      emptyNodeClass: 'is-figure-empty',
+      placeholder: 'Write something …',
     }
   },
 
   addProseMirrorPlugins() {
     return [
+      /* figcaptionLimit */
       new Plugin({
         key: new PluginKey('figcaptionLimit'),
         filterTransaction: (transaction) => {
@@ -132,6 +143,41 @@ export const FigcaptionKit = Node.create<FigcaptionKitOptions>({
         },
       }),
 
+      /* figcaptionPlaceholder */
+      new Plugin({
+        key: new PluginKey('figcaptionPlaceholder'),
+        props: {
+          decorations: ({ doc, selection }) => {
+            const decorations: Decoration[] = []
+
+            doc.descendants((node, pos) => {
+              const isFigureExtensions = supportedFigureExtensions.includes(
+                node.type.name,
+              )
+
+              if (!isFigureExtensions) return
+
+              const isEmpty = !node.isLeaf && !node.childCount
+              if (!isEmpty) return
+
+              // focus on the figcaption node
+              const isAtFigcaption = selection.$anchor.pos === pos + 1
+              if (isAtFigcaption) return
+
+              const decoration = Decoration.node(pos, pos + node.nodeSize, {
+                class: this.options.emptyNodeClass,
+                'data-figure-placeholder': this.options.placeholder,
+              })
+
+              decorations.push(decoration)
+            })
+
+            return DecorationSet.create(doc, decorations)
+          },
+        },
+      }),
+
+      /* figcaptionEventHandler */
       makeFigcaptionEventHandlerPlugin({ editor: this.editor }),
     ]
   },
