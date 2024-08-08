@@ -7,8 +7,6 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
  * FigcaptionKit extension works with FigureAudio,
  * FigureEmbed and FigureImage extensions to:
  * - limit figcaption length
- * - handle enter key event to insert a new paragraph
- * - handle backspace key event to remove the figcaption if it's empty
  * - handle click event to select the figcaption
  * - customize the empty node class and placeholder
  *
@@ -47,52 +45,6 @@ export const makeFigcaptionEventHandlerPlugin = ({
         // to prevent the default behavior which is to select the whole node
         // @see {@url https://discuss.prosemirror.net/t/prevent-nodeview-selection-on-click/3193}
         return true
-      },
-      handleKeyDown(view, event) {
-        const isBackSpace = event.key.toLowerCase() === 'backspace'
-        const isEnter = event.key.toLowerCase() === 'enter'
-
-        if (!isBackSpace && !isEnter) {
-          return
-        }
-
-        const anchorParent = view.state.selection.$anchor.parent
-        const isFigureExtensions = supportedFigureExtensions.includes(
-          anchorParent.type.name,
-        )
-        const isEmptyFigcaption = anchorParent.content.size <= 0
-
-        if (!isFigureExtensions) {
-          return
-        }
-
-        // backSpace to remove if the figcaption is empty
-        if (isBackSpace && isEmptyFigcaption) {
-          // FIXME: setTimeOut to avoid repetitive deletion
-          setTimeout(() => {
-            editor.commands.deleteNode(pluginName)
-          })
-          return
-        }
-
-        // insert a new paragraph
-        if (isEnter) {
-          const { $from, $to } = editor.state.selection
-          const isTextAfter = $to.nodeAfter?.type?.name === 'text'
-
-          // skip if figcaption text is selected
-          // or has text after current selection
-          if ($from !== $to || isTextAfter) {
-            return
-          }
-
-          // FIXME: setTimeOut to avoid repetitive paragraph insertion
-          setTimeout(() => {
-            editor.commands.insertContentAt($to.pos + 1, {
-              type: 'paragraph',
-            })
-          })
-        }
       },
     },
   })
