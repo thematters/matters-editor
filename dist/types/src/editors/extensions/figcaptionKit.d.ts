@@ -5,8 +5,6 @@ import { Plugin } from '@tiptap/pm/state';
  * FigcaptionKit extension works with FigureAudio,
  * FigureEmbed and FigureImage extensions to:
  * - limit figcaption length
- * - handle enter key event to insert a new paragraph
- * - handle backspace key event to remove the figcaption if it's empty
  * - handle click event to select the figcaption
  * - customize the empty node class and placeholder
  *

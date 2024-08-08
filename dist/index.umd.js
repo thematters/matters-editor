@@ -18746,44 +18746,6 @@ img.ProseMirror-separator {
                     // @see {@url https://discuss.prosemirror.net/t/prevent-nodeview-selection-on-click/3193}
                     return true;
                 },
-                handleKeyDown: function (view, event) {
-                    var _a, _b;
-                    var isBackSpace = event.key.toLowerCase() === 'backspace';
-                    var isEnter = event.key.toLowerCase() === 'enter';
-                    if (!isBackSpace && !isEnter) {
-                        return;
-                    }
-                    var anchorParent = view.state.selection.$anchor.parent;
-                    var isFigureExtensions = supportedFigureExtensions.includes(anchorParent.type.name);
-                    var isEmptyFigcaption = anchorParent.content.size <= 0;
-                    if (!isFigureExtensions) {
-                        return;
-                    }
-                    // backSpace to remove if the figcaption is empty
-                    if (isBackSpace && isEmptyFigcaption) {
-                        // FIXME: setTimeOut to avoid repetitive deletion
-                        setTimeout(function () {
-                            editor.commands.deleteNode(pluginName$4);
-                        });
-                        return;
-                    }
-                    // insert a new paragraph
-                    if (isEnter) {
-                        var _c = editor.state.selection, $from = _c.$from, $to_1 = _c.$to;
-                        var isTextAfter = ((_b = (_a = $to_1.nodeAfter) === null || _a === void 0 ? void 0 : _a.type) === null || _b === void 0 ? void 0 : _b.name) === 'text';
-                        // skip if figcaption text is selected
-                        // or has text after current selection
-                        if ($from !== $to_1 || isTextAfter) {
-                            return;
-                        }
-                        // FIXME: setTimeOut to avoid repetitive paragraph insertion
-                        setTimeout(function () {
-                            editor.commands.insertContentAt($to_1.pos + 1, {
-                                type: 'paragraph',
-                            });
-                        });
-                    }
-                },
             },
         });
     };
