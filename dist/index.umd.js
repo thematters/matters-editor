@@ -14402,7 +14402,7 @@
 
     function findDuplicates(items) {
         const filtered = items.filter((el, index) => items.indexOf(el) !== index);
-        return [...new Set(filtered)];
+        return Array.from(new Set(filtered));
     }
 
     class ExtensionManager {
@@ -16072,7 +16072,7 @@
                 .resolve(from)
                 .marks()
                 .forEach(mark => {
-                const $pos = doc.resolve(from - 1);
+                const $pos = doc.resolve(from);
                 const range = getMarkRange($pos, mark.type);
                 if (!range) {
                     return;
@@ -16265,31 +16265,40 @@
     }
 
     /**
-     * Returns true if the given node is empty.
-     * When `checkChildren` is true (default), it will also check if all children are empty.
+     * Returns true if the given prosemirror node is empty.
      */
-    function isNodeEmpty(node, { checkChildren } = { checkChildren: true }) {
+    function isNodeEmpty(node, { checkChildren = true, ignoreWhitespace = false, } = {}) {
+        var _a;
+        if (ignoreWhitespace) {
+            if (node.type.name === 'hardBreak') {
+                // Hard breaks are considered empty
+                return true;
+            }
+            if (node.isText) {
+                return /^\s*$/m.test((_a = node.text) !== null && _a !== void 0 ? _a : '');
+            }
+        }
         if (node.isText) {
             return !node.text;
+        }
+        if (node.isAtom || node.isLeaf) {
+            return false;
         }
         if (node.content.childCount === 0) {
             return true;
         }
-        if (node.isLeaf) {
-            return false;
-        }
         if (checkChildren) {
-            let hasSameContent = true;
+            let isContentEmpty = true;
             node.content.forEach(childNode => {
-                if (hasSameContent === false) {
+                if (isContentEmpty === false) {
                     // Exit early for perf
                     return;
                 }
-                if (!isNodeEmpty(childNode)) {
-                    hasSameContent = false;
+                if (!isNodeEmpty(childNode, { ignoreWhitespace, checkChildren })) {
+                    isContentEmpty = false;
                 }
             });
-            return hasSameContent;
+            return isContentEmpty;
         }
         return false;
     }
@@ -16537,7 +16546,7 @@
         return can;
     };
 
-    const splitListItem = typeOrName => ({ tr, state, dispatch, editor, }) => {
+    const splitListItem = (typeOrName, overrideAttrs = {}) => ({ tr, state, dispatch, editor, }) => {
         var _a;
         const type = getNodeType(typeOrName, state.schema);
         const { $from, $to } = state.selection;
@@ -16573,7 +16582,10 @@
                 // eslint-disable-next-line
                 const depthAfter = $from.indexAfter(-1) < $from.node(-2).childCount ? 1 : $from.indexAfter(-2) < $from.node(-3).childCount ? 2 : 3;
                 // Add a second list item with an empty default start node
-                const newNextTypeAttributes = getSplittedAttributes(extensionAttributes, $from.node().type.name, $from.node().attrs);
+                const newNextTypeAttributes = {
+                    ...getSplittedAttributes(extensionAttributes, $from.node().type.name, $from.node().attrs),
+                    ...overrideAttrs,
+                };
                 const nextType = ((_a = type.contentMatch.defaultType) === null || _a === void 0 ? void 0 : _a.createAndFill(newNextTypeAttributes)) || undefined;
                 wrap = wrap.append(Fragment.from(type.createAndFill(null, nextType) || undefined));
                 const start = $from.before($from.depth - (depthBefore - 1));
@@ -16595,8 +16607,14 @@
             return true;
         }
         const nextType = $to.pos === $from.end() ? grandParent.contentMatchAt(0).defaultType : null;
-        const newTypeAttributes = getSplittedAttributes(extensionAttributes, grandParent.type.name, grandParent.attrs);
-        const newNextTypeAttributes = getSplittedAttributes(extensionAttributes, $from.node().type.name, $from.node().attrs);
+        const newTypeAttributes = {
+            ...getSplittedAttributes(extensionAttributes, grandParent.type.name, grandParent.attrs),
+            ...overrideAttrs,
+        };
+        const newNextTypeAttributes = {
+            ...getSplittedAttributes(extensionAttributes, $from.node().type.name, $from.node().attrs),
+            ...overrideAttrs,
+        };
         tr.delete($from.pos, $to.pos);
         const types = nextType
             ? [
@@ -17332,8 +17350,8 @@ img.ProseMirror-separator {
   display: inline !important;
   border: none !important;
   margin: 0 !important;
-  width: 1px !important;
-  height: 1px !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .ProseMirror-gapcursor {
@@ -17394,10 +17412,14 @@ img.ProseMirror-separator {
         return styleNode;
     }
 
-    let Editor$1 = class Editor extends EventEmitter {
+    class Editor extends EventEmitter {
         constructor(options = {}) {
             super();
             this.isFocused = false;
+            /**
+             * The editor is considered initialized after the `create` event has been emitted.
+             */
+            this.isInitialized = false;
             this.extensionStorage = {};
             this.options = {
                 element: document.createElement('div'),
@@ -17448,6 +17470,7 @@ img.ProseMirror-separator {
                 }
                 this.commands.focus(this.options.autofocus);
                 this.emit('create', { editor: this });
+                this.isInitialized = true;
             }, 0);
         }
         /**
@@ -17807,7 +17830,7 @@ img.ProseMirror-separator {
         get $doc() {
             return this.$pos(0);
         }
-    };
+    }
 
     /**
      * Build an input rule that adds a mark when the
@@ -18415,14 +18438,16 @@ img.ProseMirror-separator {
             find: config.find,
             handler({ match, chain, range, pasteEvent, }) {
                 const attributes = callOrReturn(config.getAttributes, undefined, match, pasteEvent);
+                const content = callOrReturn(config.getContent, undefined, attributes);
                 if (attributes === false || attributes === null) {
                     return null;
                 }
+                const node = { type: config.type.name, attrs: attributes };
+                if (content) {
+                    node.content = content;
+                }
                 if (match.input) {
-                    chain().deleteRange(range).insertContentAt(range.from, {
-                        type: config.type.name,
-                        attrs: attributes,
-                    });
+                    chain().deleteRange(range).insertContentAt(range.from, node);
                 }
             },
         });
@@ -22131,6 +22156,7 @@ img.ProseMirror-separator {
      */
     const TextStyle$1 = Mark.create({
         name: 'textStyle',
+        priority: 101,
         addOptions() {
             return {
                 HTMLAttributes: {},
@@ -22254,6 +22280,7 @@ img.ProseMirror-separator {
                 languageClassPrefix: 'language-',
                 exitOnTripleEnter: true,
                 exitOnArrowDown: true,
+                defaultLanguage: null,
                 HTMLAttributes: {},
             };
         },
@@ -22265,7 +22292,7 @@ img.ProseMirror-separator {
         addAttributes() {
             return {
                 language: {
-                    default: null,
+                    default: this.options.defaultLanguage,
                     parseHTML: element => {
                         var _a;
                         const { languageClassPrefix } = this.options;
@@ -23589,6 +23616,7 @@ img.ProseMirror-separator {
      */
     const TextStyle = Mark.create({
         name: 'textStyle',
+        priority: 101,
         addOptions() {
             return {
                 HTMLAttributes: {},
@@ -23658,6 +23686,10 @@ img.ProseMirror-separator {
                             ? parseInt(element.getAttribute('start') || '', 10)
                             : 1;
                     },
+                },
+                type: {
+                    default: undefined,
+                    parseHTML: element => element.getAttribute('type'),
                 },
             };
         },
@@ -27542,138 +27574,6 @@ img.ProseMirror-separator {
         },
     });
 
-    const mergeRefs = (...refs) => {
-        return (node) => {
-            refs.forEach(ref => {
-                if (typeof ref === 'function') {
-                    ref(node);
-                }
-                else if (ref) {
-                    ref.current = node;
-                }
-            });
-        };
-    };
-    const Portals = ({ renderers }) => {
-        return (React.createElement(React.Fragment, null, Object.entries(renderers).map(([key, renderer]) => {
-            return ReactDOM.createPortal(renderer.reactElement, renderer.element, key);
-        })));
-    };
-    class PureEditorContent extends React.Component {
-        constructor(props) {
-            super(props);
-            this.editorContentRef = React.createRef();
-            this.initialized = false;
-            this.state = {
-                renderers: {},
-            };
-        }
-        componentDidMount() {
-            this.init();
-        }
-        componentDidUpdate() {
-            this.init();
-        }
-        init() {
-            const { editor } = this.props;
-            if (editor && !editor.isDestroyed && editor.options.element) {
-                if (editor.contentComponent) {
-                    return;
-                }
-                const element = this.editorContentRef.current;
-                element.append(...editor.options.element.childNodes);
-                editor.setOptions({
-                    element,
-                });
-                editor.contentComponent = this;
-                editor.createNodeViews();
-                this.initialized = true;
-            }
-        }
-        maybeFlushSync(fn) {
-            // Avoid calling flushSync until the editor is initialized.
-            // Initialization happens during the componentDidMount or componentDidUpdate
-            // lifecycle methods, and React doesn't allow calling flushSync from inside
-            // a lifecycle method.
-            if (this.initialized) {
-                ReactDOM.flushSync(fn);
-            }
-            else {
-                fn();
-            }
-        }
-        setRenderer(id, renderer) {
-            this.maybeFlushSync(() => {
-                this.setState(({ renderers }) => ({
-                    renderers: {
-                        ...renderers,
-                        [id]: renderer,
-                    },
-                }));
-            });
-        }
-        removeRenderer(id) {
-            this.maybeFlushSync(() => {
-                this.setState(({ renderers }) => {
-                    const nextRenderers = { ...renderers };
-                    delete nextRenderers[id];
-                    return { renderers: nextRenderers };
-                });
-            });
-        }
-        componentWillUnmount() {
-            const { editor } = this.props;
-            if (!editor) {
-                return;
-            }
-            this.initialized = false;
-            if (!editor.isDestroyed) {
-                editor.view.setProps({
-                    nodeViews: {},
-                });
-            }
-            editor.contentComponent = null;
-            if (!editor.options.element.firstChild) {
-                return;
-            }
-            const newElement = document.createElement('div');
-            newElement.append(...editor.options.element.childNodes);
-            editor.setOptions({
-                element: newElement,
-            });
-        }
-        render() {
-            const { editor, innerRef, ...rest } = this.props;
-            return (React.createElement(React.Fragment, null,
-                React.createElement("div", { ref: mergeRefs(innerRef, this.editorContentRef), ...rest }),
-                React.createElement(Portals, { renderers: this.state.renderers })));
-        }
-    }
-    // EditorContent should be re-created whenever the Editor instance changes
-    const EditorContentWithKey = React.forwardRef((props, ref) => {
-        const key = React.useMemo(() => {
-            return Math.floor(Math.random() * 0xFFFFFFFF).toString();
-        }, [props.editor]);
-        // Can't use JSX here because it conflicts with the type definition of Vue's JSX, so use createElement
-        return React.createElement(PureEditorContent, {
-            key,
-            innerRef: ref,
-            ...props,
-        });
-    });
-    const EditorContent = React.memo(EditorContentWithKey);
-
-    class Editor extends Editor$1 {
-        constructor() {
-            super(...arguments);
-            this.contentComponent = null;
-        }
-    }
-
-    var withSelector = {exports: {}};
-
-    var withSelector_production_min = {};
-
     var shim = {exports: {}};
 
     var useSyncExternalStoreShim_production_min = {};
@@ -27698,17 +27598,172 @@ img.ProseMirror-separator {
     	return useSyncExternalStoreShim_production_min;
     }
 
-    var hasRequiredShim;
-
-    function requireShim () {
-    	if (hasRequiredShim) return shim.exports;
-    	hasRequiredShim = 1;
-
-    	{
-    	  shim.exports = requireUseSyncExternalStoreShim_production_min();
-    	}
-    	return shim.exports;
+    {
+      shim.exports = requireUseSyncExternalStoreShim_production_min();
     }
+
+    var shimExports = shim.exports;
+
+    const mergeRefs = (...refs) => {
+        return (node) => {
+            refs.forEach(ref => {
+                if (typeof ref === 'function') {
+                    ref(node);
+                }
+                else if (ref) {
+                    ref.current = node;
+                }
+            });
+        };
+    };
+    /**
+     * This component renders all of the editor's node views.
+     */
+    const Portals = ({ contentComponent, }) => {
+        // For performance reasons, we render the node view portals on state changes only
+        const renderers = shimExports.useSyncExternalStore(contentComponent.subscribe, contentComponent.getSnapshot, contentComponent.getServerSnapshot);
+        // This allows us to directly render the portals without any additional wrapper
+        return (React.createElement(React.Fragment, null, Object.values(renderers)));
+    };
+    function getInstance() {
+        const subscribers = new Set();
+        let renderers = {};
+        return {
+            /**
+             * Subscribe to the editor instance's changes.
+             */
+            subscribe(callback) {
+                subscribers.add(callback);
+                return () => {
+                    subscribers.delete(callback);
+                };
+            },
+            getSnapshot() {
+                return renderers;
+            },
+            getServerSnapshot() {
+                return renderers;
+            },
+            /**
+             * Adds a new NodeView Renderer to the editor.
+             */
+            setRenderer(id, renderer) {
+                renderers = {
+                    ...renderers,
+                    [id]: ReactDOM.createPortal(renderer.reactElement, renderer.element, id),
+                };
+                subscribers.forEach(subscriber => subscriber());
+            },
+            /**
+             * Removes a NodeView Renderer from the editor.
+             */
+            removeRenderer(id) {
+                const nextRenderers = { ...renderers };
+                delete nextRenderers[id];
+                renderers = nextRenderers;
+                subscribers.forEach(subscriber => subscriber());
+            },
+        };
+    }
+    class PureEditorContent extends React.Component {
+        constructor(props) {
+            var _a;
+            super(props);
+            this.editorContentRef = React.createRef();
+            this.initialized = false;
+            this.state = {
+                hasContentComponentInitialized: Boolean((_a = props.editor) === null || _a === void 0 ? void 0 : _a.contentComponent),
+            };
+        }
+        componentDidMount() {
+            this.init();
+        }
+        componentDidUpdate() {
+            this.init();
+        }
+        init() {
+            const editor = this.props.editor;
+            if (editor && !editor.isDestroyed && editor.options.element) {
+                if (editor.contentComponent) {
+                    return;
+                }
+                const element = this.editorContentRef.current;
+                element.append(...editor.options.element.childNodes);
+                editor.setOptions({
+                    element,
+                });
+                editor.contentComponent = getInstance();
+                // Has the content component been initialized?
+                if (!this.state.hasContentComponentInitialized) {
+                    // Subscribe to the content component
+                    this.unsubscribeToContentComponent = editor.contentComponent.subscribe(() => {
+                        this.setState(prevState => {
+                            if (!prevState.hasContentComponentInitialized) {
+                                return {
+                                    hasContentComponentInitialized: true,
+                                };
+                            }
+                            return prevState;
+                        });
+                        // Unsubscribe to previous content component
+                        if (this.unsubscribeToContentComponent) {
+                            this.unsubscribeToContentComponent();
+                        }
+                    });
+                }
+                editor.createNodeViews();
+                this.initialized = true;
+            }
+        }
+        componentWillUnmount() {
+            const editor = this.props.editor;
+            if (!editor) {
+                return;
+            }
+            this.initialized = false;
+            if (!editor.isDestroyed) {
+                editor.view.setProps({
+                    nodeViews: {},
+                });
+            }
+            if (this.unsubscribeToContentComponent) {
+                this.unsubscribeToContentComponent();
+            }
+            editor.contentComponent = null;
+            if (!editor.options.element.firstChild) {
+                return;
+            }
+            const newElement = document.createElement('div');
+            newElement.append(...editor.options.element.childNodes);
+            editor.setOptions({
+                element: newElement,
+            });
+        }
+        render() {
+            const { editor, innerRef, ...rest } = this.props;
+            return (React.createElement(React.Fragment, null,
+                React.createElement("div", { ref: mergeRefs(innerRef, this.editorContentRef), ...rest }),
+                (editor === null || editor === void 0 ? void 0 : editor.contentComponent) && React.createElement(Portals, { contentComponent: editor.contentComponent })));
+        }
+    }
+    // EditorContent should be re-created whenever the Editor instance changes
+    const EditorContentWithKey = React.forwardRef((props, ref) => {
+        const key = React.useMemo(() => {
+            return Math.floor(Math.random() * 0xffffffff).toString();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [props.editor]);
+        // Can't use JSX here because it conflicts with the type definition of Vue's JSX, so use createElement
+        return React.createElement(PureEditorContent, {
+            key,
+            innerRef: ref,
+            ...props,
+        });
+    });
+    const EditorContent = React.memo(EditorContentWithKey);
+
+    var withSelector = {exports: {}};
+
+    var withSelector_production_min = {};
 
     /**
      * @license React
@@ -27725,7 +27780,7 @@ img.ProseMirror-separator {
     function requireWithSelector_production_min () {
     	if (hasRequiredWithSelector_production_min) return withSelector_production_min;
     	hasRequiredWithSelector_production_min = 1;
-    var h=React,n=requireShim();function p(a,b){return a===b&&(0!==a||1/a===1/b)||a!==a&&b!==b}var q="function"===typeof Object.is?Object.is:p,r=n.useSyncExternalStore,t=h.useRef,u=h.useEffect,v=h.useMemo,w=h.useDebugValue;
+    var h=React,n=shimExports;function p(a,b){return a===b&&(0!==a||1/a===1/b)||a!==a&&b!==b}var q="function"===typeof Object.is?Object.is:p,r=n.useSyncExternalStore,t=h.useRef,u=h.useEffect,v=h.useMemo,w=h.useDebugValue;
     	withSelector_production_min.useSyncExternalStoreWithSelector=function(a,b,e,l,g){var c=t(null);if(null===c.current){var f={hasValue:!1,value:null};c.current=f;}else f=c.current;c=v(function(){function a(a){if(!c){c=!0;d=a;a=l(a);if(void 0!==g&&f.hasValue){var b=f.value;if(g(b,a))return k=b}return k=a}b=k;if(q(d,a))return b;var e=l(a);if(void 0!==g&&g(b,e))return b;d=a;return k=e}var c=!1,d,k,m=void 0===e?null:e;return [function(){return a(b())},null===m?void 0:function(){return a(m())}]},[b,e,l,g]);var d=r(a,c[0],c[1]);
     	u(function(){f.hasValue=!0;f.value=d;},[d]);w(d);return d};
     	return withSelector_production_min;
@@ -27741,71 +27796,75 @@ img.ProseMirror-separator {
      * To synchronize the editor instance with the component state,
      * we need to create a separate instance that is not affected by the component re-renders.
      */
-    function makeEditorStateInstance(initialEditor) {
-        let transactionNumber = 0;
-        let lastTransactionNumber = 0;
-        let lastSnapshot = { editor: initialEditor, transactionNumber: 0 };
-        let editor = initialEditor;
-        const subscribers = new Set();
-        const editorInstance = {
-            /**
-             * Get the current editor instance.
-             */
-            getSnapshot() {
-                if (transactionNumber === lastTransactionNumber) {
-                    return lastSnapshot;
-                }
-                lastTransactionNumber = transactionNumber;
-                lastSnapshot = { editor, transactionNumber };
-                return lastSnapshot;
-            },
-            /**
-             * Always disable the editor on the server-side.
-             */
-            getServerSnapshot() {
-                return { editor: null, transactionNumber: 0 };
-            },
-            /**
-             * Subscribe to the editor instance's changes.
-             */
-            subscribe(callback) {
-                subscribers.add(callback);
-                return () => {
-                    subscribers.delete(callback);
+    class EditorStateManager {
+        constructor(initialEditor) {
+            this.transactionNumber = 0;
+            this.lastTransactionNumber = 0;
+            this.subscribers = new Set();
+            this.editor = initialEditor;
+            this.lastSnapshot = { editor: initialEditor, transactionNumber: 0 };
+            this.getSnapshot = this.getSnapshot.bind(this);
+            this.getServerSnapshot = this.getServerSnapshot.bind(this);
+            this.watch = this.watch.bind(this);
+            this.subscribe = this.subscribe.bind(this);
+        }
+        /**
+         * Get the current editor instance.
+         */
+        getSnapshot() {
+            if (this.transactionNumber === this.lastTransactionNumber) {
+                return this.lastSnapshot;
+            }
+            this.lastTransactionNumber = this.transactionNumber;
+            this.lastSnapshot = { editor: this.editor, transactionNumber: this.transactionNumber };
+            return this.lastSnapshot;
+        }
+        /**
+         * Always disable the editor on the server-side.
+         */
+        getServerSnapshot() {
+            return { editor: null, transactionNumber: 0 };
+        }
+        /**
+         * Subscribe to the editor instance's changes.
+         */
+        subscribe(callback) {
+            this.subscribers.add(callback);
+            return () => {
+                this.subscribers.delete(callback);
+            };
+        }
+        /**
+         * Watch the editor instance for changes.
+         */
+        watch(nextEditor) {
+            this.editor = nextEditor;
+            if (this.editor) {
+                /**
+                 * This will force a re-render when the editor state changes.
+                 * This is to support things like `editor.can().toggleBold()` in components that `useEditor`.
+                 * This could be more efficient, but it's a good trade-off for now.
+                 */
+                const fn = () => {
+                    this.transactionNumber += 1;
+                    this.subscribers.forEach(callback => callback());
                 };
-            },
-            /**
-             * Watch the editor instance for changes.
-             */
-            watch(nextEditor) {
-                editor = nextEditor;
-                if (editor) {
-                    /**
-                     * This will force a re-render when the editor state changes.
-                     * This is to support things like `editor.can().toggleBold()` in components that `useEditor`.
-                     * This could be more efficient, but it's a good trade-off for now.
-                     */
-                    const fn = () => {
-                        transactionNumber += 1;
-                        subscribers.forEach(callback => callback());
-                    };
-                    const currentEditor = editor;
-                    currentEditor.on('transaction', fn);
-                    return () => {
-                        currentEditor.off('transaction', fn);
-                    };
-                }
-            },
-        };
-        return editorInstance;
+                const currentEditor = this.editor;
+                currentEditor.on('transaction', fn);
+                return () => {
+                    currentEditor.off('transaction', fn);
+                };
+            }
+            return undefined;
+        }
     }
     function useEditorState(options) {
-        const [editorInstance] = React.useState(() => makeEditorStateInstance(options.editor));
+        const [editorInstance] = React.useState(() => new EditorStateManager(options.editor));
         // Using the `useSyncExternalStore` hook to sync the editor instance with the component state
         const selectedState = withSelectorExports.useSyncExternalStoreWithSelector(editorInstance.subscribe, editorInstance.getSnapshot, editorInstance.getServerSnapshot, options.selector, options.equalityFn);
         React.useEffect(() => {
             return editorInstance.watch(options.editor);
-        }, [options.editor]);
+        }, [options.editor, editorInstance]);
         React.useDebugValue(selectedState);
         return selectedState;
     }
@@ -27814,79 +27873,203 @@ img.ProseMirror-separator {
     const isSSR = typeof window === 'undefined';
     const isNext = isSSR || Boolean(typeof window !== 'undefined' && window.next);
     /**
-     * Create a new editor instance. And attach event listeners.
+     * This class handles the creation, destruction, and re-creation of the editor instance.
      */
-    function createEditor(options) {
-        const editor = new Editor(options.current);
-        editor.on('beforeCreate', (...args) => { var _a, _b; return (_b = (_a = options.current).onBeforeCreate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
-        editor.on('blur', (...args) => { var _a, _b; return (_b = (_a = options.current).onBlur) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
-        editor.on('create', (...args) => { var _a, _b; return (_b = (_a = options.current).onCreate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
-        editor.on('destroy', (...args) => { var _a, _b; return (_b = (_a = options.current).onDestroy) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
-        editor.on('focus', (...args) => { var _a, _b; return (_b = (_a = options.current).onFocus) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
-        editor.on('selectionUpdate', (...args) => { var _a, _b; return (_b = (_a = options.current).onSelectionUpdate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
-        editor.on('transaction', (...args) => { var _a, _b; return (_b = (_a = options.current).onTransaction) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
-        editor.on('update', (...args) => { var _a, _b; return (_b = (_a = options.current).onUpdate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
-        editor.on('contentError', (...args) => { var _a, _b; return (_b = (_a = options.current).onContentError) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); });
-        return editor;
-    }
-    function useEditor(options = {}, deps = []) {
-        const mostRecentOptions = React.useRef(options);
-        const [editor, setEditor] = React.useState(() => {
-            if (options.immediatelyRender === undefined) {
+    class EditorInstanceManager {
+        constructor(options) {
+            /**
+             * The current editor instance.
+             */
+            this.editor = null;
+            /**
+             * The subscriptions to notify when the editor instance
+             * has been created or destroyed.
+             */
+            this.subscriptions = new Set();
+            /**
+             * Whether the editor has been mounted.
+             */
+            this.isComponentMounted = false;
+            /**
+             * The most recent dependencies array.
+             */
+            this.previousDeps = null;
+            /**
+             * The unique instance ID. This is used to identify the editor instance. And will be re-generated for each new instance.
+             */
+            this.instanceId = '';
+            this.options = options;
+            this.subscriptions = new Set();
+            this.setEditor(this.getInitialEditor());
+            this.scheduleDestroy();
+            this.getEditor = this.getEditor.bind(this);
+            this.getServerSnapshot = this.getServerSnapshot.bind(this);
+            this.subscribe = this.subscribe.bind(this);
+            this.refreshEditorInstance = this.refreshEditorInstance.bind(this);
+            this.scheduleDestroy = this.scheduleDestroy.bind(this);
+            this.onRender = this.onRender.bind(this);
+            this.createEditor = this.createEditor.bind(this);
+        }
+        setEditor(editor) {
+            this.editor = editor;
+            this.instanceId = Math.random().toString(36).slice(2, 9);
+            // Notify all subscribers that the editor instance has been created
+            this.subscriptions.forEach(cb => cb());
+        }
+        getInitialEditor() {
+            if (this.options.current.immediatelyRender === undefined) {
                 if (isSSR || isNext) {
                     // Best faith effort in production, run the code in the legacy mode to avoid hydration mismatches and errors in production
                     return null;
                 }
                 // Default to immediately rendering when client-side rendering
-                return createEditor(mostRecentOptions);
+                return this.createEditor();
             }
-            if (options.immediatelyRender && isSSR && isDev) {
+            if (this.options.current.immediatelyRender && isSSR && isDev) {
                 // Warn in development, to make sure the developer is aware that tiptap cannot be SSR'd, set `immediatelyRender` to `false` to avoid hydration mismatches.
                 throw new Error('Tiptap Error: SSR has been detected, and `immediatelyRender` has been set to `true` this is an unsupported configuration that may result in errors, explicitly set `immediatelyRender` to `false` to avoid hydration mismatches.');
             }
-            if (options.immediatelyRender) {
-                return createEditor(mostRecentOptions);
+            if (this.options.current.immediatelyRender) {
+                return this.createEditor();
             }
             return null;
-        });
-        const mostRecentEditor = React.useRef(editor);
-        mostRecentEditor.current = editor;
+        }
+        /**
+         * Create a new editor instance. And attach event listeners.
+         */
+        createEditor() {
+            const optionsToApply = {
+                ...this.options.current,
+                // Always call the most recent version of the callback function by default
+                onBeforeCreate: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onBeforeCreate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onBlur: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onBlur) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onCreate: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onCreate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onDestroy: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onDestroy) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onFocus: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onFocus) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onSelectionUpdate: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onSelectionUpdate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onTransaction: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onTransaction) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onUpdate: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onUpdate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onContentError: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onContentError) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+            };
+            const editor = new Editor(optionsToApply);
+            // no need to keep track of the event listeners, they will be removed when the editor is destroyed
+            return editor;
+        }
+        /**
+         * Get the current editor instance.
+         */
+        getEditor() {
+            return this.editor;
+        }
+        /**
+         * Always disable the editor on the server-side.
+         */
+        getServerSnapshot() {
+            return null;
+        }
+        /**
+         * Subscribe to the editor instance's changes.
+         */
+        subscribe(onStoreChange) {
+            this.subscriptions.add(onStoreChange);
+            return () => {
+                this.subscriptions.delete(onStoreChange);
+            };
+        }
+        /**
+         * On each render, we will create, update, or destroy the editor instance.
+         * @param deps The dependencies to watch for changes
+         * @returns A cleanup function
+         */
+        onRender(deps) {
+            // The returned callback will run on each render
+            return () => {
+                this.isComponentMounted = true;
+                // Cleanup any scheduled destructions, since we are currently rendering
+                clearTimeout(this.scheduledDestructionTimeout);
+                if (this.editor && !this.editor.isDestroyed && deps.length === 0) {
+                    // if the editor does exist & deps are empty, we don't need to re-initialize the editor
+                    // we can fast-path to update the editor options on the existing instance
+                    this.editor.setOptions(this.options.current);
+                }
+                else {
+                    // When the editor:
+                    // - does not yet exist
+                    // - is destroyed
+                    // - the deps array changes
+                    // We need to destroy the editor instance and re-initialize it
+                    this.refreshEditorInstance(deps);
+                }
+                return () => {
+                    this.isComponentMounted = false;
+                    this.scheduleDestroy();
+                };
+            };
+        }
+        /**
+         * Recreate the editor instance if the dependencies have changed.
+         */
+        refreshEditorInstance(deps) {
+            if (this.editor && !this.editor.isDestroyed) {
+                // Editor instance already exists
+                if (this.previousDeps === null) {
+                    // If lastDeps has not yet been initialized, reuse the current editor instance
+                    this.previousDeps = deps;
+                    return;
+                }
+                const depsAreEqual = this.previousDeps.length === deps.length
+                    && this.previousDeps.every((dep, index) => dep === deps[index]);
+                if (depsAreEqual) {
+                    // deps exist and are equal, no need to recreate
+                    return;
+                }
+            }
+            if (this.editor && !this.editor.isDestroyed) {
+                // Destroy the editor instance if it exists
+                this.editor.destroy();
+            }
+            this.setEditor(this.createEditor());
+            // Update the lastDeps to the current deps
+            this.previousDeps = deps;
+        }
+        /**
+         * Schedule the destruction of the editor instance.
+         * This will only destroy the editor if it was not mounted on the next tick.
+         * This is to avoid destroying the editor instance when it's actually still mounted.
+         */
+        scheduleDestroy() {
+            const currentInstanceId = this.instanceId;
+            const currentEditor = this.editor;
+            // Wait two ticks to see if the component is still mounted
+            this.scheduledDestructionTimeout = setTimeout(() => {
+                if (this.isComponentMounted && this.instanceId === currentInstanceId) {
+                    // If still mounted on the following tick, with the same instanceId, do not destroy the editor
+                    if (currentEditor) {
+                        // just re-apply options as they might have changed
+                        currentEditor.setOptions(this.options.current);
+                    }
+                    return;
+                }
+                if (currentEditor && !currentEditor.isDestroyed) {
+                    currentEditor.destroy();
+                    if (this.instanceId === currentInstanceId) {
+                        this.setEditor(null);
+                    }
+                }
+                // This allows the effect to run again between ticks
+                // which may save us from having to re-create the editor
+            }, 1);
+        }
+    }
+    function useEditor(options = {}, deps = []) {
+        const mostRecentOptions = React.useRef(options);
+        mostRecentOptions.current = options;
+        const [instanceManager] = React.useState(() => new EditorInstanceManager(mostRecentOptions));
+        const editor = shimExports.useSyncExternalStore(instanceManager.subscribe, instanceManager.getEditor, instanceManager.getServerSnapshot);
         React.useDebugValue(editor);
         // This effect will handle creating/updating the editor instance
-        React.useEffect(() => {
-            const destroyUnusedEditor = (editorInstance) => {
-                if (editorInstance) {
-                    // We need to destroy the editor asynchronously to avoid memory leaks
-                    // because the editor instance is still being used in the component.
-                    setTimeout(() => {
-                        // re-use the editor instance if it hasn't been replaced yet
-                        // otherwise, asynchronously destroy the old editor instance
-                        if (editorInstance !== mostRecentEditor.current && !editorInstance.isDestroyed) {
-                            editorInstance.destroy();
-                        }
-                    });
-                }
-            };
-            let editorInstance = mostRecentEditor.current;
-            if (!editorInstance) {
-                editorInstance = createEditor(mostRecentOptions);
-                setEditor(editorInstance);
-                return () => destroyUnusedEditor(editorInstance);
-            }
-            if (!Array.isArray(deps) || deps.length === 0) {
-                // if the editor does exist & deps are empty, we don't need to re-initialize the editor
-                // we can fast-path to update the editor options on the existing instance
-                editorInstance.setOptions(options);
-                return () => destroyUnusedEditor(editorInstance);
-            }
-            // We need to destroy the editor instance and re-initialize it
-            // when the deps array changes
-            editorInstance.destroy();
-            // the deps array is used to re-initialize the editor instance
-            editorInstance = createEditor(mostRecentOptions);
-            setEditor(editorInstance);
-            return () => destroyUnusedEditor(editorInstance);
-        }, deps);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        React.useEffect(instanceManager.onRender(deps));
         // The default behavior is to re-render on each transaction
         // This is legacy behavior that will be removed in future versions
         useEditorState({
@@ -28004,7 +28187,9 @@ img.ProseMirror-separator {
     const NodeViewContent = props => {
         const Tag = props.as || 'div';
         const { nodeViewContentRef } = useReactNodeView();
-        return (React.createElement(Tag, { ...props, ref: nodeViewContentRef, "data-node-view-content": "", style: {
+        return (
+        // @ts-ignore
+        React.createElement(Tag, { ...props, ref: nodeViewContentRef, "data-node-view-content": "", style: {
                 whiteSpace: 'pre-wrap',
                 ...props.style,
             } }));
@@ -28013,7 +28198,9 @@ img.ProseMirror-separator {
     const NodeViewWrapper = React.forwardRef((props, ref) => {
         const { onDragStart } = useReactNodeView();
         const Tag = props.as || 'div';
-        return (React.createElement(Tag, { ...props, ref: ref, "data-node-view-wrapper": "", onDragStart: onDragStart, style: {
+        return (
+        // @ts-ignore
+        React.createElement(Tag, { ...props, ref: ref, "data-node-view-wrapper": "", onDragStart: onDragStart, style: {
                 whiteSpace: 'normal',
                 ...props.style,
             } }));
@@ -28067,19 +28254,29 @@ img.ProseMirror-separator {
                     this.element.setAttribute(key, attrs[key]);
                 });
             }
-            this.render();
+            if (this.editor.isInitialized) {
+                // On first render, we need to flush the render synchronously
+                // Renders afterwards can be async, but this fixes a cursor positioning issue
+                ReactDOM.flushSync(() => {
+                    this.render();
+                });
+            }
+            else {
+                this.render();
+            }
         }
         render() {
-            var _a, _b;
+            var _a;
             const Component = this.component;
             const props = this.props;
+            const editor = this.editor;
             if (isClassComponent(Component) || isForwardRefComponent(Component)) {
                 props.ref = (ref) => {
                     this.ref = ref;
                 };
             }
-            this.reactElement = React.createElement(Component, { ...props });
-            (_b = (_a = this.editor) === null || _a === void 0 ? void 0 : _a.contentComponent) === null || _b === void 0 ? void 0 : _b.setRenderer(this.id, this);
+            this.reactElement = React.createElement(Component, props);
+            (_a = editor === null || editor === void 0 ? void 0 : editor.contentComponent) === null || _a === void 0 ? void 0 : _a.setRenderer(this.id, this);
         }
         updateProps(props = {}) {
             this.props = {
@@ -28089,8 +28286,9 @@ img.ProseMirror-separator {
             this.render();
         }
         destroy() {
-            var _a, _b;
-            (_b = (_a = this.editor) === null || _a === void 0 ? void 0 : _a.contentComponent) === null || _b === void 0 ? void 0 : _b.removeRenderer(this.id);
+            var _a;
+            const editor = this.editor;
+            (_a = editor === null || editor === void 0 ? void 0 : editor.contentComponent) === null || _a === void 0 ? void 0 : _a.removeRenderer(this.id);
         }
     }
 
@@ -28112,18 +28310,19 @@ img.ProseMirror-separator {
                 };
                 this.component.displayName = capitalizeFirstChar(this.extension.name);
             }
-            const ReactNodeViewProvider = componentProps => {
-                const Component = this.component;
-                const onDragStart = this.onDragStart.bind(this);
-                const nodeViewContentRef = element => {
-                    if (element && this.contentDOMElement && element.firstChild !== this.contentDOMElement) {
-                        element.appendChild(this.contentDOMElement);
-                    }
-                };
-                return (React.createElement(React.Fragment, null,
-                    React.createElement(ReactNodeViewContext.Provider, { value: { onDragStart, nodeViewContentRef } },
-                        React.createElement(Component, { ...componentProps }))));
+            const onDragStart = this.onDragStart.bind(this);
+            const nodeViewContentRef = element => {
+                if (element && this.contentDOMElement && element.firstChild !== this.contentDOMElement) {
+                    element.appendChild(this.contentDOMElement);
+                }
             };
+            const context = { onDragStart, nodeViewContentRef };
+            const Component = this.component;
+            // For performance reasons, we memoize the provider component
+            // And all of the things it requires are declared outside of the component, so it doesn't need to re-render
+            const ReactNodeViewProvider = React.memo(componentProps => {
+                return (React.createElement(ReactNodeViewContext.Provider, { value: context }, React.createElement(Component, componentProps)));
+            });
             ReactNodeViewProvider.displayName = 'ReactNodeView';
             if (this.node.isLeaf) {
                 this.contentDOMElement = null;
