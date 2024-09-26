@@ -38,7 +38,6 @@ const baseEditorExtensions = [
   Document,
   History,
   Placeholder,
-  // Basic Formats
   Text,
   Paragraph,
   HardBreak.configure({
@@ -46,13 +45,12 @@ const baseEditorExtensions = [
       class: 'smart',
     },
   }),
-  // Custom Formats
   Link,
-  Blockquote,
 ]
 
 export const articleEditorExtensions = [
   ...baseEditorExtensions,
+  Blockquote,
   Gapcursor,
   Bold,
   Strike,
@@ -70,7 +68,7 @@ export const articleEditorExtensions = [
   FigcaptionKit,
 ]
 
-export const commentEditorExtensions = [...baseEditorExtensions]
+export const commentEditorExtensions = [...baseEditorExtensions, Blockquote]
 
 export const momentEditorExtensions = [...baseEditorExtensions]
 
