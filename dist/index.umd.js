@@ -2043,7 +2043,7 @@
         let result = [];
         for (let typeName in types) {
             let type = types[typeName];
-            if (type.groups.indexOf(name) > -1)
+            if (type.isInGroup(name))
                 result.push(type);
         }
         if (result.length == 0)
@@ -2321,6 +2321,13 @@
         directly editable content.
         */
         get isAtom() { return this.isLeaf || !!this.spec.atom; }
+        /**
+        Return true when this node type is part of the given
+        [group](https://prosemirror.net/docs/ref/#model.NodeSpec.group).
+        */
+        isInGroup(group) {
+            return this.groups.indexOf(group) > -1;
+        }
         /**
         The node type's [whitespace](https://prosemirror.net/docs/ref/#model.NodeSpec.whitespace) option.
         */
@@ -2778,7 +2785,7 @@
         */
         parse(dom, options = {}) {
             let context = new ParseContext(this, options, false);
-            context.addAll(dom, options.from, options.to);
+            context.addAll(dom, Mark$1.none, options.from, options.to);
             return context.finish();
         }
         /**
@@ -2791,7 +2798,7 @@
         */
         parseSlice(dom, options = {}) {
             let context = new ParseContext(this, options, true);
-            context.addAll(dom, options.from, options.to);
+            context.addAll(dom, Mark$1.none, options.from, options.to);
             return Slice.maxOpen(context.finish());
         }
         /**
@@ -2900,22 +2907,15 @@
         return type && type.whitespace == "pre" ? OPT_PRESERVE_WS | OPT_PRESERVE_WS_FULL : base & ~OPT_OPEN_LEFT;
     }
     class NodeContext {
-        constructor(type, attrs, 
-        // Marks applied to this node itself
-        marks, 
-        // Marks that can't apply here, but will be used in children if possible
-        pendingMarks, solid, match, options) {
+        constructor(type, attrs, marks, solid, match, options) {
             this.type = type;
             this.attrs = attrs;
             this.marks = marks;
-            this.pendingMarks = pendingMarks;
             this.solid = solid;
             this.options = options;
             this.content = [];
             // Marks applied to the node's children
             this.activeMarks = Mark$1.none;
-            // Nested Marks with same type
-            this.stashMarks = [];
             this.match = match || (options & OPT_OPEN_LEFT ? null : type.contentMatch);
         }
         findWrapping(node) {
@@ -2955,21 +2955,6 @@
                 content = content.append(this.match.fillBefore(Fragment.empty, true));
             return this.type ? this.type.create(this.attrs, content, this.marks) : content;
         }
-        popFromStashMark(mark) {
-            for (let i = this.stashMarks.length - 1; i >= 0; i--)
-                if (mark.eq(this.stashMarks[i]))
-                    return this.stashMarks.splice(i, 1)[0];
-        }
-        applyPending(nextType) {
-            for (let i = 0, pending = this.pendingMarks; i < pending.length; i++) {
-                let mark = pending[i];
-                if ((this.type ? this.type.allowsMarkType(mark.type) : markMayApply(mark.type, nextType)) &&
-                    !mark.isInSet(this.activeMarks)) {
-                    this.activeMarks = mark.addToSet(this.activeMarks);
-                    this.pendingMarks = mark.removeFromSet(this.pendingMarks);
-                }
-            }
-        }
         inlineContext(node) {
             if (this.type)
                 return this.type.inlineContent;
@@ -2991,11 +2976,11 @@
             let topNode = options.topNode, topContext;
             let topOptions = wsOptionsFor(null, options.preserveWhitespace, 0) | (isOpen ? OPT_OPEN_LEFT : 0);
             if (topNode)
-                topContext = new NodeContext(topNode.type, topNode.attrs, Mark$1.none, Mark$1.none, true, options.topMatch || topNode.type.contentMatch, topOptions);
+                topContext = new NodeContext(topNode.type, topNode.attrs, Mark$1.none, true, options.topMatch || topNode.type.contentMatch, topOptions);
             else if (isOpen)
-                topContext = new NodeContext(null, null, Mark$1.none, Mark$1.none, true, null, topOptions);
+                topContext = new NodeContext(null, null, Mark$1.none, true, null, topOptions);
             else
-                topContext = new NodeContext(parser.schema.topNodeType, null, Mark$1.none, Mark$1.none, true, null, topOptions);
+                topContext = new NodeContext(parser.schema.topNodeType, null, Mark$1.none, true, null, topOptions);
             this.nodes = [topContext];
             this.find = options.findPositions;
             this.needsBlock = false;
@@ -3006,31 +2991,13 @@
         // Add a DOM node to the content. Text is inserted as text node,
         // otherwise, the node is passed to `addElement` or, if it has a
         // `style` attribute, `addElementWithStyles`.
-        addDOM(dom) {
+        addDOM(dom, marks) {
             if (dom.nodeType == 3)
-                this.addTextNode(dom);
+                this.addTextNode(dom, marks);
             else if (dom.nodeType == 1)
-                this.addElement(dom);
+                this.addElement(dom, marks);
         }
-        withStyleRules(dom, f) {
-            let style = dom.style;
-            if (!style || !style.length)
-                return f();
-            let marks = this.readStyles(dom.style);
-            if (!marks)
-                return; // A style with ignore: true
-            let [addMarks, removeMarks] = marks, top = this.top;
-            for (let i = 0; i < removeMarks.length; i++)
-                this.removePendingMark(removeMarks[i], top);
-            for (let i = 0; i < addMarks.length; i++)
-                this.addPendingMark(addMarks[i]);
-            f();
-            for (let i = 0; i < addMarks.length; i++)
-                this.removePendingMark(addMarks[i], top);
-            for (let i = 0; i < removeMarks.length; i++)
-                this.addPendingMark(removeMarks[i]);
-        }
-        addTextNode(dom) {
+        addTextNode(dom, marks) {
             let value = dom.nodeValue;
             let top = this.top;
             if (top.options & OPT_PRESERVE_WS_FULL ||
@@ -3057,7 +3024,7 @@
                     value = value.replace(/\r\n?/g, "\n");
                 }
                 if (value)
-                    this.insertNode(this.parser.schema.text(value));
+                    this.insertNode(this.parser.schema.text(value), marks);
                 this.findInText(dom);
             }
             else {
@@ -3066,7 +3033,7 @@
         }
         // Try to find a handler for the given tag and use that to parse. If
         // none is found, the element's content nodes are added directly.
-        addElement(dom, matchAfter) {
+        addElement(dom, marks, matchAfter) {
             let name = dom.nodeName.toLowerCase(), ruleID;
             if (listTags.hasOwnProperty(name) && this.parser.normalizeLists)
                 normalizeList(dom);
@@ -3074,7 +3041,7 @@
                 (ruleID = this.parser.matchTag(dom, this, matchAfter));
             if (rule ? rule.ignore : ignoreTags.hasOwnProperty(name)) {
                 this.findInside(dom);
-                this.ignoreFallback(dom);
+                this.ignoreFallback(dom, marks);
             }
             else if (!rule || rule.skip || rule.closeParent) {
                 if (rule && rule.closeParent)
@@ -3092,45 +3059,44 @@
                         this.needsBlock = true;
                 }
                 else if (!dom.firstChild) {
-                    this.leafFallback(dom);
+                    this.leafFallback(dom, marks);
                     return;
                 }
-                if (rule && rule.skip)
-                    this.addAll(dom);
-                else
-                    this.withStyleRules(dom, () => this.addAll(dom));
+                let innerMarks = rule && rule.skip ? marks : this.readStyles(dom, marks);
+                if (innerMarks)
+                    this.addAll(dom, innerMarks);
                 if (sync)
                     this.sync(top);
                 this.needsBlock = oldNeedsBlock;
             }
             else {
-                this.withStyleRules(dom, () => {
-                    this.addElementByRule(dom, rule, rule.consuming === false ? ruleID : undefined);
-                });
+                let innerMarks = this.readStyles(dom, marks);
+                if (innerMarks)
+                    this.addElementByRule(dom, rule, innerMarks, rule.consuming === false ? ruleID : undefined);
             }
         }
         // Called for leaf DOM nodes that would otherwise be ignored
-        leafFallback(dom) {
+        leafFallback(dom, marks) {
             if (dom.nodeName == "BR" && this.top.type && this.top.type.inlineContent)
-                this.addTextNode(dom.ownerDocument.createTextNode("\n"));
+                this.addTextNode(dom.ownerDocument.createTextNode("\n"), marks);
         }
         // Called for ignored nodes
-        ignoreFallback(dom) {
+        ignoreFallback(dom, marks) {
             // Ignored BR nodes should at least create an inline context
             if (dom.nodeName == "BR" && (!this.top.type || !this.top.type.inlineContent))
-                this.findPlace(this.parser.schema.text("-"));
+                this.findPlace(this.parser.schema.text("-"), marks);
         }
         // Run any style parser associated with the node's styles. Either
-        // return an array of marks, or null to indicate some of the styles
-        // had a rule with `ignore` set.
-        readStyles(styles) {
-            let add = Mark$1.none, remove = Mark$1.none;
+        // return an updated array of marks, or null to indicate some of the
+        // styles had a rule with `ignore` set.
+        readStyles(dom, marks) {
+            let styles = dom.style;
             // Because many properties will only show up in 'normalized' form
             // in `style.item` (i.e. text-decoration becomes
             // text-decoration-line, text-decoration-color, etc), we directly
             // query the styles mentioned in our rules instead of iterating
             // over the items.
-            if (styles.length)
+            if (styles && styles.length)
                 for (let i = 0; i < this.parser.matchedStyles.length; i++) {
                     let name = this.parser.matchedStyles[i], value = styles.getPropertyValue(name);
                     if (value)
@@ -3140,52 +3106,50 @@
                                 break;
                             if (rule.ignore)
                                 return null;
-                            if (rule.clearMark) {
-                                this.top.pendingMarks.concat(this.top.activeMarks).forEach(m => {
-                                    if (rule.clearMark(m))
-                                        remove = m.addToSet(remove);
-                                });
-                            }
-                            else {
-                                add = this.parser.schema.marks[rule.mark].create(rule.attrs).addToSet(add);
-                            }
+                            if (rule.clearMark)
+                                marks = marks.filter(m => !rule.clearMark(m));
+                            else
+                                marks = marks.concat(this.parser.schema.marks[rule.mark].create(rule.attrs));
                             if (rule.consuming === false)
                                 after = rule;
                             else
                                 break;
                         }
                 }
-            return [add, remove];
+            return marks;
         }
         // Look up a handler for the given node. If none are found, return
         // false. Otherwise, apply it, use its return value to drive the way
         // the node's content is wrapped, and return true.
-        addElementByRule(dom, rule, continueAfter) {
-            let sync, nodeType, mark;
+        addElementByRule(dom, rule, marks, continueAfter) {
+            let sync, nodeType;
             if (rule.node) {
                 nodeType = this.parser.schema.nodes[rule.node];
                 if (!nodeType.isLeaf) {
-                    sync = this.enter(nodeType, rule.attrs || null, rule.preserveWhitespace);
+                    let inner = this.enter(nodeType, rule.attrs || null, marks, rule.preserveWhitespace);
+                    if (inner) {
+                        sync = true;
+                        marks = inner;
+                    }
                 }
-                else if (!this.insertNode(nodeType.create(rule.attrs))) {
-                    this.leafFallback(dom);
+                else if (!this.insertNode(nodeType.create(rule.attrs), marks)) {
+                    this.leafFallback(dom, marks);
                 }
             }
             else {
                 let markType = this.parser.schema.marks[rule.mark];
-                mark = markType.create(rule.attrs);
-                this.addPendingMark(mark);
+                marks = marks.concat(markType.create(rule.attrs));
             }
             let startIn = this.top;
             if (nodeType && nodeType.isLeaf) {
                 this.findInside(dom);
             }
             else if (continueAfter) {
-                this.addElement(dom, continueAfter);
+                this.addElement(dom, marks, continueAfter);
             }
             else if (rule.getContent) {
                 this.findInside(dom);
-                rule.getContent(dom, this.parser.schema).forEach(node => this.insertNode(node));
+                rule.getContent(dom, this.parser.schema).forEach(node => this.insertNode(node, marks));
             }
             else {
                 let contentDOM = dom;
@@ -3196,28 +3160,27 @@
                 else if (rule.contentElement)
                     contentDOM = rule.contentElement;
                 this.findAround(dom, contentDOM, true);
-                this.addAll(contentDOM);
+                this.addAll(contentDOM, marks);
+                this.findAround(dom, contentDOM, false);
             }
             if (sync && this.sync(startIn))
                 this.open--;
-            if (mark)
-                this.removePendingMark(mark, startIn);
         }
         // Add all child nodes between `startIndex` and `endIndex` (or the
         // whole node, if not given). If `sync` is passed, use it to
         // synchronize after every block element.
-        addAll(parent, startIndex, endIndex) {
+        addAll(parent, marks, startIndex, endIndex) {
             let index = startIndex || 0;
             for (let dom = startIndex ? parent.childNodes[startIndex] : parent.firstChild, end = endIndex == null ? null : parent.childNodes[endIndex]; dom != end; dom = dom.nextSibling, ++index) {
                 this.findAtPoint(parent, index);
-                this.addDOM(dom);
+                this.addDOM(dom, marks);
             }
             this.findAtPoint(parent, index);
         }
         // Try to find a way to fit the given node type into the current
         // context. May add intermediate wrappers and/or leave non-solid
         // nodes that we're in.
-        findPlace(node) {
+        findPlace(node, marks) {
             let route, sync;
             for (let depth = this.open; depth >= 0; depth--) {
                 let cx = this.nodes[depth];
@@ -3232,53 +3195,61 @@
                     break;
             }
             if (!route)
-                return false;
+                return null;
             this.sync(sync);
             for (let i = 0; i < route.length; i++)
-                this.enterInner(route[i], null, false);
-            return true;
+                marks = this.enterInner(route[i], null, marks, false);
+            return marks;
         }
         // Try to insert the given node, adjusting the context when needed.
-        insertNode(node) {
+        insertNode(node, marks) {
             if (node.isInline && this.needsBlock && !this.top.type) {
                 let block = this.textblockFromContext();
                 if (block)
-                    this.enterInner(block);
+                    marks = this.enterInner(block, null, marks);
             }
-            if (this.findPlace(node)) {
+            let innerMarks = this.findPlace(node, marks);
+            if (innerMarks) {
                 this.closeExtra();
                 let top = this.top;
-                top.applyPending(node.type);
                 if (top.match)
                     top.match = top.match.matchType(node.type);
-                let marks = top.activeMarks;
-                for (let i = 0; i < node.marks.length; i++)
-                    if (!top.type || top.type.allowsMarkType(node.marks[i].type))
-                        marks = node.marks[i].addToSet(marks);
-                top.content.push(node.mark(marks));
+                let nodeMarks = Mark$1.none;
+                for (let m of innerMarks.concat(node.marks))
+                    if (top.type ? top.type.allowsMarkType(m.type) : markMayApply(m.type, node.type))
+                        nodeMarks = m.addToSet(nodeMarks);
+                top.content.push(node.mark(nodeMarks));
                 return true;
             }
             return false;
         }
         // Try to start a node of the given type, adjusting the context when
         // necessary.
-        enter(type, attrs, preserveWS) {
-            let ok = this.findPlace(type.create(attrs));
-            if (ok)
-                this.enterInner(type, attrs, true, preserveWS);
-            return ok;
+        enter(type, attrs, marks, preserveWS) {
+            let innerMarks = this.findPlace(type.create(attrs), marks);
+            if (innerMarks)
+                innerMarks = this.enterInner(type, attrs, marks, true, preserveWS);
+            return innerMarks;
         }
         // Open a node of the given type
-        enterInner(type, attrs = null, solid = false, preserveWS) {
+        enterInner(type, attrs, marks, solid = false, preserveWS) {
             this.closeExtra();
             let top = this.top;
-            top.applyPending(type);
             top.match = top.match && top.match.matchType(type);
             let options = wsOptionsFor(type, preserveWS, top.options);
             if ((top.options & OPT_OPEN_LEFT) && top.content.length == 0)
                 options |= OPT_OPEN_LEFT;
-            this.nodes.push(new NodeContext(type, attrs, top.activeMarks, top.pendingMarks, solid, null, options));
+            let applyMarks = Mark$1.none;
+            marks = marks.filter(m => {
+                if (top.type ? top.type.allowsMarkType(m.type) : markMayApply(m.type, type)) {
+                    applyMarks = m.addToSet(applyMarks);
+                    return false;
+                }
+                return true;
+            });
+            this.nodes.push(new NodeContext(type, attrs, applyMarks, solid, null, options));
             this.open++;
+            return marks;
         }
         // Make sure all nodes above this.open are finished and added to
         // their parents
@@ -3369,7 +3340,7 @@
                         let next = depth > 0 || (depth == 0 && useRoot) ? this.nodes[depth].type
                             : option && depth >= minDepth ? option.node(depth - minDepth).type
                                 : null;
-                        if (!next || (next.name != part && next.groups.indexOf(part) == -1))
+                        if (!next || (next.name != part && !next.isInGroup(part)))
                             return false;
                         depth--;
                     }
@@ -3390,29 +3361,6 @@
                 let type = this.parser.schema.nodes[name];
                 if (type.isTextblock && type.defaultAttrs)
                     return type;
-            }
-        }
-        addPendingMark(mark) {
-            let found = findSameMarkInSet(mark, this.top.pendingMarks);
-            if (found)
-                this.top.stashMarks.push(found);
-            this.top.pendingMarks = mark.addToSet(this.top.pendingMarks);
-        }
-        removePendingMark(mark, upto) {
-            for (let depth = this.open; depth >= 0; depth--) {
-                let level = this.nodes[depth];
-                let found = level.pendingMarks.lastIndexOf(mark);
-                if (found > -1) {
-                    level.pendingMarks = mark.removeFromSet(level.pendingMarks);
-                }
-                else {
-                    level.activeMarks = mark.removeFromSet(level.activeMarks);
-                    let stashMark = level.popFromStashMark(mark);
-                    if (stashMark && level.type && level.type.allowsMarkType(stashMark.type))
-                        level.activeMarks = stashMark.addToSet(level.activeMarks);
-                }
-                if (level == upto)
-                    break;
             }
         }
     }
@@ -3465,12 +3413,6 @@
             };
             if (scan(parent.contentMatch))
                 return true;
-        }
-    }
-    function findSameMarkInSet(mark, set) {
-        for (let i = 0; i < set.length; i++) {
-            if (mark.eq(set[i]))
-                return set[i];
         }
     }
 
@@ -4775,7 +4717,9 @@
             throw new RangeError("Type given to setBlockType should be a textblock");
         let mapFrom = tr.steps.length;
         tr.doc.nodesBetween(from, to, (node, pos) => {
-            if (node.isTextblock && !node.hasMarkup(type, attrs) && canChangeType(tr.doc, tr.mapping.slice(mapFrom).map(pos), type)) {
+            let attrsHere = typeof attrs == "function" ? attrs(node) : attrs;
+            if (node.isTextblock && !node.hasMarkup(type, attrsHere) &&
+                canChangeType(tr.doc, tr.mapping.slice(mapFrom).map(pos), type)) {
                 let convertNewlines = null;
                 if (type.schema.linebreakReplacement) {
                     let pre = type.whitespace == "pre", supportLinebreak = !!type.contentMatch.matchType(type.schema.linebreakReplacement);
@@ -4790,7 +4734,7 @@
                 clearIncompatible(tr, tr.mapping.slice(mapFrom).map(pos, 1), type, undefined, convertNewlines === null);
                 let mapping = tr.mapping.slice(mapFrom);
                 let startM = mapping.map(pos, 1), endM = mapping.map(pos + node.nodeSize, 1);
-                tr.step(new ReplaceAroundStep(startM, endM, startM + 1, endM - 1, new Slice(Fragment.from(type.create(attrs, null, node.marks)), 0, 0), 1, true));
+                tr.step(new ReplaceAroundStep(startM, endM, startM + 1, endM - 1, new Slice(Fragment.from(type.create(attrsHere, null, node.marks)), 0, 0), 1, true));
                 if (convertNewlines === true)
                     replaceNewlines$1(tr, node, pos, mapFrom);
                 return false;
@@ -4881,8 +4825,24 @@
         return joinable($pos.nodeBefore, $pos.nodeAfter) &&
             $pos.parent.canReplace(index, index + 1);
     }
+    function canAppendWithSubstitutedLinebreaks(a, b) {
+        if (!b.content.size)
+            a.type.compatibleContent(b.type);
+        let match = a.contentMatchAt(a.childCount);
+        let { linebreakReplacement } = a.type.schema;
+        for (let i = 0; i < b.childCount; i++) {
+            let child = b.child(i);
+            let type = child.type == linebreakReplacement ? a.type.schema.nodes.text : child.type;
+            match = match.matchType(type);
+            if (!match)
+                return false;
+            if (!a.type.allowsMarks(child.marks))
+                return false;
+        }
+        return match.validEnd;
+    }
     function joinable(a, b) {
-        return !!(a && b && !a.isLeaf && a.canAppend(b));
+        return !!(a && b && !a.isLeaf && canAppendWithSubstitutedLinebreaks(a, b));
     }
     /**
     Find an ancestor of the given position that can be joined to the
@@ -4915,8 +4875,31 @@
         }
     }
     function join$2(tr, pos, depth) {
-        let step = new ReplaceStep(pos - depth, pos + depth, Slice.empty, true);
-        tr.step(step);
+        let convertNewlines = null;
+        let { linebreakReplacement } = tr.doc.type.schema;
+        let $before = tr.doc.resolve(pos - depth), beforeType = $before.node().type;
+        if (linebreakReplacement && beforeType.inlineContent) {
+            let pre = beforeType.whitespace == "pre";
+            let supportLinebreak = !!beforeType.contentMatch.matchType(linebreakReplacement);
+            if (pre && !supportLinebreak)
+                convertNewlines = false;
+            else if (!pre && supportLinebreak)
+                convertNewlines = true;
+        }
+        let mapFrom = tr.steps.length;
+        if (convertNewlines === false) {
+            let $after = tr.doc.resolve(pos + depth);
+            replaceLinebreaks(tr, $after.node(), $after.before(), mapFrom);
+        }
+        if (beforeType.inlineContent)
+            clearIncompatible(tr, pos + depth - 1, beforeType, $before.node().contentMatchAt($before.index()), convertNewlines == null);
+        let mapping = tr.mapping.slice(mapFrom), start = mapping.map(pos - depth);
+        tr.step(new ReplaceStep(start, mapping.map(pos + depth, -1), Slice.empty, true));
+        if (convertNewlines === true) {
+            let $full = tr.doc.resolve(start);
+            replaceNewlines$1(tr, $full.node(), $full.before(), tr.steps.length);
+        }
+        return tr;
     }
     /**
     Try to find a point where a node of the given type can be inserted
@@ -5400,7 +5383,8 @@
                 return tr.delete($from.before(depth), $to.after(depth));
         }
         for (let d = 1; d <= $from.depth && d <= $to.depth; d++) {
-            if (from - $from.start(d) == $from.depth - d && to > $from.end(d) && $to.end(d) - to != $to.depth - d)
+            if (from - $from.start(d) == $from.depth - d && to > $from.end(d) && $to.end(d) - to != $to.depth - d &&
+                $from.start(d - 1) == $to.start(d - 1) && $from.node(d - 1).canReplace($from.index(d - 1), $to.index(d - 1)))
                 return tr.delete($from.before(d), to);
         }
         tr.delete(from, to);
@@ -6940,15 +6924,18 @@
         if (doc.caretPositionFromPoint) {
             try { // Firefox throws for this call in hard-to-predict circumstances (#994)
                 let pos = doc.caretPositionFromPoint(x, y);
+                // Clip the offset, because Chrome will return a text offset
+                // into <input> nodes, which can't be treated as a regular DOM
+                // offset
                 if (pos)
-                    return { node: pos.offsetNode, offset: pos.offset };
+                    return { node: pos.offsetNode, offset: Math.min(nodeSize(pos.offsetNode), pos.offset) };
             }
             catch (_) { }
         }
         if (doc.caretRangeFromPoint) {
             let range = doc.caretRangeFromPoint(x, y);
             if (range)
-                return { node: range.startContainer, offset: range.startOffset };
+                return { node: range.startContainer, offset: Math.min(nodeSize(range.startContainer), range.startOffset) };
         }
     }
 
@@ -7460,6 +7447,8 @@
             return false;
         let offset = $head.parentOffset, atStart = !offset, atEnd = offset == $head.parent.content.size;
         let sel = view.domSelection();
+        if (!sel)
+            return $head.pos == $head.start() || $head.pos == $head.end();
         // If the textblock is all LTR, or the browser doesn't support
         // Selection.modify (Edge), fall back to a primitive approach
         if (!maybeRTL.test($head.parent.textContent) || !sel.modify)
@@ -8666,6 +8655,7 @@
                         return true;
                     }
                     else if (!locked && (updated = this.recreateWrapper(next, node, outerDeco, innerDeco, view, pos))) {
+                        this.destroyBetween(this.index, i);
                         this.top.children[this.index] = updated;
                         if (updated.contentDOM) {
                             updated.dirty = CONTENT_DIRTY;
@@ -8685,7 +8675,8 @@
         // identical content, move over its children.
         recreateWrapper(next, node, outerDeco, innerDeco, view, pos) {
             if (next.dirty || node.isAtom || !next.children.length ||
-                !next.node.content.eq(node.content))
+                !next.node.content.eq(node.content) ||
+                !sameOuterDeco(outerDeco, next.outerDeco) || !innerDeco.eq(next.innerDeco))
                 return null;
             let wrapper = NodeViewDesc.create(this.top, node, outerDeco, innerDeco, view, pos);
             if (wrapper.contentDOM) {
@@ -8956,9 +8947,9 @@
         let head = view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset, 1);
         if (head < 0)
             return null;
-        let $head = doc.resolve(head), $anchor, selection;
+        let $head = doc.resolve(head), anchor, selection;
         if (selectionCollapsed(domSel)) {
-            $anchor = $head;
+            anchor = head;
             while (nearestDesc && !nearestDesc.node)
                 nearestDesc = nearestDesc.parent;
             let nearestDescNode = nearestDesc.node;
@@ -8969,11 +8960,25 @@
             }
         }
         else {
-            let anchor = view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset, 1);
+            if (domSel instanceof view.dom.ownerDocument.defaultView.Selection && domSel.rangeCount > 1) {
+                let min = head, max = head;
+                for (let i = 0; i < domSel.rangeCount; i++) {
+                    let range = domSel.getRangeAt(i);
+                    min = Math.min(min, view.docView.posFromDOM(range.startContainer, range.startOffset, 1));
+                    max = Math.max(max, view.docView.posFromDOM(range.endContainer, range.endOffset, -1));
+                }
+                if (min < 0)
+                    return null;
+                [anchor, head] = max == view.state.selection.anchor ? [max, min] : [min, max];
+                $head = doc.resolve(head);
+            }
+            else {
+                anchor = view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset, 1);
+            }
             if (anchor < 0)
                 return null;
-            $anchor = doc.resolve(anchor);
         }
+        let $anchor = doc.resolve(anchor);
         if (!selection) {
             let bias = origin == "pointer" || (view.state.selection.head < $head.pos && !inWidget) ? 1 : -1;
             selection = selectionBetween(view, $anchor, $head, bias);
@@ -9082,12 +9087,14 @@
     }
     function selectCursorWrapper(view) {
         let domSel = view.domSelection(), range = document.createRange();
+        if (!domSel)
+            return;
         let node = view.cursorWrapper.dom, img = node.nodeName == "IMG";
         if (img)
-            range.setEnd(node.parentNode, domIndex(node) + 1);
+            range.setStart(node.parentNode, domIndex(node) + 1);
         else
-            range.setEnd(node, 0);
-        range.collapse(false);
+            range.setStart(node, 0);
+        range.collapse(true);
         domSel.removeAllRanges();
         domSel.addRange(range);
         // Kludge to kill 'control selection' in IE11 when selecting an
@@ -9375,6 +9382,8 @@
             }
         }
         let sel = view.domSelection();
+        if (!sel)
+            return;
         if (selectionCollapsed(sel)) {
             let range = document.createRange();
             range.setEnd(node, offset);
@@ -9729,6 +9738,15 @@
     function detachedDoc() {
         return _detachedDoc || (_detachedDoc = document.implementation.createHTMLDocument("title"));
     }
+    function maybeWrapTrusted(html) {
+        let trustedTypes = window.trustedTypes;
+        if (!trustedTypes)
+            return html;
+        // With the require-trusted-types-for CSP, Chrome will block
+        // innerHTML, even on a detached document. This wraps the string in
+        // a way that makes the browser allow us to use its parser again.
+        return trustedTypes.createPolicy("detachedDocument", { createHTML: (s) => s }).createHTML(html);
+    }
     function readHTML(html) {
         let metas = /^(\s*<meta [^>]*>)*/.exec(html);
         if (metas)
@@ -9737,7 +9755,7 @@
         let firstTag = /<([a-z][^>\s]+)/i.exec(html), wrap;
         if (wrap = firstTag && wrapMap[firstTag[1].toLowerCase()])
             html = wrap.map(n => "<" + n + ">").join("") + html + wrap.map(n => "</" + n + ">").reverse().join("");
-        elt.innerHTML = html;
+        elt.innerHTML = maybeWrapTrusted(html);
         if (wrap)
             for (let i = 0; i < wrap.length; i++)
                 elt = elt.querySelector(wrap[i]) || elt;
@@ -9878,7 +9896,9 @@
         // and handling them eagerly tends to corrupt the input.
         if (android && chrome && event.keyCode == 13)
             return;
-        if (event.keyCode != 229)
+        if (view.domObserver.selectionChanged(view.domSelectionRange()))
+            view.domObserver.flush();
+        else if (event.keyCode != 229)
             view.domObserver.forceFlush();
         // On iOS, if we preventDefault enter key presses, the virtual
         // keyboard gets confused. So the hack here is to set a flag that
@@ -9941,6 +9961,8 @@
     function updateSelection(view, selection, origin) {
         if (!view.focused)
             view.focus();
+        if (view.state.selection.eq(selection))
+            return;
         let tr = view.state.tr.setSelection(selection);
         if (origin == "pointer")
             tr.setMeta("pointer", true);
@@ -10195,8 +10217,8 @@
     editHandlers.compositionstart = editHandlers.compositionupdate = view => {
         if (!view.composing) {
             view.domObserver.flush();
-            let { state } = view, $pos = state.selection.$from;
-            if (state.selection.empty &&
+            let { state } = view, $pos = state.selection.$to;
+            if (state.selection instanceof TextSelection &&
                 (state.storedMarks ||
                     (!$pos.textOffset && $pos.parentOffset && $pos.nodeBefore.marks.some(m => m.type.spec.inclusive === false)))) {
                 // Need to wrap the cursor in mark nodes different from the ones in the DOM context
@@ -10205,7 +10227,7 @@
                 view.markCursor = null;
             }
             else {
-                endComposition(view);
+                endComposition(view, !state.selection.empty);
                 // In firefox, if the cursor is after but outside a marked node,
                 // the inserted text won't inherit the marks. So this moves it
                 // inside if necessary.
@@ -10216,7 +10238,9 @@
                         if (!before)
                             break;
                         if (before.nodeType == 3) {
-                            view.domSelection().collapse(before, before.nodeValue.length);
+                            let sel = view.domSelection();
+                            if (sel)
+                                sel.collapse(before, before.nodeValue.length);
                             break;
                         }
                         else {
@@ -10284,15 +10308,17 @@
     /**
     @internal
     */
-    function endComposition(view, forceUpdate = false) {
+    function endComposition(view, restarting = false) {
         if (android && view.domObserver.flushingSoon >= 0)
             return;
         view.domObserver.forceFlush();
         clearComposition(view);
-        if (forceUpdate || view.docView && view.docView.dirty) {
+        if (restarting || view.docView && view.docView.dirty) {
             let sel = selectionFromDOM(view);
             if (sel && !sel.eq(view.state.selection))
                 view.dispatch(view.state.tr.setSelection(sel));
+            else if ((view.markCursor || restarting) && !view.state.selection.empty)
+                view.dispatch(view.state.tr.deleteSelection());
             else
                 view.updateState(view.state);
             return true;
@@ -10949,6 +10975,7 @@
             }
             return result;
         }
+        forEachSet(f) { f(this); }
     }
     /**
     The empty set of decorations.
@@ -11023,6 +11050,10 @@
                 default: return new DecorationGroup(members.every(m => m instanceof DecorationSet) ? members :
                     members.reduce((r, m) => r.concat(m instanceof DecorationSet ? m : m.members), []));
             }
+        }
+        forEachSet(f) {
+            for (let i = 0; i < this.members.length; i++)
+                this.members[i].forEachSet(f);
         }
     }
     function mapChildren(oldChildren, newLocal, mapping, node, offset, oldOffset, options) {
@@ -11390,6 +11421,9 @@
                     this.queue.push(mut);
             return this.queue;
         }
+        selectionChanged(sel) {
+            return !this.suppressingSelectionUpdates && !this.currentSelection.eq(sel) && hasFocusAndSelection(this.view) && !this.ignoreSelectionChange(sel);
+        }
         flush() {
             let { view } = this;
             if (!view.docView || this.flushingSoon > -1)
@@ -11397,8 +11431,7 @@
             let mutations = this.pendingRecords();
             if (mutations.length)
                 this.queue = [];
-            let sel = view.domSelectionRange();
-            let newSel = !this.suppressingSelectionUpdates && !this.currentSelection.eq(sel) && hasFocusAndSelection(view) && !this.ignoreSelectionChange(sel);
+            let sel = view.domSelectionRange(), newSel = this.selectionChanged(sel);
             let from = -1, to = -1, typeOver = false, added = [];
             if (view.editable) {
                 for (let i = 0; i < mutations.length; i++) {
@@ -11686,6 +11719,8 @@
         }
         view.input.lastKeyCode = null;
         let change = findDiff(compare.content, parse.doc.content, parse.from, preferredPos, preferredSide);
+        if (change)
+            view.input.domChangeCount++;
         if ((ios && view.input.lastIOSEnter > Date.now() - 225 || android) &&
             addedNodes.some(n => n.nodeType == 1 && !isInline.test(n.nodeName)) &&
             (!change || change.endA >= change.endB) &&
@@ -11711,7 +11746,6 @@
                 return;
             }
         }
-        view.input.domChangeCount++;
         // Handle the case where overwriting a selection by typing matches
         // the start or end of the selected content, creating a change
         // that's smaller than what was actually overwritten.
@@ -12434,6 +12468,8 @@
         */
         domSelectionRange() {
             let sel = this.domSelection();
+            if (!sel)
+                return { focusNode: null, focusOffset: 0, anchorNode: null, anchorOffset: 0 };
             return safari && this.root.nodeType === 11 &&
                 deepActiveElement(this.dom.ownerDocument) == this.dom && safariShadowSelectionRange(this, sel) || sel;
         }
@@ -12471,7 +12507,7 @@
             dom.className = "ProseMirror-separator";
             dom.setAttribute("mark-placeholder", "true");
             dom.setAttribute("alt", "");
-            view.cursorWrapper = { dom, deco: Decoration.widget(view.state.selection.head, dom, { raw: true, marks: view.markCursor }) };
+            view.cursorWrapper = { dom, deco: Decoration.widget(view.state.selection.from, dom, { raw: true, marks: view.markCursor }) };
         }
         else {
             view.cursorWrapper = null;
@@ -12794,21 +12830,26 @@
         }
         let before = $cut.nodeBefore;
         // Apply the joining algorithm
-        if (!before.type.spec.isolating && deleteBarrier(state, $cut, dispatch))
+        if (deleteBarrier(state, $cut, dispatch, -1))
             return true;
         // If the node below has no content and the node above is
         // selectable, delete the node below and select the one above.
         if ($cursor.parent.content.size == 0 &&
             (textblockAt(before, "end") || NodeSelection.isSelectable(before))) {
-            let delStep = replaceStep(state.doc, $cursor.before(), $cursor.after(), Slice.empty);
-            if (delStep && delStep.slice.size < delStep.to - delStep.from) {
-                if (dispatch) {
-                    let tr = state.tr.step(delStep);
-                    tr.setSelection(textblockAt(before, "end") ? Selection.findFrom(tr.doc.resolve(tr.mapping.map($cut.pos, -1)), -1)
-                        : NodeSelection.create(tr.doc, $cut.pos - before.nodeSize));
-                    dispatch(tr.scrollIntoView());
+            for (let depth = $cursor.depth;; depth--) {
+                let delStep = replaceStep(state.doc, $cursor.before(depth), $cursor.after(depth), Slice.empty);
+                if (delStep && delStep.slice.size < delStep.to - delStep.from) {
+                    if (dispatch) {
+                        let tr = state.tr.step(delStep);
+                        tr.setSelection(textblockAt(before, "end")
+                            ? Selection.findFrom(tr.doc.resolve(tr.mapping.map($cut.pos, -1)), -1)
+                            : NodeSelection.create(tr.doc, $cut.pos - before.nodeSize));
+                        dispatch(tr.scrollIntoView());
+                    }
+                    return true;
                 }
-                return true;
+                if (depth == 1 || $cursor.node(depth - 1).childCount > 1)
+                    break;
             }
         }
         // If the node before is an atom, delete it
@@ -12940,7 +12981,7 @@
             return false;
         let after = $cut.nodeAfter;
         // Try the joining algorithm
-        if (deleteBarrier(state, $cut, dispatch))
+        if (deleteBarrier(state, $cut, dispatch, 1))
             return true;
         // If the node above has no content and the node below is
         // selectable, delete the node above and select the one below.
@@ -13166,19 +13207,15 @@
         if (!$pos.parent.canReplace(index, index + 1) || !(after.isTextblock || canJoin(state.doc, $pos.pos)))
             return false;
         if (dispatch)
-            dispatch(state.tr
-                .clearIncompatible($pos.pos, before.type, before.contentMatchAt(before.childCount))
-                .join($pos.pos)
-                .scrollIntoView());
+            dispatch(state.tr.join($pos.pos).scrollIntoView());
         return true;
     }
-    function deleteBarrier(state, $cut, dispatch) {
+    function deleteBarrier(state, $cut, dispatch, dir) {
         let before = $cut.nodeBefore, after = $cut.nodeAfter, conn, match;
-        if (before.type.spec.isolating || after.type.spec.isolating)
-            return false;
-        if (joinMaybeClear(state, $cut, dispatch))
+        let isolated = before.type.spec.isolating || after.type.spec.isolating;
+        if (!isolated && joinMaybeClear(state, $cut, dispatch))
             return true;
-        let canDelAfter = $cut.parent.canReplace($cut.index(), $cut.index() + 1);
+        let canDelAfter = !isolated && $cut.parent.canReplace($cut.index(), $cut.index() + 1);
         if (canDelAfter &&
             (conn = (match = before.contentMatchAt(before.childCount)).findWrapping(after.type)) &&
             match.matchType(conn[0] || after.type).validEnd) {
@@ -13188,14 +13225,15 @@
                     wrap = Fragment.from(conn[i].create(null, wrap));
                 wrap = Fragment.from(before.copy(wrap));
                 let tr = state.tr.step(new ReplaceAroundStep($cut.pos - 1, end, $cut.pos, end, new Slice(wrap, 1, 0), conn.length, true));
-                let joinAt = end + 2 * conn.length;
-                if (canJoin(tr.doc, joinAt))
-                    tr.join(joinAt);
+                let $joinAt = tr.doc.resolve(end + 2 * conn.length);
+                if ($joinAt.nodeAfter && $joinAt.nodeAfter.type == before.type &&
+                    canJoin(tr.doc, $joinAt.pos))
+                    tr.join($joinAt.pos);
                 dispatch(tr.scrollIntoView());
             }
             return true;
         }
-        let selAfter = Selection.findFrom($cut, 1);
+        let selAfter = after.type.spec.isolating || (dir > 0 && isolated) ? null : Selection.findFrom($cut, 1);
         let range = selAfter && selAfter.$from.blockRange(selAfter.$to), target = range && liftTarget(range);
         if (target != null && target >= $cut.depth) {
             if (dispatch)
@@ -13757,7 +13795,18 @@
                     mergedAttributes[key] = [...existingClasses, ...insertClasses].join(' ');
                 }
                 else if (key === 'style') {
-                    mergedAttributes[key] = [mergedAttributes[key], value].join('; ');
+                    const newStyles = value ? value.split(';').map((style) => style.trim()).filter(Boolean) : [];
+                    const existingStyles = mergedAttributes[key] ? mergedAttributes[key].split(';').map((style) => style.trim()).filter(Boolean) : [];
+                    const styleMap = new Map();
+                    existingStyles.forEach(style => {
+                        const [property, val] = style.split(':').map(part => part.trim());
+                        styleMap.set(property, val);
+                    });
+                    newStyles.forEach(style => {
+                        const [property, val] = style.split(':').map(part => part.trim());
+                        styleMap.set(property, val);
+                    });
+                    mergedAttributes[key] = Array.from(styleMap.entries()).map(([property, val]) => `${property}: ${val}`).join('; ');
                 }
                 else {
                     mergedAttributes[key] = value;
@@ -13769,6 +13818,7 @@
 
     function getRenderedAttributes(nodeOrMark, extensionAttributes) {
         return extensionAttributes
+            .filter(attribute => attribute.type === nodeOrMark.type.name)
             .filter(item => item.attribute.rendered)
             .map(item => {
             if (!item.attribute.renderHTML) {
@@ -14205,6 +14255,123 @@
         return plugin;
     }
 
+    // see: https://github.com/mesqueeb/is-what/blob/88d6e4ca92fb2baab6003c54e02eedf4e729e5ab/src/index.ts
+    function getType(value) {
+        return Object.prototype.toString.call(value).slice(8, -1);
+    }
+    function isPlainObject$2(value) {
+        if (getType(value) !== 'Object') {
+            return false;
+        }
+        return value.constructor === Object && Object.getPrototypeOf(value) === Object.prototype;
+    }
+
+    function mergeDeep(target, source) {
+        const output = { ...target };
+        if (isPlainObject$2(target) && isPlainObject$2(source)) {
+            Object.keys(source).forEach(key => {
+                if (isPlainObject$2(source[key]) && isPlainObject$2(target[key])) {
+                    output[key] = mergeDeep(target[key], source[key]);
+                }
+                else {
+                    output[key] = source[key];
+                }
+            });
+        }
+        return output;
+    }
+
+    /**
+     * The Mark class is used to create custom mark extensions.
+     * @see https://tiptap.dev/api/extensions#create-a-new-extension
+     */
+    class Mark {
+        constructor(config = {}) {
+            this.type = 'mark';
+            this.name = 'mark';
+            this.parent = null;
+            this.child = null;
+            this.config = {
+                name: this.name,
+                defaultOptions: {},
+            };
+            this.config = {
+                ...this.config,
+                ...config,
+            };
+            this.name = this.config.name;
+            if (config.defaultOptions && Object.keys(config.defaultOptions).length > 0) {
+                console.warn(`[tiptap warn]: BREAKING CHANGE: "defaultOptions" is deprecated. Please use "addOptions" instead. Found in extension: "${this.name}".`);
+            }
+            // TODO: remove `addOptions` fallback
+            this.options = this.config.defaultOptions;
+            if (this.config.addOptions) {
+                this.options = callOrReturn(getExtensionField(this, 'addOptions', {
+                    name: this.name,
+                }));
+            }
+            this.storage = callOrReturn(getExtensionField(this, 'addStorage', {
+                name: this.name,
+                options: this.options,
+            })) || {};
+        }
+        static create(config = {}) {
+            return new Mark(config);
+        }
+        configure(options = {}) {
+            // return a new instance so we can use the same extension
+            // with different calls of `configure`
+            const extension = this.extend({
+                ...this.config,
+                addOptions: () => {
+                    return mergeDeep(this.options, options);
+                },
+            });
+            // Always preserve the current name
+            extension.name = this.name;
+            // Set the parent to be our parent
+            extension.parent = this.parent;
+            return extension;
+        }
+        extend(extendedConfig = {}) {
+            const extension = new Mark(extendedConfig);
+            extension.parent = this;
+            this.child = extension;
+            extension.name = extendedConfig.name ? extendedConfig.name : extension.parent.name;
+            if (extendedConfig.defaultOptions && Object.keys(extendedConfig.defaultOptions).length > 0) {
+                console.warn(`[tiptap warn]: BREAKING CHANGE: "defaultOptions" is deprecated. Please use "addOptions" instead. Found in extension: "${extension.name}".`);
+            }
+            extension.options = callOrReturn(getExtensionField(extension, 'addOptions', {
+                name: extension.name,
+            }));
+            extension.storage = callOrReturn(getExtensionField(extension, 'addStorage', {
+                name: extension.name,
+                options: extension.options,
+            }));
+            return extension;
+        }
+        static handleExit({ editor, mark }) {
+            const { tr } = editor.state;
+            const currentPos = editor.state.selection.$from;
+            const isAtEnd = currentPos.pos === currentPos.end();
+            if (isAtEnd) {
+                const currentMarks = currentPos.marks();
+                const isInMark = !!currentMarks.find(m => (m === null || m === void 0 ? void 0 : m.type.name) === mark.name);
+                if (!isInMark) {
+                    return false;
+                }
+                const removeMark = currentMarks.find(m => (m === null || m === void 0 ? void 0 : m.type.name) === mark.name);
+                if (removeMark) {
+                    tr.removeStoredMark(removeMark);
+                }
+                tr.insertText(' ', currentPos.pos);
+                editor.view.dispatch(tr);
+                return true;
+            }
+            return false;
+        }
+    }
+
     function isNumber$1(value) {
         return typeof value === 'number';
     }
@@ -14588,15 +14755,19 @@
                 if (!addNodeView) {
                     return [];
                 }
-                const nodeview = (node, view, getPos, decorations) => {
+                const nodeview = (node, view, getPos, decorations, innerDecorations) => {
                     const HTMLAttributes = getRenderedAttributes(node, extensionAttributes);
                     return addNodeView()({
-                        editor,
+                        // pass-through
                         node,
-                        getPos,
+                        view,
+                        getPos: getPos,
                         decorations,
-                        HTMLAttributes,
+                        innerDecorations,
+                        // tiptap-specific
+                        editor,
                         extension,
+                        HTMLAttributes,
                     });
                 };
                 return [extension.name, nodeview];
@@ -14658,32 +14829,6 @@
                 }
             });
         }
-    }
-
-    // see: https://github.com/mesqueeb/is-what/blob/88d6e4ca92fb2baab6003c54e02eedf4e729e5ab/src/index.ts
-    function getType(value) {
-        return Object.prototype.toString.call(value).slice(8, -1);
-    }
-    function isPlainObject$2(value) {
-        if (getType(value) !== 'Object') {
-            return false;
-        }
-        return value.constructor === Object && Object.getPrototypeOf(value) === Object.prototype;
-    }
-
-    function mergeDeep(target, source) {
-        const output = { ...target };
-        if (isPlainObject$2(target) && isPlainObject$2(source)) {
-            Object.keys(source).forEach(key => {
-                if (isPlainObject$2(source[key]) && isPlainObject$2(target[key])) {
-                    output[key] = mergeDeep(target[key], source[key]);
-                }
-                else {
-                    output[key] = source[key];
-                }
-            });
-        }
-        return output;
     }
 
     /**
@@ -15204,7 +15349,11 @@
                 if (isArrayContent) {
                     return Fragment.fromArray(content.map(item => schema.nodeFromJSON(item)));
                 }
-                return schema.nodeFromJSON(content);
+                const node = schema.nodeFromJSON(content);
+                if (options.errorOnInvalidContent) {
+                    node.check();
+                }
+                return node;
             }
             catch (error) {
                 if (options.errorOnInvalidContent) {
@@ -16750,10 +16899,17 @@
         const type = getNodeType(typeOrName, state.schema);
         const toggleType = getNodeType(toggleTypeOrName, state.schema);
         const isActive = isNodeActive(state, type, attributes);
-        if (isActive) {
-            return commands.setNode(toggleType);
+        let attributesToCopy;
+        if (state.selection.$anchor.sameParent(state.selection.$head)) {
+            // only copy attributes if the selection is pointing to a node of the same type
+            attributesToCopy = state.selection.$anchor.parent.attrs;
         }
-        return commands.setNode(type, attributes);
+        if (isActive) {
+            return commands.setNode(toggleType, attributesToCopy);
+        }
+        // If the node is not active, we want to set the new node type with the given attributes
+        // Copying over the attributes from the current node if the selection is pointing to a node of the same type
+        return commands.setNode(type, { ...attributesToCopy, ...attributes });
     };
 
     const toggleWrap = (typeOrName, attributes = {}) => ({ state, commands }) => {
@@ -16958,6 +17114,27 @@
         },
     });
 
+    const Drop = Extension.create({
+        name: 'drop',
+        addProseMirrorPlugins() {
+            return [
+                new Plugin({
+                    key: new PluginKey('tiptapDrop'),
+                    props: {
+                        handleDrop: (_, e, slice, moved) => {
+                            this.editor.emit('drop', {
+                                editor: this.editor,
+                                event: e,
+                                slice,
+                                moved,
+                            });
+                        },
+                    },
+                }),
+            ];
+        },
+    });
+
     const Editable = Extension.create({
         name: 'editable',
         addProseMirrorPlugins() {
@@ -17087,7 +17264,8 @@
                     appendTransaction: (transactions, oldState, newState) => {
                         const docChanges = transactions.some(transaction => transaction.docChanged)
                             && !oldState.doc.eq(newState.doc);
-                        if (!docChanges) {
+                        const ignoreTr = transactions.some(transaction => transaction.getMeta('preventClearDocument'));
+                        if (!docChanges || ignoreTr) {
                             return;
                         }
                         const { empty, from, to } = oldState.selection;
@@ -17097,7 +17275,7 @@
                         if (empty || !allWasSelected) {
                             return;
                         }
-                        const isEmpty = newState.doc.textBetween(0, newState.doc.content.size, ' ', ' ').length === 0;
+                        const isEmpty = isNodeEmpty(newState.doc);
                         if (!isEmpty) {
                             return;
                         }
@@ -17115,6 +17293,26 @@
                             return;
                         }
                         return tr;
+                    },
+                }),
+            ];
+        },
+    });
+
+    const Paste = Extension.create({
+        name: 'paste',
+        addProseMirrorPlugins() {
+            return [
+                new Plugin({
+                    key: new PluginKey('tiptapPaste'),
+                    props: {
+                        handlePaste: (_view, e, slice) => {
+                            this.editor.emit('paste', {
+                                editor: this.editor,
+                                event: e,
+                                slice,
+                            });
+                        },
                     },
                 }),
             ];
@@ -17139,9 +17337,11 @@
       __proto__: null,
       ClipboardTextSerializer: ClipboardTextSerializer,
       Commands: Commands,
+      Drop: Drop,
       Editable: Editable,
       FocusEvents: FocusEvents,
       Keymap: Keymap,
+      Paste: Paste,
       Tabindex: Tabindex
     });
 
@@ -17445,6 +17645,8 @@ img.ProseMirror-separator {
                 onBlur: () => null,
                 onDestroy: () => null,
                 onContentError: ({ error }) => { throw error; },
+                onPaste: () => null,
+                onDrop: () => null,
             };
             this.isCapturingTransaction = false;
             this.capturedTransaction = null;
@@ -17464,6 +17666,8 @@ img.ProseMirror-separator {
             this.on('focus', this.options.onFocus);
             this.on('blur', this.options.onBlur);
             this.on('destroy', this.options.onDestroy);
+            this.on('drop', ({ event, slice, moved }) => this.options.onDrop(event, slice, moved));
+            this.on('paste', ({ event, slice }) => this.options.onPaste(event, slice));
             window.setTimeout(() => {
                 if (this.isDestroyed) {
                     return;
@@ -17552,6 +17756,7 @@ img.ProseMirror-separator {
          *
          * @param plugin A ProseMirror plugin
          * @param handlePlugins Control how to merge the plugin into the existing plugins.
+         * @returns The new editor state
          */
         registerPlugin(plugin, handlePlugins) {
             const plugins = isFunction(handlePlugins)
@@ -17559,15 +17764,17 @@ img.ProseMirror-separator {
                 : [...this.state.plugins, plugin];
             const state = this.state.reconfigure({ plugins });
             this.view.updateState(state);
+            return state;
         }
         /**
          * Unregister a ProseMirror plugin.
          *
          * @param nameOrPluginKey The plugins name
+         * @returns The new editor state or undefined if the editor is destroyed
          */
         unregisterPlugin(nameOrPluginKey) {
             if (this.isDestroyed) {
-                return;
+                return undefined;
             }
             // @ts-ignore
             const name = typeof nameOrPluginKey === 'string' ? `${nameOrPluginKey}$` : nameOrPluginKey.key;
@@ -17576,6 +17783,7 @@ img.ProseMirror-separator {
                 plugins: this.state.plugins.filter(plugin => !plugin.key.startsWith(name)),
             });
             this.view.updateState(state);
+            return state;
         }
         /**
          * Creates an extension manager.
@@ -17591,7 +17799,14 @@ img.ProseMirror-separator {
                 FocusEvents,
                 Keymap,
                 Tabindex,
-            ] : [];
+                Drop,
+                Paste,
+            ].filter(ext => {
+                if (typeof this.options.enableCoreExtensions === 'object') {
+                    return this.options.enableCoreExtensions[ext.name] !== false;
+                }
+                return true;
+            }) : [];
             const allExtensions = [...coreExtensions, ...this.options.extensions].filter(extension => {
                 return ['extension', 'node', 'mark'].includes(extension === null || extension === void 0 ? void 0 : extension.type);
             });
@@ -17803,6 +18018,12 @@ img.ProseMirror-separator {
         destroy() {
             this.emit('destroy');
             if (this.view) {
+                // Cleanup our reference to prevent circular references which caused memory leaks
+                // @ts-ignore
+                const dom = this.view.dom;
+                if (dom && dom.editor) {
+                    delete dom.editor;
+                }
                 this.view.destroy();
             }
             this.removeAllListeners();
@@ -18018,97 +18239,6 @@ img.ProseMirror-separator {
     }
 
     /**
-     * The Mark class is used to create custom mark extensions.
-     * @see https://tiptap.dev/api/extensions#create-a-new-extension
-     */
-    class Mark {
-        constructor(config = {}) {
-            this.type = 'mark';
-            this.name = 'mark';
-            this.parent = null;
-            this.child = null;
-            this.config = {
-                name: this.name,
-                defaultOptions: {},
-            };
-            this.config = {
-                ...this.config,
-                ...config,
-            };
-            this.name = this.config.name;
-            if (config.defaultOptions && Object.keys(config.defaultOptions).length > 0) {
-                console.warn(`[tiptap warn]: BREAKING CHANGE: "defaultOptions" is deprecated. Please use "addOptions" instead. Found in extension: "${this.name}".`);
-            }
-            // TODO: remove `addOptions` fallback
-            this.options = this.config.defaultOptions;
-            if (this.config.addOptions) {
-                this.options = callOrReturn(getExtensionField(this, 'addOptions', {
-                    name: this.name,
-                }));
-            }
-            this.storage = callOrReturn(getExtensionField(this, 'addStorage', {
-                name: this.name,
-                options: this.options,
-            })) || {};
-        }
-        static create(config = {}) {
-            return new Mark(config);
-        }
-        configure(options = {}) {
-            // return a new instance so we can use the same extension
-            // with different calls of `configure`
-            const extension = this.extend({
-                ...this.config,
-                addOptions: () => {
-                    return mergeDeep(this.options, options);
-                },
-            });
-            // Always preserve the current name
-            extension.name = this.name;
-            // Set the parent to be our parent
-            extension.parent = this.parent;
-            return extension;
-        }
-        extend(extendedConfig = {}) {
-            const extension = new Mark(extendedConfig);
-            extension.parent = this;
-            this.child = extension;
-            extension.name = extendedConfig.name ? extendedConfig.name : extension.parent.name;
-            if (extendedConfig.defaultOptions && Object.keys(extendedConfig.defaultOptions).length > 0) {
-                console.warn(`[tiptap warn]: BREAKING CHANGE: "defaultOptions" is deprecated. Please use "addOptions" instead. Found in extension: "${extension.name}".`);
-            }
-            extension.options = callOrReturn(getExtensionField(extension, 'addOptions', {
-                name: extension.name,
-            }));
-            extension.storage = callOrReturn(getExtensionField(extension, 'addStorage', {
-                name: extension.name,
-                options: extension.options,
-            }));
-            return extension;
-        }
-        static handleExit({ editor, mark }) {
-            const { tr } = editor.state;
-            const currentPos = editor.state.selection.$from;
-            const isAtEnd = currentPos.pos === currentPos.end();
-            if (isAtEnd) {
-                const currentMarks = currentPos.marks();
-                const isInMark = !!currentMarks.find(m => (m === null || m === void 0 ? void 0 : m.type.name) === mark.name);
-                if (!isInMark) {
-                    return false;
-                }
-                const removeMark = currentMarks.find(m => (m === null || m === void 0 ? void 0 : m.type.name) === mark.name);
-                if (removeMark) {
-                    tr.removeStoredMark(removeMark);
-                }
-                tr.insertText(' ', currentPos.pos);
-                editor.view.dispatch(tr);
-                return true;
-            }
-            return false;
-        }
-    }
-
-    /**
      * The Node class is used to create custom node extensions.
      * @see https://tiptap.dev/api/extensions#create-a-new-extension
      */
@@ -18200,6 +18330,9 @@ img.ProseMirror-separator {
             this.extension = props.extension;
             this.node = props.node;
             this.decorations = props.decorations;
+            this.innerDecorations = props.innerDecorations;
+            this.view = props.view;
+            this.HTMLAttributes = props.HTMLAttributes;
             this.getPos = props.getPos;
             this.mount();
         }
@@ -18238,9 +18371,13 @@ img.ProseMirror-separator {
                 y = handleBox.y - domBox.y + offsetY;
             }
             (_g = event.dataTransfer) === null || _g === void 0 ? void 0 : _g.setDragImage(this.dom, x, y);
+            const pos = this.getPos();
+            if (typeof pos !== 'number') {
+                return;
+            }
             // we need to tell ProseMirror that we want to move the whole node
             // so we create a NodeSelection
-            const selection = NodeSelection.create(view.state.doc, this.getPos());
+            const selection = NodeSelection.create(view.state.doc, pos);
             const transaction = view.state.tr.setSelection(selection);
             view.dispatch(transaction);
         }
@@ -18311,6 +18448,11 @@ img.ProseMirror-separator {
             }
             return true;
         }
+        /**
+         * Called when a DOM [mutation](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver) or a selection change happens within the view.
+         * @return `false` if the editor should re-read the selection or re-parse the range around the mutation
+         * @return `true` if it can safely be ignored.
+         */
         ignoreMutation(mutation) {
             if (!this.dom || !this.contentDOM) {
                 return true;
@@ -18357,9 +18499,15 @@ img.ProseMirror-separator {
             }
             return true;
         }
+        /**
+         * Update the attributes of the prosemirror node.
+         */
         updateAttributes(attributes) {
             this.editor.commands.command(({ tr }) => {
                 const pos = this.getPos();
+                if (typeof pos !== 'number') {
+                    return false;
+                }
                 tr.setNodeMarkup(pos, undefined, {
                     ...this.node.attrs,
                     ...attributes,
@@ -18367,8 +18515,14 @@ img.ProseMirror-separator {
                 return true;
             });
         }
+        /**
+         * Delete the node.
+         */
         deleteNode() {
             const from = this.getPos();
+            if (typeof from !== 'number') {
+                return;
+            }
             const to = from + this.node.nodeSize;
             this.editor.commands.deleteRange({ from, to });
         }
@@ -21568,9 +21722,9 @@ img.ProseMirror-separator {
                         const started = !prev.active && next.active;
                         const stopped = prev.active && !next.active;
                         const changed = !started && !stopped && prev.query !== next.query;
-                        const handleStart = started;
+                        const handleStart = started || (moved && changed);
                         const handleChange = changed || moved;
-                        const handleExit = stopped;
+                        const handleExit = stopped || (moved && changed);
                         // Cancel when suggestion isn't active
                         if (!handleStart && !handleChange && !handleExit) {
                             return;
@@ -22119,7 +22273,7 @@ img.ProseMirror-separator {
      * This extension allows you to create list items.
      * @see https://www.tiptap.dev/api/nodes/list-item
      */
-    const ListItem$2 = Node.create({
+    const ListItem = Node.create({
         name: 'listItem',
         addOptions() {
             return {
@@ -22154,7 +22308,7 @@ img.ProseMirror-separator {
      * for the `textColor` and `backgroundColor` extensions.
      * @see https://www.tiptap.dev/api/marks/text-style
      */
-    const TextStyle$1 = Mark.create({
+    const TextStyle = Mark.create({
         name: 'textStyle',
         priority: 101,
         addOptions() {
@@ -22229,7 +22383,7 @@ img.ProseMirror-separator {
             return {
                 toggleBulletList: () => ({ commands, chain }) => {
                     if (this.options.keepAttributes) {
-                        return chain().toggleList(this.name, this.options.itemTypeName, this.options.keepMarks).updateAttributes(ListItem$2.name, this.editor.getAttributes(TextStyle$1.name)).run();
+                        return chain().toggleList(this.name, this.options.itemTypeName, this.options.keepMarks).updateAttributes(ListItem.name, this.editor.getAttributes(TextStyle.name)).run();
                     }
                     return commands.toggleList(this.name, this.options.itemTypeName, this.options.keepMarks);
                 },
@@ -22251,7 +22405,7 @@ img.ProseMirror-separator {
                     type: this.type,
                     keepMarks: this.options.keepMarks,
                     keepAttributes: this.options.keepAttributes,
-                    getAttributes: () => { return this.editor.getAttributes(TextStyle$1.name); },
+                    getAttributes: () => { return this.editor.getAttributes(TextStyle.name); },
                     editor: this.editor,
                 });
             }
@@ -23542,118 +23696,6 @@ img.ProseMirror-separator {
     });
 
     /**
-     * This extension allows you to create list items.
-     * @see https://www.tiptap.dev/api/nodes/list-item
-     */
-    const ListItem$1 = Node.create({
-        name: 'listItem',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-                bulletListTypeName: 'bulletList',
-                orderedListTypeName: 'orderedList',
-            };
-        },
-        content: 'paragraph block*',
-        defining: true,
-        parseHTML() {
-            return [
-                {
-                    tag: 'li',
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addKeyboardShortcuts() {
-            return {
-                Enter: () => this.editor.commands.splitListItem(this.name),
-                Tab: () => this.editor.commands.sinkListItem(this.name),
-                'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
-            };
-        },
-    });
-
-    /**
-     * This extension allows you to create list items.
-     * @see https://www.tiptap.dev/api/nodes/list-item
-     */
-    const ListItem = Node.create({
-        name: 'listItem',
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-                bulletListTypeName: 'bulletList',
-                orderedListTypeName: 'orderedList',
-            };
-        },
-        content: 'paragraph block*',
-        defining: true,
-        parseHTML() {
-            return [
-                {
-                    tag: 'li',
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addKeyboardShortcuts() {
-            return {
-                Enter: () => this.editor.commands.splitListItem(this.name),
-                Tab: () => this.editor.commands.sinkListItem(this.name),
-                'Shift-Tab': () => this.editor.commands.liftListItem(this.name),
-            };
-        },
-    });
-
-    /**
-     * This extension allows you to create text styles. It is required by default
-     * for the `textColor` and `backgroundColor` extensions.
-     * @see https://www.tiptap.dev/api/marks/text-style
-     */
-    const TextStyle = Mark.create({
-        name: 'textStyle',
-        priority: 101,
-        addOptions() {
-            return {
-                HTMLAttributes: {},
-            };
-        },
-        parseHTML() {
-            return [
-                {
-                    tag: 'span',
-                    getAttrs: element => {
-                        const hasStyles = element.hasAttribute('style');
-                        if (!hasStyles) {
-                            return false;
-                        }
-                        return {};
-                    },
-                },
-            ];
-        },
-        renderHTML({ HTMLAttributes }) {
-            return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
-        },
-        addCommands() {
-            return {
-                removeEmptyTextStyle: () => ({ state, commands }) => {
-                    const attributes = getMarkAttributes(state, this.type);
-                    const hasStyles = Object.entries(attributes).some(([, value]) => !!value);
-                    if (hasStyles) {
-                        return true;
-                    }
-                    return commands.unsetMark(this.name);
-                },
-            };
-        },
-    });
-
-    /**
      * Matches an ordered list to a 1. on input (or any number followed by a dot).
      */
     const inputRegex$1 = /^(\d+)\.\s$/;
@@ -23870,7 +23912,6 @@ img.ProseMirror-separator {
         Document,
         History,
         Placeholder,
-        // Basic Formats
         Text,
         Paragraph,
         HardBreak.configure({
@@ -23878,18 +23919,17 @@ img.ProseMirror-separator {
                 class: 'smart',
             },
         }),
-        // Custom Formats
         Link,
-        Blockquote,
     ];
     var articleEditorExtensions = __spreadArray(__spreadArray([], baseEditorExtensions, true), [
+        Blockquote,
         Gapcursor,
         Bold,
         Strike,
         CodeBlock,
         HorizontalRule,
         OrderedList,
-        ListItem$1,
+        ListItem,
         BulletList,
         Heading.configure({
             levels: [2, 3],
@@ -23899,7 +23939,7 @@ img.ProseMirror-separator {
         FigureEmbed,
         FigcaptionKit,
     ], false);
-    var commentEditorExtensions = __spreadArray([], baseEditorExtensions, true);
+    var commentEditorExtensions = __spreadArray(__spreadArray([], baseEditorExtensions, true), [Blockquote], false);
     var momentEditorExtensions = __spreadArray([], baseEditorExtensions, true);
     var campaignEditorExtensions = [
         Document,
@@ -27574,6 +27614,10 @@ img.ProseMirror-separator {
         },
     });
 
+    function getDefaultExportFromCjs$1 (x) {
+    	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
+    }
+
     var shim = {exports: {}};
 
     var useSyncExternalStoreShim_production_min = {};
@@ -27761,6 +27805,80 @@ img.ProseMirror-separator {
     });
     const EditorContent = React.memo(EditorContentWithKey);
 
+    var react = function equal(a, b) {
+      if (a === b) return true;
+
+      if (a && b && typeof a == 'object' && typeof b == 'object') {
+        if (a.constructor !== b.constructor) return false;
+
+        var length, i, keys;
+        if (Array.isArray(a)) {
+          length = a.length;
+          if (length != b.length) return false;
+          for (i = length; i-- !== 0;)
+            if (!equal(a[i], b[i])) return false;
+          return true;
+        }
+
+
+        if ((a instanceof Map) && (b instanceof Map)) {
+          if (a.size !== b.size) return false;
+          for (i of a.entries())
+            if (!b.has(i[0])) return false;
+          for (i of a.entries())
+            if (!equal(i[1], b.get(i[0]))) return false;
+          return true;
+        }
+
+        if ((a instanceof Set) && (b instanceof Set)) {
+          if (a.size !== b.size) return false;
+          for (i of a.entries())
+            if (!b.has(i[0])) return false;
+          return true;
+        }
+
+        if (ArrayBuffer.isView(a) && ArrayBuffer.isView(b)) {
+          length = a.length;
+          if (length != b.length) return false;
+          for (i = length; i-- !== 0;)
+            if (a[i] !== b[i]) return false;
+          return true;
+        }
+
+
+        if (a.constructor === RegExp) return a.source === b.source && a.flags === b.flags;
+        if (a.valueOf !== Object.prototype.valueOf) return a.valueOf() === b.valueOf();
+        if (a.toString !== Object.prototype.toString) return a.toString() === b.toString();
+
+        keys = Object.keys(a);
+        length = keys.length;
+        if (length !== Object.keys(b).length) return false;
+
+        for (i = length; i-- !== 0;)
+          if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
+
+        for (i = length; i-- !== 0;) {
+          var key = keys[i];
+
+          if (key === '_owner' && a.$$typeof) {
+            // React-specific: avoid traversing React elements' _owner.
+            //  _owner contains circular references
+            // and is not needed when comparing the actual elements (and not their owners)
+            continue;
+          }
+
+          if (!equal(a[key], b[key])) return false;
+        }
+
+        return true;
+      }
+
+      // true if both NaN, false otherwise
+      return a!==a && b!==b;
+    };
+
+    var deepEqual = /*@__PURE__*/getDefaultExportFromCjs$1(react);
+
     var withSelector = {exports: {}};
 
     var withSelector_production_min = {};
@@ -27858,13 +27976,25 @@ img.ProseMirror-separator {
             return undefined;
         }
     }
+    /**
+     * This hook allows you to watch for changes on the editor instance.
+     * It will allow you to select a part of the editor state and re-render the component when it changes.
+     * @example
+     * ```tsx
+     * const editor = useEditor({...options})
+     * const { currentSelection } = useEditorState({
+     *  editor,
+     *  selector: snapshot => ({ currentSelection: snapshot.editor.state.selection }),
+     * })
+     */
     function useEditorState(options) {
-        const [editorInstance] = React.useState(() => new EditorStateManager(options.editor));
+        var _a;
+        const [editorStateManager] = React.useState(() => new EditorStateManager(options.editor));
         // Using the `useSyncExternalStore` hook to sync the editor instance with the component state
-        const selectedState = withSelectorExports.useSyncExternalStoreWithSelector(editorInstance.subscribe, editorInstance.getSnapshot, editorInstance.getServerSnapshot, options.selector, options.equalityFn);
+        const selectedState = withSelectorExports.useSyncExternalStoreWithSelector(editorStateManager.subscribe, editorStateManager.getSnapshot, editorStateManager.getServerSnapshot, options.selector, (_a = options.equalityFn) !== null && _a !== void 0 ? _a : deepEqual);
         React.useEffect(() => {
-            return editorInstance.watch(options.editor);
-        }, [options.editor, editorInstance]);
+            return editorStateManager.watch(options.editor);
+        }, [options.editor, editorStateManager]);
         React.useDebugValue(selectedState);
         return selectedState;
     }
@@ -27950,6 +28080,8 @@ img.ProseMirror-separator {
                 onTransaction: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onTransaction) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
                 onUpdate: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onUpdate) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
                 onContentError: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onContentError) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onDrop: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onDrop) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
+                onPaste: (...args) => { var _a, _b; return (_b = (_a = this.options.current).onPaste) === null || _b === void 0 ? void 0 : _b.call(_a, ...args); },
             };
             const editor = new Editor(optionsToApply);
             // no need to keep track of the event listeners, they will be removed when the editor is destroyed
@@ -28102,14 +28234,14 @@ img.ProseMirror-separator {
      * It allows the editor to be accessible across the entire component tree
      * with `useCurrentEditor`.
      */
-    function EditorProvider({ children, slotAfter, slotBefore, ...editorOptions }) {
+    function EditorProvider({ children, slotAfter, slotBefore, editorContainerProps = {}, ...editorOptions }) {
         const editor = useEditor(editorOptions);
         if (!editor) {
             return null;
         }
         return (React.createElement(EditorContext.Provider, { value: { editor } },
             slotBefore,
-            React.createElement(EditorConsumer, null, ({ editor: currentEditor }) => (React.createElement(EditorContent, { editor: currentEditor }))),
+            React.createElement(EditorConsumer, null, ({ editor: currentEditor }) => (React.createElement(EditorContent, { editor: currentEditor, ...editorContainerProps }))),
             children,
             slotAfter));
     }
@@ -28140,7 +28272,7 @@ img.ProseMirror-separator {
                 tippyOptions,
             });
             menuEditor.registerPlugin(plugin);
-            return () => menuEditor.unregisterPlugin(pluginKey);
+            return () => { menuEditor.unregisterPlugin(pluginKey); };
         }, [props.editor, currentEditor, element]);
         return (React.createElement("div", { ref: setElement, className: props.className, style: { visibility: 'hidden' } }, props.children));
     };
@@ -28170,7 +28302,7 @@ img.ProseMirror-separator {
                 shouldShow,
             });
             menuEditor.registerPlugin(plugin);
-            return () => menuEditor.unregisterPlugin(pluginKey);
+            return () => { menuEditor.unregisterPlugin(pluginKey); };
         }, [
             props.editor,
             currentEditor,
@@ -28238,7 +28370,10 @@ img.ProseMirror-separator {
      * })
     */
     class ReactRenderer {
-        constructor(component, { editor, props = {}, as = 'div', className = '', attrs, }) {
+        /**
+         * Immediately creates element and renders the provided React component.
+         */
+        constructor(component, { editor, props = {}, as = 'div', className = '', }) {
             this.ref = null;
             this.id = Math.floor(Math.random() * 0xFFFFFFFF).toString();
             this.component = component;
@@ -28248,11 +28383,6 @@ img.ProseMirror-separator {
             this.element.classList.add('react-renderer');
             if (className) {
                 this.element.classList.add(...className.split(' '));
-            }
-            if (attrs) {
-                Object.keys(attrs).forEach(key => {
-                    this.element.setAttribute(key, attrs[key]);
-                });
             }
             if (this.editor.isInitialized) {
                 // On first render, we need to flush the render synchronously
@@ -28265,12 +28395,16 @@ img.ProseMirror-separator {
                 this.render();
             }
         }
+        /**
+         * Render the React component.
+         */
         render() {
             var _a;
             const Component = this.component;
             const props = this.props;
             const editor = this.editor;
             if (isClassComponent(Component) || isForwardRefComponent(Component)) {
+                // @ts-ignore This is a hack to make the ref work
                 props.ref = (ref) => {
                     this.ref = ref;
                 };
@@ -28278,6 +28412,9 @@ img.ProseMirror-separator {
             this.reactElement = React.createElement(Component, props);
             (_a = editor === null || editor === void 0 ? void 0 : editor.contentComponent) === null || _a === void 0 ? void 0 : _a.setRenderer(this.id, this);
         }
+        /**
+         * Re-renders the React component with new props.
+         */
         updateProps(props = {}) {
             this.props = {
                 ...this.props,
@@ -28285,21 +28422,39 @@ img.ProseMirror-separator {
             };
             this.render();
         }
+        /**
+         * Destroy the React component.
+         */
         destroy() {
             var _a;
             const editor = this.editor;
             (_a = editor === null || editor === void 0 ? void 0 : editor.contentComponent) === null || _a === void 0 ? void 0 : _a.removeRenderer(this.id);
         }
+        /**
+         * Update the attributes of the element that holds the React component.
+         */
+        updateAttributes(attributes) {
+            Object.keys(attributes).forEach(key => {
+                this.element.setAttribute(key, attributes[key]);
+            });
+        }
     }
 
     class ReactNodeView extends NodeView {
+        /**
+         * Setup the React component.
+         * Called on initialization.
+         */
         mount() {
             const props = {
                 editor: this.editor,
                 node: this.node,
                 decorations: this.decorations,
+                innerDecorations: this.innerDecorations,
+                view: this.view,
                 selected: false,
                 extension: this.extension,
+                HTMLAttributes: this.HTMLAttributes,
                 getPos: () => this.getPos(),
                 updateAttributes: (attributes = {}) => this.updateAttributes(attributes),
                 deleteNode: () => this.deleteNode(),
@@ -28334,6 +28489,7 @@ img.ProseMirror-separator {
                 this.contentDOMElement = document.createElement(this.node.isInline ? 'span' : 'div');
             }
             if (this.contentDOMElement) {
+                this.contentDOMElement.dataset.nodeViewContentReact = '';
                 // For some reason the whiteSpace prop is not inherited properly in Chrome and Safari
                 // With this fix it seems to work fine
                 // See: https://github.com/ueberdosis/tiptap/issues/1197
@@ -28351,9 +28507,13 @@ img.ProseMirror-separator {
                 props,
                 as,
                 className: `node-${this.node.type.name} ${className}`.trim(),
-                attrs: this.options.attrs,
             });
+            this.updateElementAttributes();
         }
+        /**
+         * Return the DOM element.
+         * This is the element that will be used to display the node view.
+         */
         get dom() {
             var _a;
             if (this.renderer.element.firstElementChild
@@ -28362,15 +28522,27 @@ img.ProseMirror-separator {
             }
             return this.renderer.element;
         }
+        /**
+         * Return the content DOM element.
+         * This is the element that will be used to display the rich-text content of the node.
+         */
         get contentDOM() {
             if (this.node.isLeaf) {
                 return null;
             }
             return this.contentDOMElement;
         }
+        /**
+         * On editor selection update, check if the node is selected.
+         * If it is, call `selectNode`, otherwise call `deselectNode`.
+         */
         handleSelectionUpdate() {
             const { from, to } = this.editor.state.selection;
-            if (from <= this.getPos() && to >= this.getPos() + this.node.nodeSize) {
+            const pos = this.getPos();
+            if (typeof pos !== 'number') {
+                return;
+            }
+            if (from <= pos && to >= pos + this.node.nodeSize) {
                 if (this.renderer.props.selected) {
                     return;
                 }
@@ -28383,9 +28555,16 @@ img.ProseMirror-separator {
                 this.deselectNode();
             }
         }
-        update(node, decorations) {
-            const updateProps = (props) => {
+        /**
+         * On update, update the React component.
+         * To prevent unnecessary updates, the `update` option can be used.
+         */
+        update(node, decorations, innerDecorations) {
+            const rerenderComponent = (props) => {
                 this.renderer.updateProps(props);
+                if (typeof this.options.attrs === 'function') {
+                    this.updateElementAttributes();
+                }
             };
             if (node.type !== this.node.type) {
                 return false;
@@ -28393,44 +28572,83 @@ img.ProseMirror-separator {
             if (typeof this.options.update === 'function') {
                 const oldNode = this.node;
                 const oldDecorations = this.decorations;
+                const oldInnerDecorations = this.innerDecorations;
                 this.node = node;
                 this.decorations = decorations;
+                this.innerDecorations = innerDecorations;
                 return this.options.update({
                     oldNode,
                     oldDecorations,
                     newNode: node,
                     newDecorations: decorations,
-                    updateProps: () => updateProps({ node, decorations }),
+                    oldInnerDecorations,
+                    innerDecorations,
+                    updateProps: () => rerenderComponent({ node, decorations, innerDecorations }),
                 });
             }
-            if (node === this.node && this.decorations === decorations) {
+            if (node === this.node
+                && this.decorations === decorations
+                && this.innerDecorations === innerDecorations) {
                 return true;
             }
             this.node = node;
             this.decorations = decorations;
-            updateProps({ node, decorations });
+            this.innerDecorations = innerDecorations;
+            rerenderComponent({ node, decorations, innerDecorations });
             return true;
         }
+        /**
+         * Select the node.
+         * Add the `selected` prop and the `ProseMirror-selectednode` class.
+         */
         selectNode() {
             this.renderer.updateProps({
                 selected: true,
             });
             this.renderer.element.classList.add('ProseMirror-selectednode');
         }
+        /**
+         * Deselect the node.
+         * Remove the `selected` prop and the `ProseMirror-selectednode` class.
+         */
         deselectNode() {
             this.renderer.updateProps({
                 selected: false,
             });
             this.renderer.element.classList.remove('ProseMirror-selectednode');
         }
+        /**
+         * Destroy the React component instance.
+         */
         destroy() {
             this.renderer.destroy();
             this.editor.off('selectionUpdate', this.handleSelectionUpdate);
             this.contentDOMElement = null;
         }
+        /**
+         * Update the attributes of the top-level element that holds the React component.
+         * Applying the attributes defined in the `attrs` option.
+         */
+        updateElementAttributes() {
+            if (this.options.attrs) {
+                let attrsObj = {};
+                if (typeof this.options.attrs === 'function') {
+                    const extensionAttributes = this.editor.extensionManager.attributes;
+                    const HTMLAttributes = getRenderedAttributes(this.node, extensionAttributes);
+                    attrsObj = this.options.attrs({ node: this.node, HTMLAttributes });
+                }
+                else {
+                    attrsObj = this.options.attrs;
+                }
+                this.renderer.updateAttributes(attrsObj);
+            }
+        }
     }
+    /**
+     * Create a React node view renderer.
+     */
     function ReactNodeViewRenderer(component, options) {
-        return (props) => {
+        return props => {
             // try to get the parent component
             // this is important for vue devtools to show the component hierarchy correctly
             // maybe it’s `undefined` because <editor-content> isn’t rendered yet
@@ -74497,6 +74715,7 @@ img.ProseMirror-separator {
     exports.PasteRule = PasteRule;
     exports.Placeholder = Placeholder;
     exports.PureEditorContent = PureEditorContent;
+    exports.ReactNodeView = ReactNodeView;
     exports.ReactNodeViewContext = ReactNodeViewContext;
     exports.ReactNodeViewRenderer = ReactNodeViewRenderer;
     exports.ReactRenderer = ReactRenderer;
