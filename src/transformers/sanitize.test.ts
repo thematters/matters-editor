@@ -167,6 +167,19 @@ describe('Sanitization: custom', () => {
         <p>abc</p>
         <p></p>
         <p></p>
+      `,
+      stripIndent`
+        <p>abc</p>
+        <p></p>
+        <p></p>
+      `,
+    )
+
+    expectSanitizeHTML(
+      stripIndent`
+        <p>abc</p>
+        <p></p>
+        <p></p>
         abc
         <p></p>
         <p>abc</p>
