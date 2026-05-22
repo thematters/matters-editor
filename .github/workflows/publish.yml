@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - develop
+      - codex/publish-editor-node24-develop
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -46,6 +47,12 @@ jobs:
       - name: Publish to NPM
         if: github.ref == 'refs/heads/master'
         run: npm publish ./dist
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+
+      - name: Publish develop pre-release to NPM
+        if: github.ref == 'refs/heads/codex/publish-editor-node24-develop'
+        run: npm publish ./dist --tag develop
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 
