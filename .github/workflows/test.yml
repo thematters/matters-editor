@@ -1,6 +1,7 @@
 name: Test
 
 on:
+  pull_request:
   push:
     branches-ignore:
       - develop
@@ -16,7 +17,7 @@ jobs:
         node-version: ['18.19', '24']
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
