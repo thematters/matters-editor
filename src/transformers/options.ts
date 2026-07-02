@@ -78,7 +78,7 @@ export const rehypeRewriteOptions: RehypeRewriteOptions = {
       node.properties !== undefined
     ) {
       node.properties.target = '_blank'
-      node.properties.rel = 'noopener noreferrer nofollow'
+      node.properties.rel = 'noopener noreferrer ugc nofollow'
     }
     if (node.type === 'element' && node.tagName === 'del') {
       node.tagName = 's'

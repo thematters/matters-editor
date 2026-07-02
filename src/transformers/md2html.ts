@@ -29,7 +29,9 @@ const formatter = unified()
   .use(rehypeRewrite, rehypeRewriteOptions)
   .use(rehypeRaw)
   .use(rehypeSanitize, rehypeSanitizeOptions)
-  .use(rehypeExternalLinks, { rel: ['noopener', 'nofollow', 'noreferrer'] })
+  .use(rehypeExternalLinks, {
+    rel: ['noopener', 'noreferrer', 'ugc', 'nofollow'],
+  })
   .use(rehypeFormat)
   .use(rehypeStringify, rehypeStringifyOptions)
 

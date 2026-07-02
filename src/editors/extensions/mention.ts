@@ -14,7 +14,7 @@ import Suggestion, { type SuggestionOptions } from '@tiptap/suggestion'
  *  data-id="ID"
  *  data-display-name="DISPLAYNAME"
  *  data-user-name="USERNAME"
- *  rel="noopener noreferrer nofollow"
+ *  rel="noopener noreferrer ugc nofollow"
  *  >
  *   <span>@USERNAME</span>
  * </a>
@@ -116,7 +116,7 @@ export const Mention = Node.create<MentionOptions>({
         'data-id': node.attrs.id,
         'data-user-name': node.attrs.userName,
         'data-display-name': node.attrs.displayName,
-        rel: 'noopener noreferrer nofollow',
+        rel: 'noopener noreferrer ugc nofollow',
       },
       ['span', `@${node.attrs.displayName ?? node.attrs.userName}`],
     ]
