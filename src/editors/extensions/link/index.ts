@@ -177,7 +177,7 @@ export const Link = Mark.create<LinkOptions>({
       defaultProtocol: 'http',
       HTMLAttributes: {
         target: '_blank',
-        rel: 'noopener noreferrer nofollow',
+        rel: 'noopener noreferrer ugc nofollow',
         class: null,
       },
       validate: (url) => !!url,
