@@ -10,7 +10,8 @@ on:
       - stage
 
 jobs:
-  build:
+  test:
+    name: test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -43,3 +44,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ always() }}
+    steps:
+      - name: Check test matrix result
+        run: test "${{ needs.test.result }}" = "success"
