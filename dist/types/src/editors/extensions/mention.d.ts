@@ -13,7 +13,7 @@ import { type SuggestionOptions } from '@tiptap/suggestion';
  *  data-id="ID"
  *  data-display-name="DISPLAYNAME"
  *  data-user-name="USERNAME"
- *  rel="noopener noreferrer nofollow"
+ *  rel="noopener noreferrer ugc nofollow"
  *  >
  *   <span>@USERNAME</span>
  * </a>

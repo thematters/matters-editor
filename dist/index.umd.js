@@ -21508,7 +21508,7 @@ img.ProseMirror-separator {
                 defaultProtocol: 'http',
                 HTMLAttributes: {
                     target: '_blank',
-                    rel: 'noopener noreferrer nofollow',
+                    rel: 'noopener noreferrer ugc nofollow',
                     class: null,
                 },
                 validate: function (url) { return !!url; },
@@ -21970,7 +21970,7 @@ img.ProseMirror-separator {
                     'data-id': node.attrs.id,
                     'data-user-name': node.attrs.userName,
                     'data-display-name': node.attrs.displayName,
-                    rel: 'noopener noreferrer nofollow',
+                    rel: 'noopener noreferrer ugc nofollow',
                 },
                 ['span', "@".concat((_b = node.attrs.displayName) !== null && _b !== void 0 ? _b : node.attrs.userName)],
             ];
@@ -56552,7 +56552,7 @@ img.ProseMirror-separator {
                 node.tagName === 'a' &&
                 node.properties !== undefined) {
                 node.properties.target = '_blank';
-                node.properties.rel = 'noopener noreferrer nofollow';
+                node.properties.rel = 'noopener noreferrer ugc nofollow';
             }
             if (node.type === 'element' && node.tagName === 'del') {
                 node.tagName = 's';
@@ -72703,7 +72703,9 @@ img.ProseMirror-separator {
         .use(rehypeRewrite, rehypeRewriteOptions)
         .use(rehypeRaw)
         .use(rehypeSanitize, rehypeSanitizeOptions)
-        .use(rehypeExternalLinks, { rel: ['noopener', 'nofollow', 'noreferrer'] })
+        .use(rehypeExternalLinks, {
+        rel: ['noopener', 'noreferrer', 'ugc', 'nofollow'],
+    })
         .use(rehypeFormat)
         .use(rehypeStringify, rehypeStringifyOptions);
     var md2html = function (md) {
